@@ -1,0 +1,22 @@
+#version 330 core
+
+out vec4 FragColor;
+in vec2 TexCoords;
+
+uniform sampler2D hdr_image;
+uniform float threshold;
+
+void main()
+{
+	vec3 col = texture(hdr_image,TexCoords).rgb;
+	float brightness = dot(col, vec3(0.2126, 0.7152, 0.0722));
+	vec3 result;
+	if(brightness>threshold) {
+		result = col;
+	}
+	else {
+		result = vec3(0);
+	}
+	FragColor = vec4(result*0.5,1.0);
+}
+	

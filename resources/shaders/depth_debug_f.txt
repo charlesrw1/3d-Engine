@@ -1,0 +1,18 @@
+#version 330 core
+
+uniform float u_near;
+uniform float u_far;
+
+out vec4 frag_color;
+
+float linearize_depth(float depth)
+{
+	float z = depth * 2.0 - 1;
+	return (2.0*u_near*u_far)/(u_far+u_near - z * (u_far - u_near));
+}
+
+void main()
+{
+	float depth = linearize_depth(gl_FragCoord.z)/u_far;
+	frag_color = vec4(vec3(depth), 1.0);
+}

@@ -1,0 +1,46 @@
+#version 330 core
+
+in vec2 TexCoords;
+out vec4 frag_color;
+
+uniform float gamma;
+uniform float exposure;
+uniform sampler2D screen_tex;
+
+
+float luminance(vec3 v)
+{
+	return dot(v,vec3(0.2126,0.7152,0.0722));
+}
+vec3 change_luminance(vec3 c_in, float l_out)
+{
+	float l_in = luminance(c_in);
+	return c_in * (l_out/l_in);
+}
+
+vec3 reinhard_luminance(vec3 v, float max_white_l)
+{
+	float l_old = luminance(v);
+	float numerator = l_old * (1.0+(l_old/(max_white_l*max_white_l)));
+	float l_new = numerator / (1.0 + l_old);
+	
+	return change_luminance(v,l_new);
+}
+
+void main()
+{
+	vec3 hdr_color = texture(screen_tex, TexCoords).rgb;
+	
+	vec3 mapped = vec3(1.0)-exp(-hdr_color*exposure);
+	
+	//vec3 mapped = reinhard_luminance(hdr_color, 1.0);
+	
+	//vec3 mapped = hdr_color/(hdr_color+vec3(1.0));
+	
+	mapped = pow(mapped, vec3(1.0/gamma));
+
+	//frag_color = texture(screen_tex,TexCoords);
+	
+	
+	frag_color = vec4(mapped,1.0);
+}
