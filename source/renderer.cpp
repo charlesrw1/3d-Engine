@@ -5,6 +5,9 @@
 #include "camera.h"
 #include "glad/glad.h"
 
+#include "Texture_def.h"
+#include "TextureManager.h"
+
 #include <iostream>
 
 const int SHADOW_WIDTH = 2048;
@@ -26,8 +29,9 @@ Renderer::Renderer(App& app): app(app)
 
 	point_lights = Shader("point_light_v.txt", "point_light_f.txt");
 
-	cube = load_qobj_mesh("cube.qobj");
-	sky_gradient = load_texture_file("sky_gradient2.png");
+	//cube = load_qobj_mesh("cube.qobj");
+	sky_gradient = global_textures.find_or_load("sky_gradient2.png");
+
 	sky_shader = Shader("gradient.vert", "gradient.frag");
 
 	gamma_tm = Shader("no_transform_v.txt", "gamma_f.txt");
@@ -56,9 +60,9 @@ Renderer::Renderer(App& app): app(app)
 
 
 	quad.add_quad(vec2(-1, 1), vec2(2, 2));
-	temp = load_texture_file("engineer_red.png",false);
+	temp = global_textures.find_or_load("engineer_red.png");
 
-	white_tex = load_texture_file("white.png", false);
+	white_tex = global_textures.find_or_load("white.png");
 
 	intermediate.create(FramebufferSpec(app.width, app.height, 1, FBAttachments::a_float16, true));
 
@@ -104,7 +108,7 @@ void Renderer::render_scene(SceneData& scene)
 
 	mat4 light_space_matrix = render_shadow_map(scene);
 
-	halt_and_render_to_screen(temp.ID);
+	halt_and_render_to_screen(temp->get_ID());
 	//return;
 
 	glViewport(0, 0, app.width, app.height);
@@ -126,6 +130,7 @@ void Renderer::render_scene(SceneData& scene)
 	untextured_unshaded.set_mat4("projection", projection_matrix).set_mat4("view", view_matrix);
 
 	// Unshaded untextured
+	/*
 	for (auto obj : scene.objects) {
 		if (!obj->has_shading && !obj->model->meshes.at(0).mat.diffuse) {
 
@@ -143,6 +148,7 @@ void Renderer::render_scene(SceneData& scene)
 			obj->model->meshes.at(0).mesh.draw_indexed_primitive();
 		}
 	}
+	*/
 
 	// Temporary fresnel pass
 	//fresnel.use();
@@ -234,9 +240,9 @@ void Renderer::draw_gradient_skybox(SceneData& scene)
 	sky_shader.set_vec3("sun_direction", scene.sun.direction);
 	sky_shader.set_mat4("projection", app.projection_matrix);
 	sky_shader.set_mat4("view", mat3(scene.active_camera()->view_matrix));	// Removes translation from matrix
-	sky_gradient.bind(0);
-	cube.bind();
-	cube.draw_indexed_primitive();
+	//sky_gradient.bind(0);
+	//cube.bind();
+	//cube.draw_indexed_primitive();
 	glDepthMask(GL_TRUE);
 	glEnable(GL_CULL_FACE);
 }
@@ -253,7 +259,7 @@ void Renderer::upload_point_lights(SceneData& scene)
 
 void Renderer::scene_pass(SceneData& scene, Shader& shader)
 {
-	for (auto obj : scene.objects) {
+	for (const auto obj : scene.objects) {
 		// this should be changed, the list should only be textured items
 		if (obj->has_shading) {
 
@@ -270,24 +276,30 @@ void Renderer::scene_pass(SceneData& scene, Shader& shader)
 
 			// Check if previous draw call used same texture or buffer!
 			//Model::SubMesh& sm = obj->model->meshes.at(0);
-			for (auto& sm : obj->model->meshes) {
+			for (int i = 0; i < obj->model->num_meshes();i++) {
 
-				if (sm.mat.diffuse) {
-					sm.mat.diffuse->bind(0);
+				const RenderMesh* rm = obj->model->mesh(i);
+
+				if (rm->diffuse) {
+					rm->diffuse->bind(0);
 				}
 				else {
-					white_tex.bind(0);
+					white_tex->bind(0);
 				}
 
-				if (sm.mat.specular) {
-					sm.mat.specular->bind(1);
+				if (rm->specular) {
+					rm->specular->bind(1);
 				}
-				else set_sampler2d(1, 0);
+				else {
+					white_tex->bind(1);
+				}
 
 				shader.set_mat4("u_model", obj->model_matrix).set_mat4("normal_mat", obj->inverse_matrix);
 
-				sm.mesh.bind();
-				sm.mesh.draw_indexed_primitive();
+			//	sm.mesh.bind();
+				glBindVertexArray(rm->vao);
+				glDrawElements(GL_TRIANGLES, rm->num_indices, GL_UNSIGNED_INT, NULL);
+				//sm.mesh.draw_indexed_primitive();
 
 			}
 		}

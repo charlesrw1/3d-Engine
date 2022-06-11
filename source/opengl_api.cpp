@@ -6,7 +6,7 @@
 #include <cassert>
 #include <iostream>
 
-
+/*
 Mesh::Mesh(const Vertex* verticies, const uint32_t* elements, int vert_count, int element_count, bool dynamic)
 {
 	assert(verticies && elements);
@@ -84,7 +84,7 @@ void Texture::destroy()
 	ID = 0;
 	type = none;
 }
-
+*/
 void Framebuffer::create(FramebufferSpec n_spec)
 {
 	spec = n_spec;

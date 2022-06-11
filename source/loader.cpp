@@ -1,8 +1,8 @@
 #include "loader.h"
 #include <SDL2/SDL_image.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image/stb_image.h"
+//#define STB_IMAGE_IMPLEMENTATION
+//#include "stb_image/stb_image.h"
 
 #include <fstream>
 #include <cassert>
@@ -14,7 +14,7 @@
 
 const std::string texture_path = "resources/textures/";
 const std::string model_path = "resources/models/";
-
+/*
 Texture load_texture_file(const char* file, bool flip_y)
 {
 	std::string true_path = texture_path + file;
@@ -362,4 +362,4 @@ void load_model_qobj(Model* m, std::string name)
 
 		m->meshes.push_back(sm);
 	}
-}
+}*/

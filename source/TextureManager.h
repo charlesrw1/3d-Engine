@@ -2,6 +2,9 @@
 #define TEXTUREMANAGER_H
 #include <unordered_map>
 #include <string>
+#include <vector>
+#include <future>
+#include <queue>
 
 class Texture;
 class TextureManager
@@ -24,11 +27,22 @@ public:
 
 	void reload_all();
 
+	// Checks queue for new textures to upload from loading threads
+	void update();
+	
+	// called by Texture class only
+	void queue_for_upload(Texture* t) {
+		ready_for_upload.push(t);
+	}
 private:
 	std::unordered_map<std::string, Texture*> textures;
+
+	// Async loading
+	std::vector<std::future<void>> futures;
+	std::queue<Texture*> ready_for_upload;
 };
 
-//extern TextureManager global_textures;
+extern TextureManager global_textures;
 
 
 #endif // !TEXTUREMANAGER_H

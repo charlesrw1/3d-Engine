@@ -36,13 +36,13 @@ struct qobj_mesh
 	// element data of element_count * sizeof(int);
 };
 
-Texture load_texture_file(const char* file_name,bool flip_y=true);
-Mesh load_qobj_mesh(const char* file);
+//Texture load_texture_file(const char* file_name,bool flip_y=true);
+//Mesh load_qobj_mesh(const char* file);
 
-void load_model_assimp(Model* m, const char* file, bool pretransform_verts);
+//void load_model_assimp(Model* m, const char* file, bool pretransform_verts);
 
-void make_qobj_from_assimp(std::string model_name,std::string output_name, bool pretransform_verts);
+//void make_qobj_from_assimp(std::string model_name,std::string output_name, bool pretransform_verts);
 
-void load_model_qobj(Model* m, std::string file_name);
+//void load_model_qobj(Model* m, std::string file_name);
 
 #endif // !LOADER_H

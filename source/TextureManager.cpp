@@ -2,7 +2,8 @@
 #include "Texture_def.h"
 #include <cassert>
 
-//TextureManager global_textures;
+
+TextureManager global_textures;
 
 void TextureManager::init() {
 
@@ -20,13 +21,21 @@ Texture* TextureManager::find_or_load(const char* filename, int params) {
 	// Model not found, load it
 	Texture* t = new Texture;
 
-	t->init_from_file(filename, params);
-	// Error on loading image
+
+	if (params & TParams::LOAD_NOW) {
+		t->init_from_file(filename, params);
+		t->print();
+	}
+	else {
+		std::string s(filename);
+		futures.push_back(std::async(std::launch::async, &Texture::init_from_file, t, s ,params));
+	}
+
+	/*// Error on loading image
 	if (!t->is_loaded()) {
 		delete t;
 		return nullptr;
-	}
-
+	}*/
 	textures.insert({ std::string(filename), t });
 
 	return t;
@@ -61,4 +70,11 @@ Texture* TextureManager::create_scratch(const char* internal_name, int width, in
 	textures.insert({ internal_name,t });
 
 	return t;
+}
+void TextureManager::update() {
+	while (!ready_for_upload.empty()) {
+		auto tex = ready_for_upload.front();
+		tex->upload_raw_data();
+		ready_for_upload.pop();
+	}
 }

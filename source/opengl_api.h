@@ -15,6 +15,7 @@ struct Vertex
 	vec3 normal = vec3(0);
 	vec2 uv = vec2(0);
 };
+/*
 struct Texture
 {
 	uint32_t ID=0;
@@ -39,7 +40,8 @@ struct Texture
 		return vec2(pixel_coords.x / width, pixel_coords.y / height);
 	}
 };
-
+*/
+/*
 // Wrapper around a GPU hardware buffer
 struct Mesh
 {
@@ -49,8 +51,7 @@ struct Mesh
 
 	uint32_t total_verticies;	// vbo count
 	uint32_t total_elements;	// ebo count
-	
-	/* AABB */
+
 
 	bool dynamic;
 
@@ -65,6 +66,7 @@ struct Mesh
 	void draw_indexed_primitive();
 };
 
+	*/
 enum class Uniforms
 {
 	u_viewpos,
@@ -98,6 +100,7 @@ private:
 	std::string read_file(const char* filepath);
 	unsigned int load_shader(const char* vertex_path, const char* fragment_path, const char* geo_path = NULL);
 };
+/*
 struct Material
 {
 	Texture* diffuse =nullptr;
@@ -111,7 +114,7 @@ struct Material
 	// flexible programs, but later
 	Shader* program =nullptr;
 };
-
+*/
 // Vertex primitive, for drawing things like lines, triangles, quads, etc.
 struct VertexP
 {
@@ -180,7 +183,7 @@ private:
 	Primitive type = triangle;
 	uint32_t allocated_size = 0;
 };
-
+/*
 struct Model
 {
 	struct SubMesh {
@@ -193,7 +196,7 @@ struct Model
 	AABB aabb;
 	const char* model_name;
 };
-
+*/
 enum class FBAttachments
 {
 	a_none,

@@ -22,7 +22,7 @@ private:
 	std::unordered_map<std::string, Model*> models;
 };
 
-//extern ModelManager global_models;
+extern ModelManager global_models;
 
 #endif // !MODELMANAGER_H
 

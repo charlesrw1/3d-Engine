@@ -19,8 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ModelManager.cpp" />
-    <ClCompile Include="Model_def.cpp" />
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="source\camera.cpp" />
     <ClCompile Include="source\deps\glad.c" />
@@ -34,15 +32,14 @@
     <ClCompile Include="source\editor.cpp" />
     <ClCompile Include="source\loader.cpp" />
     <ClCompile Include="source\main.cpp" />
+    <ClCompile Include="source\ModelManager.cpp" />
+    <ClCompile Include="source\Model_def.cpp" />
     <ClCompile Include="source\opengl_api.cpp" />
     <ClCompile Include="source\renderer.cpp" />
-    <ClCompile Include="TextureManager.cpp" />
-    <ClCompile Include="Texture_def.cpp" />
+    <ClCompile Include="source\TextureManager.cpp" />
+    <ClCompile Include="source\Texture_def.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Files.h" />
-    <ClInclude Include="Model_def.h" />
-    <ClInclude Include="ModelManager.h" />
     <ClInclude Include="source\app.h" />
     <ClInclude Include="source\camera.h" />
     <ClInclude Include="source\deps\include\glad\glad.h" />
@@ -58,14 +55,17 @@
     <ClInclude Include="source\deps\include\KHR\khrplatform.h" />
     <ClInclude Include="source\deps\include\stb_image\stb_image.h" />
     <ClInclude Include="source\editor.h" />
+    <ClInclude Include="source\Files.h" />
     <ClInclude Include="source\geometry.h" />
     <ClInclude Include="source\loader.h" />
+    <ClInclude Include="source\ModelManager.h" />
+    <ClInclude Include="source\Model_def.h" />
     <ClInclude Include="source\opengl_api.h" />
     <ClInclude Include="source\perlinnoise.h" />
     <ClInclude Include="source\renderer.h" />
+    <ClInclude Include="source\TextureManager.h" />
+    <ClInclude Include="source\Texture_def.h" />
     <ClInclude Include="source\types.h" />
-    <ClInclude Include="TextureManager.h" />
-    <ClInclude Include="Texture_def.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -156,7 +156,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -195,7 +195,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EntryPointSymbol>
       </EntryPointSymbol>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\lib\manual-link\SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

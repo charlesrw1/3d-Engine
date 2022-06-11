@@ -3,7 +3,7 @@
 
 #include <cassert>
 
-//ModelManager global_models;
+ModelManager global_models;
 
 void ModelManager::init() {
 
@@ -21,9 +21,12 @@ Model* ModelManager::find_or_load(const char* model_name) {
 	// Model not found, load it
 	Model* model = new Model;
 	
+	model->init_from_file(model_name);
 	// Load here
 	
 	models.insert({ std::string(model_name), model });
+
+	return model;
 }
 void ModelManager::add_model(Model* model) {
 	assert(model);

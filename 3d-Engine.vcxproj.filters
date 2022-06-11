@@ -54,15 +54,6 @@
     <ClCompile Include="source\deps\imgui_widgets.cpp">
       <Filter>Source Files\Dependencies</Filter>
     </ClCompile>
-    <ClCompile Include="ModelManager.cpp">
-      <Filter>Source Files\Renderer</Filter>
-    </ClCompile>
-    <ClCompile Include="Texture_def.cpp">
-      <Filter>Source Files\Renderer</Filter>
-    </ClCompile>
-    <ClCompile Include="TextureManager.cpp">
-      <Filter>Source Files\Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="source\renderer.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
@@ -75,7 +66,16 @@
     <ClCompile Include="source\opengl_api.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="Model_def.cpp">
+    <ClCompile Include="source\Model_def.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\ModelManager.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Texture_def.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\TextureManager.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
   </ItemGroup>
@@ -131,18 +131,6 @@
     <ClInclude Include="source\deps\include\stb_image\stb_image.h">
       <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
-    <ClInclude Include="Files.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ModelManager.h">
-      <Filter>Source Files\Renderer</Filter>
-    </ClInclude>
-    <ClInclude Include="Texture_def.h">
-      <Filter>Source Files\Renderer</Filter>
-    </ClInclude>
-    <ClInclude Include="TextureManager.h">
-      <Filter>Source Files\Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="source\renderer.h">
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
@@ -155,8 +143,20 @@
     <ClInclude Include="source\opengl_api.h">
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="Model_def.h">
+    <ClInclude Include="source\Model_def.h">
       <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="source\ModelManager.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Texture_def.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="source\TextureManager.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Files.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

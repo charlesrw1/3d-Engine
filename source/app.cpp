@@ -13,6 +13,10 @@
 
 #include "editor.h"
 
+#include "ModelManager.h"
+
+#include "TextureManager.h"
+
 
 App::App()
 {
@@ -29,30 +33,31 @@ void sdldie(const char* msg)
 	SDL_Quit();
 	exit(1);
 }
-
+/*
 GameObject* temp_create(const char* qobj, const char* texture)
 {
 	Mesh mes = load_qobj_mesh(qobj);
 	Material mat;
 	mat.diffuse = new Texture(load_texture_file(texture));
 	return new GameObject(mes, mat);
-}
+}*/
 vec3 make_color(uint8_t r, uint8_t b, uint8_t g) {
 	return vec3(r / 255.f, b / 255.f, g / 255.f);
 }
 
 void App::create_scene()
 {
-
+	u32 start = SDL_GetTicks();
 
 	
 	// yes memory leaks galore
 	//scene->objects.push_back(temp_create("plane.qobj", "grid0.png"));
 	//scene->objects.back()->scale = 20;
-	scene->objects.push_back(temp_create("rep_inf_ep3trooper.qobj", "rep_inf_ep3trooper.png"));
+/*	scene->objects.push_back(temp_create("rep_inf_ep3trooper.qobj", "rep_inf_ep3trooper.png"));
 	// Engineer
 	GameObject* tmp = temp_create("engineer.qobj", "engineer_red.png");
 	tmp->model->meshes.at(0).mat.specular = new Texture(load_texture_file("engineer_exponent.png"));
+
 	for (int i = 0; i < 1; i++)
 	{
 		GameObject* eng = new GameObject(*tmp);
@@ -60,7 +65,10 @@ void App::create_scene()
 	//	eng->euler_y = 3.141 / 4;
 		scene->objects.push_back(eng);
 	}
+	*/
 
+	GameObject* temp;
+	/*
 	Model* plane = new Model;
 	Texture* grid = new Texture;
 	*grid = load_texture_file("grid0.png");
@@ -90,7 +98,7 @@ void App::create_scene()
 	tmp->position = vec3(2, 6, -6);
 	tmp->has_shading = false;
 	scene->objects.push_back(tmp);
-	
+	*/
 
 
 	scene->sun.diffuse = vec3(1);//1.f*vec3(make_color(248, 197, 139));
@@ -107,26 +115,26 @@ void App::create_scene()
 	scene->sun.direction = normalize(-vec3(cos(azimuth) * sin(altidude), cos(altidude),sin(azimuth) * sin(altidude)));
 
 
-//	Model* soldier = new Model;
-//	load_model_assimp(soldier, "soldier/soldier.dae", false);
-//	scene->objects.push_back(new GameObject(soldier));
-//	scene->objects.back()->scale = vec3(0.03);
-//	scene->objects.back()->position = vec3(1, 0, 0);
+	Model* soldier = global_models.find_or_load("soldier/soldier.dae");
+	//load_model_assimp(soldier, "soldier/soldier.dae", false);
+	scene->objects.push_back(new GameObject(soldier));
+	scene->objects.back()->scale = vec3(0.03);
+	scene->objects.back()->position = vec3(1, 0, 0);
 
 //	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
-	//Model* sponza = new Model;
-//	load_model_assimp(sponza, "sponza/sponza.obj", true);
+	Model* sponza = global_models.find_or_load("sponza/sponza.obj");
+	//load_model_assimp(sponza, "sponza/sponza.obj", true);
 	//load_model_qobj(sponza, "sponza.qobj");
 	//
-	//scene->objects.push_back(new GameObject(sponza));
-	//scene->objects.back()->scale = vec3(0.01);
+	scene->objects.push_back(new GameObject(sponza));
+	scene->objects.back()->scale = vec3(0.01);
 	
-	//Model* revant = new Model;
+	Model* revant = global_models.find_or_load("Revenant/revenant.dae");
 	//load_model_assimp(revant, "Revenant/revenant.dae",false);
-	//scene->objects.push_back(new GameObject(revant));
-	//scene->objects.back()->scale = 0.015;
-	//scene->objects.back()->position = vec3(2, 0, 1);
-	//scene->objects.back()->euler_x = - 3.14 / 2;
+	scene->objects.push_back(new GameObject(revant));
+	scene->objects.back()->scale = vec3(0.015);
+	scene->objects.back()->position = vec3(2, 0, 1);
+	scene->objects.back()->euler_x = - 3.14 / 2;
 
 	scene->num_lights = 5;
 	scene->lights[0].color = 2.f*vec3(1, 0, 0);
@@ -143,6 +151,10 @@ void App::create_scene()
 
 	scene->lights[4].color = 50.f*vec3(0, 0.4, 2);
 	scene->lights[4].position = vec3(-1, 3, -1);
+
+	u32 end = SDL_GetTicks();
+
+	printf("\n\n\n     TIME: %u\n\n\n", end - start);
 
 }
 
@@ -240,6 +252,8 @@ void App::quit()
 }
 void App::update_loop()
 {
+	global_textures.update();
+
 	float sec_elap = SDL_GetTicks() / 1000.f;
 
 	editor->on_update();

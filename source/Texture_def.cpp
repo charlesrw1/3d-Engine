@@ -1,8 +1,14 @@
 #include "Texture_def.h"
 #include "glad/glad.h"
 
-//#include "stb_image/stb_image.h"
+#include <iostream>
+#include <mutex>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image/stb_image.h"
 static const std::string resouce_path = "resources/textures/";
+
+#include "TextureManager.h"
 
 Texture::~Texture()
 {
@@ -27,7 +33,7 @@ u32 Texture::memory_usage() const
 }
 void Texture::print() const
 {
-	printf("%s, %i x %i, %u KB\n", name.c_str(), width, height, memory_usage());
+	printf("%s, %i x %i, %u KB\n", name.c_str(), width, height, memory_usage()/1000);
 }
 void Texture::init_empty(const char* internal_name, int width, int height, int params)
 {	
@@ -44,32 +50,39 @@ void Texture::init_empty(const char* internal_name, int width, int height, int p
 	
 	internal_init(NULL);
 }
-void Texture::init_from_file(const char* filename, int params)
+
+static std::mutex tmanager_queue;
+
+void Texture::init_from_file(std::string filename, int params)
 {
 	std::string true_path = resouce_path + filename;
 	int x{}, y{}, n{};
-//	stbi_set_flip_vertically_on_load(params&TParams::FILP_Y);
-	//uint8_t* data = stbi_load(true_path.c_str(), &x, &y, &n, STBI_rgb_alpha);
-//	if (data == NULL) {
-	//	printf("\x1B[31mCouldn't load texture: %s\x1B[37m\n", true_path.c_str());
-	///	stbi_image_free(data);
-		//return;
-	//}
-	printf("%s loaded. W: %d, H: %d\n", filename, x, y);
-
-	if (n == 4) {
-		params |= TParams::HAS_ALPHA;
+	stbi_set_flip_vertically_on_load(params&TParams::FILP_Y);
+	uint8_t* data = stbi_load(true_path.c_str(), &x, &y, &n, STBI_rgb_alpha);
+	if (data == NULL) {
+		printf("\x1B[31mCouldn't load texture: %s\x1B[37m\n", true_path.c_str());
+		stbi_image_free(data);
+		return;
 	}
+
+	params |= TParams::HAS_ALPHA;
 
 	width = x;
 	height = y;
 	this->params = params;
 	name = filename;
+	raw_data = data;
 
-	//internal_init(data);
-
-	//stbi_image_free(data);
+	if (params & TParams::LOAD_NOW) {
+		internal_init(data);
+		stbi_image_free(data);
+	}
+	else {
+		std::lock_guard<std::mutex> lock(tmanager_queue);
+		global_textures.queue_for_upload(this);
+	}
 }
+
 void Texture::internal_init(u8* data) 
 {
 	if (loaded) purge();
@@ -97,4 +110,12 @@ void Texture::internal_init(u8* data)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+void Texture::upload_raw_data()
+{
+	internal_init(raw_data);
+	stbi_image_free(raw_data);
+
+	print();
 }

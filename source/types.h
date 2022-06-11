@@ -8,6 +8,8 @@
 #include "geometry.h"
 #include <vector>
 
+#include "Model_def.h"
+
 using namespace glm;
 
 
@@ -17,16 +19,9 @@ class GameObject
 public:
 	GameObject() {}
 
-	GameObject(Mesh m, Material mat = Material()) {
-		model = new Model();
-		Model::SubMesh sm;
-		sm.mesh = m;
-		sm.mat = mat;
-		model->meshes.push_back(sm);
-	}
 	GameObject(Model* model) : model(model) {}
 
-	uint32_t ID;
+	uint32_t ID{};
 
 	// TRANSFORM
 	vec3 position = vec3(0, 0, 0);

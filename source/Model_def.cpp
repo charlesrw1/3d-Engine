@@ -10,7 +10,7 @@
 
 #include "glad/glad.h"
 
-const std::string model_path = "resources/models";
+const std::string model_path = "resources/models/";
 
 
 
@@ -54,6 +54,21 @@ void load_model_assimp(Model* model, const char* file, bool pretransform_verts)
 		printf("\x1B[31mCouldn't load model: %s\x1B[37m: %s\n", file, imp.GetErrorString());
 		return;
 	}
+	// Get textures loading on different threads
+	for (int i = 0; i < scene->mNumMaterials; i++) {
+		aiMaterial* m = scene->mMaterials[i];
+		if (m->GetTextureCount(aiTextureType_DIFFUSE) != 0) {
+			aiString str;
+			m->GetTexture(aiTextureType_DIFFUSE, 0, &str);
+			global_textures.find_or_load(str.C_Str(), GEN_MIPS);
+		}
+		if (m->GetTextureCount(aiTextureType_SPECULAR) != 0) {
+			aiString str;
+			m->GetTexture(aiTextureType_SPECULAR, 0, &str);
+			global_textures.find_or_load(str.C_Str(), GEN_MIPS);
+		}
+	}
+
 	process_assimp_node(scene->mRootNode, model, scene);
 
 	imp.FreeScene();
@@ -84,13 +99,11 @@ inline bool process_texture(aiMaterial* mat, aiTextureType type, Texture** textu
 	// TEMPORARY
 	//assert(texture != nullptr);
 	if (mat->GetTextureCount(type) == 0) return false;
-	if (type == aiTextureType_SPECULAR) {
-		printf("df");
-	}
 
 	aiString str;
 	mat->GetTexture(type, 0, &str);
-	//*texture = global_textures.find_or_load(str.C_Str(), GEN_MIPS);
+	
+	*texture = global_textures.find_or_load(str.C_Str(), GEN_MIPS);
 	return true;
 }
 RenderMesh process_mesh(aiMesh* mesh, const aiScene* scene)

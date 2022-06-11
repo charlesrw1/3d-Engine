@@ -3,6 +3,7 @@
 
 #include "opengl_api.h"
 
+class Texture;
 class App;
 struct SceneData;
 class Renderer
@@ -38,14 +39,14 @@ public:
 	Shader fresnel;
 
 	// Skybox temp stuff
-	Mesh cube;
-	Texture sky_gradient;
+	//Mesh cube;
+	Texture* sky_gradient;
 	Shader sky_shader;
 	void draw_gradient_skybox(SceneData& scene);
 	//---------
-	Texture white_tex;
+	Texture* white_tex;
 
-	Texture temp;
+	Texture* temp;
 	VertexArray quad;
 
 	Framebuffer HDRbuffer;

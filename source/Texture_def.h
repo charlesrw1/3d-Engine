@@ -12,6 +12,9 @@ enum TParams
 	HAS_ALPHA	=4,
 	NEAREST		=8,
 	CLAMP		=16,
+
+
+	LOAD_NOW	=128
 };
 
 
@@ -21,7 +24,7 @@ public:
 	~Texture();
 
 	void init_empty(const char* internal_name, int width, int height, int params = 0);
-	void init_from_file(const char* filename, int params = 0);
+	void init_from_file(std::string file_name, int params = 0);
 
 	void bind(int binding) const;
 
@@ -34,6 +37,8 @@ public:
 	u32 get_ID() const { return ID; }
 	bool is_loaded() const { return loaded; }
 	const std::string& get_name() const { return name; }
+
+	void upload_raw_data();
 
 private:
 	// OpenGL calls, thread unsafe
