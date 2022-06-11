@@ -45,6 +45,10 @@ public:
 		global_app = a;
 	}
 
+	void Printf();
+	void Warning();
+	void Error();
+
 	Renderer* r;
 	SceneData* scene;
 	Editor* editor;
@@ -52,4 +56,6 @@ public:
 private:
 	static App* global_app;
 };
+
+//extern App global_app;
 #endif // !EDITOR_H

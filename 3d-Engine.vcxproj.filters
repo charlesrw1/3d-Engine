@@ -13,59 +13,74 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Source Files\Dependencies">
+      <UniqueIdentifier>{476aed2f-e9fa-4f8e-b8eb-96818d737f82}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Renderer">
+      <UniqueIdentifier>{b78358f5-49f3-4b9d-aeb9-e0b6ad7c84ef}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\app.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\camera.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="source\editor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\opengl_api.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="source\renderer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="source\deps\glad.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="source\deps\imgui.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="source\deps\imgui_demo.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="source\deps\imgui_draw.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="source\deps\imgui_impl_opengl3.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="source\deps\imgui_impl_sdl.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="source\deps\imgui_tables.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClCompile>
     <ClCompile Include="source\deps\imgui_widgets.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelManager.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Texture_def.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureManager.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\renderer.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\loader.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\camera.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\opengl_api.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Model_def.cpp">
+      <Filter>Source Files\Renderer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\app.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\camera.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="source\editor.h">
@@ -74,56 +89,74 @@
     <ClInclude Include="source\geometry.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\loader.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\opengl_api.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="source\perlinnoise.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\renderer.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="source\types.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="source\deps\include\glad\glad.h">
+      <Filter>Source Files\Dependencies</Filter>
+    </ClInclude>
     <ClInclude Include="source\deps\include\imconfig.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\imgui.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\imgui_impl_opengl3.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\imgui_impl_opengl3_loader.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\imgui_impl_sdl.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\imgui_internal.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\imstb_rectpack.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\imstb_textedit.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\imstb_truetype.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\deps\include\stb_image\stb_image.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Dependencies</Filter>
     </ClInclude>
     <ClInclude Include="source\deps\include\KHR\khrplatform.h">
+      <Filter>Source Files\Dependencies</Filter>
+    </ClInclude>
+    <ClInclude Include="source\deps\include\stb_image\stb_image.h">
+      <Filter>Source Files\Dependencies</Filter>
+    </ClInclude>
+    <ClInclude Include="Files.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\deps\include\glad\glad.h">
-      <Filter>Source Files</Filter>
+    <ClInclude Include="ModelManager.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Texture_def.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureManager.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="source\renderer.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="source\loader.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="source\camera.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="source\opengl_api.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Model_def.h">
+      <Filter>Source Files\Renderer</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

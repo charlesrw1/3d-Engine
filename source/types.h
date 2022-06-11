@@ -8,10 +8,15 @@
 #include "geometry.h"
 #include <vector>
 
+using namespace glm;
+
+
+
 class GameObject
 {
 public:
 	GameObject() {}
+
 	GameObject(Mesh m, Material mat = Material()) {
 		model = new Model();
 		Model::SubMesh sm;

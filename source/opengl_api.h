@@ -89,11 +89,11 @@ struct Shader
 	Shader(){}
 
 	void use();
-	Shader& set_bool(const std::string& name, bool value);
-	Shader& set_int(const std::string& name, int value);
-	Shader& set_float(const std::string& name, float value);
-	Shader& set_mat4(const std::string& name, mat4 value);
-	Shader& set_vec3(const std::string& name, vec3 value);
+	Shader& set_bool(const char* name, bool value);
+	Shader& set_int(const char* name, int value);
+	Shader& set_float(const char* name, float value);
+	Shader& set_mat4(const char* name, mat4 value);
+	Shader& set_vec3(const char* name, vec3 value);
 private:
 	std::string read_file(const char* filepath);
 	unsigned int load_shader(const char* vertex_path, const char* fragment_path, const char* geo_path = NULL);
@@ -175,8 +175,8 @@ struct VertexArray
 
 private:
 	std::vector<VertexP> verts;
-	uint32_t VBO;
-	uint32_t VAO;
+	uint32_t VBO=0;
+	uint32_t VAO=0;
 	Primitive type = triangle;
 	uint32_t allocated_size = 0;
 };

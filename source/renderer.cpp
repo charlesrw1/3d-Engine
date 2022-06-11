@@ -104,7 +104,8 @@ void Renderer::render_scene(SceneData& scene)
 
 	mat4 light_space_matrix = render_shadow_map(scene);
 
-	halt_and_render_to_screen(depth_map.depth_id);
+	halt_and_render_to_screen(temp.ID);
+	//return;
 
 	glViewport(0, 0, app.width, app.height);
 	debug_depth.use();
@@ -244,9 +245,9 @@ void Renderer::upload_point_lights(SceneData& scene)
 {
 	point_lights.use();
 	for (int i = 0; i < scene.num_lights; i++) {
-		point_lights.set_vec3("lights[" + std::to_string(i) + "].position", scene.lights[i].position);
-		point_lights.set_vec3("lights[" + std::to_string(i) + "].color", scene.lights[i].color);
-		point_lights.set_float("lights[" + std::to_string(i) + "].radius", scene.lights[i].radius);
+		point_lights.set_vec3(("lights[" + std::to_string(i) + "].position").c_str(), scene.lights[i].position);
+		point_lights.set_vec3(("lights[" + std::to_string(i) + "].color").c_str(), scene.lights[i].color);
+		point_lights.set_float(("lights[" + std::to_string(i) + "].radius").c_str(), scene.lights[i].radius);
 	}
 }
 

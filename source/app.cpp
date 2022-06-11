@@ -43,6 +43,9 @@ vec3 make_color(uint8_t r, uint8_t b, uint8_t g) {
 
 void App::create_scene()
 {
+
+
+	
 	// yes memory leaks galore
 	//scene->objects.push_back(temp_create("plane.qobj", "grid0.png"));
 	//scene->objects.back()->scale = 20;
@@ -87,6 +90,7 @@ void App::create_scene()
 	tmp->position = vec3(2, 6, -6);
 	tmp->has_shading = false;
 	scene->objects.push_back(tmp);
+	
 
 
 	scene->sun.diffuse = vec3(1);//1.f*vec3(make_color(248, 197, 139));
@@ -103,11 +107,11 @@ void App::create_scene()
 	scene->sun.direction = normalize(-vec3(cos(azimuth) * sin(altidude), cos(altidude),sin(azimuth) * sin(altidude)));
 
 
-	Model* soldier = new Model;
-	load_model_assimp(soldier, "soldier/soldier.dae", false);
-	scene->objects.push_back(new GameObject(soldier));
-	scene->objects.back()->scale = vec3(0.03);
-	scene->objects.back()->position = vec3(1, 0, 0);
+//	Model* soldier = new Model;
+//	load_model_assimp(soldier, "soldier/soldier.dae", false);
+//	scene->objects.push_back(new GameObject(soldier));
+//	scene->objects.back()->scale = vec3(0.03);
+//	scene->objects.back()->position = vec3(1, 0, 0);
 
 //	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
 	//Model* sponza = new Model;

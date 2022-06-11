@@ -63,7 +63,7 @@ void Texture::init_standard(uint8_t* data, int width, int height, bool has_alpha
 	// RGBA is RGB+1
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB+has_alpha, width, height, 0, GL_RGB+has_alpha, GL_UNSIGNED_BYTE, data);
 	
-	if (make_mipmap) {
+	if (0) {
 		glGenerateMipmap(GL_TEXTURE_2D);
 	}
 	else {
@@ -221,29 +221,29 @@ void Shader::use()
 {
 	glUseProgram(ID);
 }
-Shader& Shader::set_bool(const std::string& name, bool value)
+Shader& Shader::set_bool(const char* name, bool value)
 {
-	glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value);
+	glUniform1i(glGetUniformLocation(ID, name), (int)value);
 	return *this;
 }
-Shader& Shader::set_int(const std::string& name, int value)
+Shader& Shader::set_int(const char* name, int value)
 {
-	glUniform1i(glGetUniformLocation(ID, name.c_str()), value);
+	glUniform1i(glGetUniformLocation(ID, name), value);
 	return *this;
 }
-Shader& Shader::set_float(const std::string& name, float value)
+Shader& Shader::set_float(const char* name, float value)
 {
-	glUniform1f(glGetUniformLocation(ID, name.c_str()), value);
+	glUniform1f(glGetUniformLocation(ID, name), value);
 	return *this;
 }
-Shader& Shader::set_mat4(const std::string& name, mat4 value)
+Shader& Shader::set_mat4(const char* name, mat4 value)
 {
-	glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(value));
+	glUniformMatrix4fv(glGetUniformLocation(ID, name), 1, GL_FALSE, glm::value_ptr(value));
 	return *this;
 }
-Shader& Shader::set_vec3(const std::string& name, vec3 value)
+Shader& Shader::set_vec3(const char* name, vec3 value)
 {
-	glUniform3f(glGetUniformLocation(ID, name.c_str()), value.r, value.g, value.b);
+	glUniform3f(glGetUniformLocation(ID, name), value.r, value.g, value.b);
 	return *this;
 }
 std::string Shader::read_file(const char* filepath)
