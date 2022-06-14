@@ -14,10 +14,10 @@ const int SHADOW_WIDTH = 2048;
 
 void Renderer::on_resize()
 {
-	HDRbuffer.update_window_size(app.width, app.height);
-	intermediate.update_window_size(app.width, app.height);
+	HDRbuffer.update_window_size(global_app.width, global_app.height);
+	intermediate.update_window_size(global_app.width, global_app.height);
 }
-Renderer::Renderer(App& app): app(app)
+Renderer::Renderer()
 {
 	debug_depth = Shader("no_transform_v.txt", "depth_map_debug_f.txt");
 
@@ -64,17 +64,17 @@ Renderer::Renderer(App& app): app(app)
 
 	white_tex = global_textures.find_or_load("white.png");
 
-	intermediate.create(FramebufferSpec(app.width, app.height, 1, FBAttachments::a_float16, true));
+	intermediate.create(FramebufferSpec(global_app.width, global_app.height, 1, FBAttachments::a_float16, true));
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		std::cout << "Framebuffer not complete!" << std::endl;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	new_b.create(FramebufferSpec(app.width, app.height, 4, FBAttachments::a_rgb, true));
+	new_b.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::a_rgb, true));
 
 
-	HDRbuffer.create(FramebufferSpec(app.width, app.height, 4, FBAttachments::a_float16, true));
+	HDRbuffer.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::a_float16, true));
 
 	depth_map.create(FramebufferSpec(SHADOW_WIDTH, SHADOW_WIDTH, 1, FBAttachments::a_depth, false));
 	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
@@ -111,7 +111,7 @@ void Renderer::render_scene(SceneData& scene)
 	halt_and_render_to_screen(temp->get_ID());
 	//return;
 
-	glViewport(0, 0, app.width, app.height);
+	glViewport(0, 0, global_app.width, global_app.height);
 	debug_depth.use();
 	glDisable(GL_CULL_FACE);
 	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
@@ -124,7 +124,7 @@ void Renderer::render_scene(SceneData& scene)
 
 	//draw_gradient_skybox(scene);
 
-	projection_matrix = app.projection_matrix, view_matrix = scene.active_camera()->view_matrix;
+	projection_matrix = global_app.projection_matrix, view_matrix = scene.active_camera()->view_matrix;
 	
 	untextured_unshaded.use();
 	untextured_unshaded.set_mat4("projection", projection_matrix).set_mat4("view", view_matrix);
@@ -188,7 +188,7 @@ skip_light:
 	// unbind framebuffer, blit to resolve multisample
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, HDRbuffer.ID);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediate.ID);
-	glBlitFramebuffer(0, 0, app.width, app.height, 0, 0, app.width, app.height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+	glBlitFramebuffer(0, 0, global_app.width, global_app.height, 0, 0, global_app.width, global_app.height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
 	bloom_pass();
 	// ugly ass shit
@@ -212,7 +212,7 @@ skip_light:
 	glDisable(GL_CULL_FACE);
 	// Draw to the screen
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, app.width, app.height);
+	glViewport(0, 0, global_app.width, global_app.height);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, intermediate.color_id);
 	glActiveTexture(GL_TEXTURE1);
@@ -238,7 +238,7 @@ void Renderer::draw_gradient_skybox(SceneData& scene)
 	glDisable(GL_CULL_FACE);
 	sky_shader.use();
 	sky_shader.set_vec3("sun_direction", scene.sun.direction);
-	sky_shader.set_mat4("projection", app.projection_matrix);
+	sky_shader.set_mat4("projection", global_app.projection_matrix);
 	sky_shader.set_mat4("view", mat3(scene.active_camera()->view_matrix));	// Removes translation from matrix
 	//sky_gradient.bind(0);
 	//cube.bind();
@@ -270,7 +270,7 @@ void Renderer::scene_pass(SceneData& scene, Shader& shader)
 			}
 
 			// Frustum culling
-			if (!app.scene->cams[0].frust.sphere_in_frustum(obj->position, 4)) {
+			if (!global_app.scene->cams[0].frust.sphere_in_frustum(obj->position, 4)) {
 			//	continue;
 			}
 
@@ -318,14 +318,14 @@ void Renderer::init_bloom()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, bright_pass_fbo);
 	glBindTexture(GL_TEXTURE_2D, bright_pass);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, app.width/2, app.height/2, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, global_app.width/2, global_app.height/2, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bright_pass, 0);
 
-	int w = app.width / 4, h = app.height / 4;
+	int w = global_app.width / 4, h = global_app.height / 4;
 	for (int i = 0; i < 6; i++) {
 		glBindFramebuffer(GL_FRAMEBUFFER, downsample_fbo[0][i]);
 
@@ -352,7 +352,7 @@ void Renderer::init_bloom()
 		w /= 2; h /= 2;
 	}
 	
-	w = app.width / 2; h = app.height / 2;
+	w = global_app.width / 2; h = global_app.height / 2;
 	for (int i = 0; i < 6; i++) {
 		glBindFramebuffer(GL_FRAMEBUFFER, upsample_fbo[i]);
 
@@ -374,7 +374,7 @@ void Renderer::bloom_pass()
 	glBindFramebuffer(GL_FRAMEBUFFER, bright_pass_fbo);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	glViewport(0, 0, app.width / 2, app.height / 2);	// has half width + height
+	glViewport(0, 0, global_app.width / 2, global_app.height / 2);	// has half width + height
 	bright_pass_filter.use();
 	bright_pass_filter.set_float("threshold", threshold);
 
@@ -386,7 +386,7 @@ void Renderer::bloom_pass()
 	guassian_blur.use();
 	glBindTexture(GL_TEXTURE_2D, bright_pass);
 
-	float w = app.width / 4, h = app.height / 4;
+	float w = global_app.width / 4, h = global_app.height / 4;
 	for (int i = 0; i < 6; i++) {
 		glViewport(0, 0, w, h);
 
@@ -464,7 +464,7 @@ void Renderer::halt_and_render_to_screen(uint32_t texture_id)
 	no_transform.use();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, app.width, app.height);
+	glViewport(0, 0, global_app.width, global_app.height);
 	glDisable(GL_CULL_FACE);
 
 	glActiveTexture(GL_TEXTURE0);
@@ -521,11 +521,11 @@ VertexP make_point(vec3 pos, vec3 color)
 	p.position = pos;
 	return p;
 }
-void Renderer::add_point(vec3 point, vec3 color)
+void Renderer::debug_point(vec3 point, vec3 color)
 {
 	debug_points.append(make_point(point, color));
 }
-void Renderer::add_line(vec3 start, vec3 end, vec3 color)
+void Renderer::debug_line(vec3 start, vec3 end, vec3 color)
 {
 	debug_lines.push_2(make_point(start, color), make_point(end, color));
 }

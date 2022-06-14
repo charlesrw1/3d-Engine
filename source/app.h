@@ -14,6 +14,7 @@ public:
 	SDL_Window* window = nullptr;
 	SDL_GLContext context;
 	ImGuiContext* imgui_context;
+
 	int width = 1600;
 	int height = 900;
 	float aspect_r = 1600 / 900.f;
@@ -25,8 +26,10 @@ public:
 
 	glm::mat4 projection_matrix;
 
-	App();
 	void init();
+	void shutdown();
+	void init_window();
+
 	void handle_event(SDL_Event& event);
 
 	void update_loop();
@@ -37,14 +40,6 @@ public:
 
 	void update_projection_matrix();
 
-	// Bad??
-	static const App& get() {
-		return *global_app;
-	}
-	static void set_global(App* a) {
-		global_app = a;
-	}
-
 	void Printf();
 	void Warning();
 	void Error();
@@ -52,10 +47,7 @@ public:
 	Renderer* r;
 	SceneData* scene;
 	Editor* editor;
-
-private:
-	static App* global_app;
 };
 
-//extern App global_app;
+extern App global_app;
 #endif // !EDITOR_H

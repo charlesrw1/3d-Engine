@@ -17,18 +17,17 @@ using namespace std;
 
 
 /* Virtual Interface for Game Logic */
-class IGame
+class IGamee
 {
-	IGame();
-	virtual ~IGame() = 0;
+	IGamee();
+	virtual ~IGamee() = 0;
 };
 
-App* App::global_app;
 
 int main(int argc, char** argv)
 {
-	App app;
-	app.set_global(&app);
+	App& app = global_app;
+	app.init();
 
 	while (app.running)
 	{

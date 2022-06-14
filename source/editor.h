@@ -2,11 +2,12 @@
 #define EDITOR
 #include <SDL2/SDL.h>
 
-class App;
+
+
 class Editor
 {
 public:
-	Editor(App& app);
+	Editor();
 	void handle_event(SDL_Event& event);
 	void on_render();
 	void on_update();
@@ -21,7 +22,5 @@ private:
 	bool show_shadow_map = false;
 
 	//Bloom viwer
-
-	App& app;
 };
 #endif // !EDITOR

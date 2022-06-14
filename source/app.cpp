@@ -17,16 +17,22 @@
 
 #include "TextureManager.h"
 
+#include "MapParser.h"
 
-App::App()
+App global_app;
+
+void App::init()
 {
-	init();
-	r = new Renderer(*this);
+	init_window();
+
+	r = new Renderer;
 	scene = new SceneData;
-	editor = new Editor(*this);
+	editor = new Editor;
+
 	create_scene();
 	update_projection_matrix();
 }
+
 void sdldie(const char* msg)
 {
 	printf(" % s: % s\n", msg, SDL_GetError());
@@ -47,6 +53,10 @@ vec3 make_color(uint8_t r, uint8_t b, uint8_t g) {
 
 void App::create_scene()
 {
+	MapParser mp;
+	mp.start_file("resources/maps/test.map");
+	exit(1);
+
 	u32 start = SDL_GetTicks();
 
 	
@@ -122,12 +132,12 @@ void App::create_scene()
 	scene->objects.back()->position = vec3(1, 0, 0);
 
 //	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
-	Model* sponza = global_models.find_or_load("sponza/sponza.obj");
+	//Model* sponza = global_models.find_or_load("sponza/sponza.obj");
 	//load_model_assimp(sponza, "sponza/sponza.obj", true);
 	//load_model_qobj(sponza, "sponza.qobj");
 	//
-	scene->objects.push_back(new GameObject(sponza));
-	scene->objects.back()->scale = vec3(0.01);
+	//scene->objects.push_back(new GameObject(sponza));
+	//scene->objects.back()->scale = vec3(0.01);
 	
 	Model* revant = global_models.find_or_load("Revenant/revenant.dae");
 	//load_model_assimp(revant, "Revenant/revenant.dae",false);
@@ -135,6 +145,10 @@ void App::create_scene()
 	scene->objects.back()->scale = vec3(0.015);
 	scene->objects.back()->position = vec3(2, 0, 1);
 	scene->objects.back()->euler_x = - 3.14 / 2;
+
+	Model* geo = global_models.find_or_load("TUNNELS.obj");
+	scene->objects.push_back(new GameObject(geo));
+	scene->objects.back()->scale = vec3(0.2);
 
 	scene->num_lights = 5;
 	scene->lights[0].color = 2.f*vec3(1, 0, 0);
@@ -158,7 +172,7 @@ void App::create_scene()
 
 }
 
-void App::init()
+void App::init_window()
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
 		sdldie("SDL init failed");
@@ -185,7 +199,7 @@ void App::init()
 	printf("Renderer: %s\n", glGetString(GL_RENDERER));
 	printf("Version: %s\n", glGetString(GL_VERSION));
 
-	SDL_GL_SetSwapInterval(1);
+	SDL_GL_SetSwapInterval(0);
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);

@@ -19,6 +19,9 @@
     <Filter Include="Source Files\Renderer">
       <UniqueIdentifier>{b78358f5-49f3-4b9d-aeb9-e0b6ad7c84ef}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Scene">
+      <UniqueIdentifier>{ba39baf2-f97d-46ef-a3da-2c1c23d6706a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\app.cpp">
@@ -77,6 +80,9 @@
     </ClCompile>
     <ClCompile Include="source\TextureManager.cpp">
       <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\MapParser.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -156,6 +162,18 @@
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="source\Files.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Object.h">
+      <Filter>Source Files\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="source\IGame.h">
+      <Filter>Source Files\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Scene.h">
+      <Filter>Source Files\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="source\MapParser.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

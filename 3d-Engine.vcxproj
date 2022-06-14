@@ -32,6 +32,7 @@
     <ClCompile Include="source\editor.cpp" />
     <ClCompile Include="source\loader.cpp" />
     <ClCompile Include="source\main.cpp" />
+    <ClCompile Include="source\MapParser.cpp" />
     <ClCompile Include="source\ModelManager.cpp" />
     <ClCompile Include="source\Model_def.cpp" />
     <ClCompile Include="source\opengl_api.cpp" />
@@ -57,12 +58,16 @@
     <ClInclude Include="source\editor.h" />
     <ClInclude Include="source\Files.h" />
     <ClInclude Include="source\geometry.h" />
+    <ClInclude Include="source\IGame.h" />
     <ClInclude Include="source\loader.h" />
+    <ClInclude Include="source\MapParser.h" />
     <ClInclude Include="source\ModelManager.h" />
     <ClInclude Include="source\Model_def.h" />
+    <ClInclude Include="source\Object.h" />
     <ClInclude Include="source\opengl_api.h" />
     <ClInclude Include="source\perlinnoise.h" />
     <ClInclude Include="source\renderer.h" />
+    <ClInclude Include="source\Scene.h" />
     <ClInclude Include="source\TextureManager.h" />
     <ClInclude Include="source\Texture_def.h" />
     <ClInclude Include="source\types.h" />

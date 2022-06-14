@@ -122,7 +122,7 @@ void Frustum::update(Camera& cam)
 	// position of far plane
 	vec3 far_center = cam.front * cam.zfar;
 	float far_h = tan(cam.fov / 2) * cam.zfar;
-	float far_w = far_h * App::get().aspect_r;
+	float far_w = far_h * global_app.aspect_r;
 
 	// clockwise from top left
 	corners[0] = far_center - right * far_w + up * far_h;	// top left

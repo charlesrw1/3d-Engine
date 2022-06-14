@@ -15,58 +15,6 @@ struct Vertex
 	vec3 normal = vec3(0);
 	vec2 uv = vec2(0);
 };
-/*
-struct Texture
-{
-	uint32_t ID=0;
-	enum FormatType{
-		none,
-		rgb,
-		rgba,
-	}type=none;
-	int height=0, width=0;
-
-	void bind(int binding);
-
-	// Standard RGBA texture, can pass NULL for an empty texture
-	void init_standard(uint8_t* data, int width, int height,
-		bool has_alpha=true, bool make_mipmap=true);
-
-	// Deletes texture from GPU memory
-	void destroy();
-
-
-	vec2 pixel_to_uv(vec2 pixel_coords) {
-		return vec2(pixel_coords.x / width, pixel_coords.y / height);
-	}
-};
-*/
-/*
-// Wrapper around a GPU hardware buffer
-struct Mesh
-{
-	uint32_t VAO;				// Vertex array
-	uint32_t VBO;				// Vertex buffer
-	uint32_t EBO;				// Element buffer
-
-	uint32_t total_verticies;	// vbo count
-	uint32_t total_elements;	// ebo count
-
-
-	bool dynamic;
-
-	Mesh(const Vertex* verticies, const uint32_t* elements, int vert_count, int element_count, bool dynamic = false);
-	Mesh(const char* file_path);
-	Mesh() {}
-
-	void deinit();
-	void update_data(const Vertex* verts, const uint32_t* elements, int vert_count, int element_count);
-
-	void bind();
-	void draw_indexed_primitive();
-};
-
-	*/
 enum class Uniforms
 {
 	u_viewpos,
@@ -100,21 +48,7 @@ private:
 	std::string read_file(const char* filepath);
 	unsigned int load_shader(const char* vertex_path, const char* fragment_path, const char* geo_path = NULL);
 };
-/*
-struct Material
-{
-	Texture* diffuse =nullptr;
-	Texture* specular=nullptr;
-	Texture* bump	 =nullptr;
 
-	float pong_exp = 36.f;
-
-	// For now this is never used, the renderer provides the shader
-	// Would be nice to configure some rendering pipeline that allows
-	// flexible programs, but later
-	Shader* program =nullptr;
-};
-*/
 // Vertex primitive, for drawing things like lines, triangles, quads, etc.
 struct VertexP
 {
@@ -183,20 +117,7 @@ private:
 	Primitive type = triangle;
 	uint32_t allocated_size = 0;
 };
-/*
-struct Model
-{
-	struct SubMesh {
-		SubMesh() {}
-		SubMesh(Mesh m) : mesh{ m } {}
-		Mesh mesh;
-		Material mat;
-	};
-	std::vector<SubMesh> meshes;
-	AABB aabb;
-	const char* model_name;
-};
-*/
+
 enum class FBAttachments
 {
 	a_none,
@@ -244,26 +165,6 @@ struct Framebuffer
 
 	void bind();
 	void destroy();
-	// Bad
-	/*
-	enum AttachmentType{
-		a_color,
-		a_stencil,
-		a_depth,
-		a_depth_stencil,
-	};
-	bool color =false, stencil =false, depth =false;
-
-	// Creates the framebuffer, must attach a complete buffer (color,depth or stencil)
-	// by calling attach_texture() to use
-	void init();
-
-	// Checks if FBO is ready to be read/written
-	bool check_completeness();
-	// Attaches a texture with one of the types, must bind() before calling
-	void attach_texture(Texture& t, AttachmentType type);
-	*/
-
 };
 
 void clear_screen(bool color = true, bool depth = true);

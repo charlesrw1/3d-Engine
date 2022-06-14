@@ -21,7 +21,6 @@ Texture* TextureManager::find_or_load(const char* filename, int params) {
 	// Model not found, load it
 	Texture* t = new Texture;
 
-
 	if (params & TParams::LOAD_NOW) {
 		t->init_from_file(filename, params);
 		t->print();

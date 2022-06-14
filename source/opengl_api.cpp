@@ -6,85 +6,6 @@
 #include <cassert>
 #include <iostream>
 
-/*
-Mesh::Mesh(const Vertex* verticies, const uint32_t* elements, int vert_count, int element_count, bool dynamic)
-{
-	assert(verticies && elements);
-	this->dynamic = dynamic;
-	total_elements = element_count;
-	total_verticies = vert_count;
-
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
-
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vert_count * sizeof(Vertex), verticies, (dynamic)?GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, element_count * sizeof(uint32_t), elements, (dynamic) ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
-	// POSITION
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	// NORMALS
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(1);
-	// UV
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-	glEnableVertexAttribArray(2);
-	
-	glBindVertexArray(0);
-}
-void Mesh::deinit()
-{
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
-	total_verticies = total_elements = 0;
-}
-void Mesh::bind()
-{
-	glBindVertexArray(VAO);
-}
-
-void Mesh::draw_indexed_primitive()
-{
-	glDrawElements(GL_TRIANGLES, total_elements, GL_UNSIGNED_INT, 0);
-}
-
-void Texture::init_standard(uint8_t* data, int width, int height, bool has_alpha, bool make_mipmap)
-{
-	this->width = width;
-	this->height = height;
-	type = (has_alpha) ? rgba : rgb;
-
-	glGenTextures(1, &ID);
-	glBindTexture(GL_TEXTURE_2D, ID);
-	// RGBA is RGB+1
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB+has_alpha, width, height, 0, GL_RGB+has_alpha, GL_UNSIGNED_BYTE, data);
-	
-	if (0) {
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-	else {
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	}
-}
-
-
-void Texture::bind(int binding)
-{
-	glActiveTexture(GL_TEXTURE0 + binding);
-	glBindTexture(GL_TEXTURE_2D, ID);
-}
-void Texture::destroy()
-{
-	glDeleteTextures(1, &ID);
-	ID = 0;
-	type = none;
-}
-*/
 void Framebuffer::create(FramebufferSpec n_spec)
 {
 	spec = n_spec;
@@ -198,19 +119,6 @@ void Framebuffer::destroy()
 	color_id = 0;
 	depth_stencil_id = 0;
 }
-/*
-void Framebuffer::init()
-{
-	glGenFramebuffers(1, &ID);
-	glBindFramebuffer(GL_FRAMEBUFFER, ID);
-}
-void Framebuffer::attach_texture(Texture& t, AttachmentType type)
-{
-	static const GLenum to_glenum[] = { GL_COLOR_ATTACHMENT0,GL_DEPTH_ATTACHMENT, GL_STENCIL_ATTACHMENT,GL_DEPTH_STENCIL_ATTACHMENT };
-	assert(type >= 0 && type < 4);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, to_glenum[type], GL_TEXTURE_2D, t.ID, 0);
-}
-*/
 
 const char* shader_path = "resources/shaders/";
 Shader::Shader(const char* vertex_path, const char* fragment_path, const char* geo_path)

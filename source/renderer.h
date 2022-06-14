@@ -3,13 +3,19 @@
 
 #include "opengl_api.h"
 
+struct rendersettings_t
+{
+
+};
+
+
 class Texture;
 class App;
 struct SceneData;
 class Renderer
 {
 public:
-	Renderer(App& app);
+	Renderer();
 
 	Shader untextured;
 	Shader untextured_unshaded;
@@ -86,8 +92,9 @@ public:
 	mat4 projection_matrix, view_matrix;
 
 	// Temporary Debug Stuff
-	void add_line(vec3 start, vec3 end, vec3 color);
-	void add_point(vec3 pos, vec3 color);
+	void debug_line(vec3 start, vec3 end, vec3 color);
+	void debug_point(vec3 pos, vec3 color);
+
 	VertexArray debug_lines;
 	VertexArray debug_points;
 
@@ -100,6 +107,8 @@ public:
 	int sample_num=0;
 	bool down_sample=true;
 	bool first_blur_pass=false;
+
+
 private:
 	void init_basic_sphere();
 
@@ -118,7 +127,5 @@ private:
 	void bounding_sphere_pass(SceneData& scene);
 
 	void debug_multi_viewport_bloom();
-
-	App& app;
 };
 #endif
