@@ -108,6 +108,10 @@ struct VertexArray
 		verts.clear();
 	}
 
+	void upload_data();
+	void draw_array_static();
+
+
 	void add_quad(vec2 upper, vec2 lower);
 
 private:

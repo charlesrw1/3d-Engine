@@ -8,7 +8,7 @@
 struct GameScene
 {
 	Camera main_cam;
-	std::vector<Object*> objects;
+	std::vector<Entity*> objects;
 
 	DirectionalLight sun;
 	PointLight lights[8];

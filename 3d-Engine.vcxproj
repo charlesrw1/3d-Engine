@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -39,8 +39,10 @@
     <ClCompile Include="source\renderer.cpp" />
     <ClCompile Include="source\TextureManager.cpp" />
     <ClCompile Include="source\Texture_def.cpp" />
+    <ClCompile Include="source\WorldGeometry.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Dict.h" />
     <ClInclude Include="source\app.h" />
     <ClInclude Include="source\camera.h" />
     <ClInclude Include="source\deps\include\glad\glad.h" />
@@ -71,6 +73,7 @@
     <ClInclude Include="source\TextureManager.h" />
     <ClInclude Include="source\Texture_def.h" />
     <ClInclude Include="source\types.h" />
+    <ClInclude Include="source\WorldGeometry.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

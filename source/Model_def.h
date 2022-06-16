@@ -39,6 +39,9 @@ struct RenderMesh
 	u32 ebo{};
 };
 
+// Creates a VBO,VAO,EBO and uploads data to gpu, init_from_file calls this, but it can be called on its own as well
+void M_upload_mesh(RenderMesh* rm, const RenderVert* verticies, const uint32_t* elements, int vert_count, int element_count);
+
 class Model
 {
 public:

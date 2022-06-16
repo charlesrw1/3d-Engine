@@ -8,6 +8,8 @@
 #include "Texture_def.h"
 #include "TextureManager.h"
 
+#include "WorldGeometry.h"
+
 #include <iostream>
 
 const int SHADOW_WIDTH = 2048;
@@ -53,6 +55,7 @@ Renderer::Renderer()
 	leaf = Shader("leaf_shader_v.txt", "directional.frag");
 
 	fresnel = Shader("point_light_v.txt", "fresnel_f.txt");
+	overdraw = Shader("point_light_v.txt", "overdraw_f.txt");
 
 	debug_lines.set_primitive(VertexArray::Primitive::lines);
 	debug_points.set_primitive(VertexArray::Primitive::points);
@@ -108,7 +111,7 @@ void Renderer::render_scene(SceneData& scene)
 
 	mat4 light_space_matrix = render_shadow_map(scene);
 
-	halt_and_render_to_screen(temp->get_ID());
+	//halt_and_render_to_screen(temp->get_ID());
 	//return;
 
 	glViewport(0, 0, global_app.width, global_app.height);
@@ -122,10 +125,12 @@ void Renderer::render_scene(SceneData& scene)
 	HDRbuffer.bind();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
 	//draw_gradient_skybox(scene);
 
 	projection_matrix = global_app.projection_matrix, view_matrix = scene.active_camera()->view_matrix;
 	
+
 	untextured_unshaded.use();
 	untextured_unshaded.set_mat4("projection", projection_matrix).set_mat4("view", view_matrix);
 
@@ -168,7 +173,6 @@ void Renderer::render_scene(SceneData& scene)
 
 	glActiveTexture(GL_TEXTURE0 + 2);
 	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
-
 	scene_pass(scene, directional_shadows);
 
 	// Point lights pass
@@ -185,10 +189,23 @@ void Renderer::render_scene(SceneData& scene)
 	
 skip_light:
 
+	//glDisable(GL_CULL_FACE);
+	glFrontFace(GL_CW);
+	primitive_debug_pass();
+	glEnable(GL_DEPTH_TEST);
+	//scene.map_geo.draw_array();
+	//scene.map_geo_edges.draw_array();
+	//bounding_sphere_pass(scene);
+	//global_world.debug_draw();
+	glFrontFace(GL_CCW);
+	
+	//glEnable(GL_CULL_FACE);
+
 	// unbind framebuffer, blit to resolve multisample
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, HDRbuffer.ID);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediate.ID);
 	glBlitFramebuffer(0, 0, global_app.width, global_app.height, 0, 0, global_app.width, global_app.height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
 
 	bloom_pass();
 	// ugly ass shit
@@ -224,11 +241,14 @@ skip_light:
 	gamma_tm_bloom.set_float("exposure", exposure).set_int("screen_tex", 0).set_int("bloom_tex", 1);
 
 	quad.draw_array();
-
+/*
+	glDisable(GL_CULL_FACE);
 	primitive_debug_pass();
+	scene.map_geo.draw_array();
 	//bounding_sphere_pass(scene);
-
+	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
+	*/
 
 }
 
@@ -256,7 +276,37 @@ void Renderer::upload_point_lights(SceneData& scene)
 		point_lights.set_float(("lights[" + std::to_string(i) + "].radius").c_str(), scene.lights[i].radius);
 	}
 }
+void Renderer::draw_world_geo(Shader& s)
+{
+	glFrontFace(GL_CW);
+	Model* m = global_world.get_model();
+	for (int i = 0; i < m->num_meshes(); i++) {
 
+		const RenderMesh* rm = m->mesh(i);
+
+		if (rm->diffuse) {
+			rm->diffuse->bind(0);
+		}
+		else {
+			white_tex->bind(0);
+		}
+
+		if (rm->specular) {
+			rm->specular->bind(1);
+		}
+		else {
+			white_tex->bind(1);
+		}
+
+		s.set_mat4("u_model", mat4(1)).set_mat4("normal_mat", mat4(1));
+
+		//	sm.mesh.bind();
+		glBindVertexArray(rm->vao);
+		glDrawElements(GL_TRIANGLES, rm->num_indices, GL_UNSIGNED_INT, NULL);
+		//sm.mesh.draw_indexed_primitive();
+	}
+	glFrontFace(GL_CCW);
+}
 void Renderer::scene_pass(SceneData& scene, Shader& shader)
 {
 	for (const auto obj : scene.objects) {
@@ -303,6 +353,9 @@ void Renderer::scene_pass(SceneData& scene, Shader& shader)
 
 			}
 		}
+	}
+	if (draw_world) {
+		draw_world_geo(shader);
 	}
 }
 
@@ -493,7 +546,7 @@ void Renderer::primitive_debug_pass()
 	debug_lines.draw_array();
 	debug_lines.clear();
 
-	glEnable(GL_DEPTH_TEST);
+	//glEnable(GL_DEPTH_TEST);
 
 }
 void Renderer::bounding_sphere_pass(SceneData& scene)
@@ -560,4 +613,13 @@ void Renderer::init_basic_sphere()
 	basic_sphere.push_2(VertexP(points[iterations - 1], vec3(0, 0, 1)), VertexP(points[0], vec3(0, 0, 1)));
 
 	basic_sphere.set_primitive(VertexArray::lines);
+}
+void Renderer::visualize_overdraw(SceneData& scene)
+{
+	overdraw.use();
+	overdraw.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE);
+	scene_pass(scene, overdraw);
+	glDisable(GL_BLEND);
 }

@@ -14,6 +14,7 @@ using namespace glm;
 #include <unordered_map>
 
 class Texture;
+class VertexArray;
 
 struct plane_t
 {
@@ -34,49 +35,41 @@ struct plane_t
 	float distance(const vec3& v) {
 		return dot(normal, v) + d;
 	}
+	// true= in front or on the plane, false= behind
+	bool classify(const vec3& p) {
+		return dist(p) > -0.001;
+	}
+	float dist(const vec3& p) {
+		return dot(normal,p) + d;
+	}
 };
 
-
-
 // Parsed from .map file
-struct face_t
+struct mface_t
 {
 	vec3 v[3];
+
 	int t_index{};
 	vec2 uv_scale;
 	vec3 u_axis, v_axis;
 	int u_offset, v_offset;
 
+	int v_start{}, v_end{};
 	plane_t plane;
 };
 #define MAX_FACES 20
-struct brush_t
+// Collection of faces
+struct mbrush_t
 {
 	uint16 indices[MAX_FACES];
 	uint8 num_i = 0;
 };
 
-// Mesh geometry
-struct poly_t
-{
-	short v_start{}, v_end{};
-};
-struct vert_t
-{
-	vec3 pos, normal;
-	vec2 uv;
-};
-struct mesh_surface_t
-{
-	Texture* tex = nullptr;
-	std::vector<vert_t> verts;
-};
-
-struct parse_entity_t
+struct mentity_t
 {
 	// Key value pairs for properties
 	std::unordered_map<std::string, std::string> properties;
-	// Brush (optional), end will be 0 if not used
+	// associated brush (optional)
 	u16 brush_start{}, brush_end{};
 };
 
@@ -87,20 +80,37 @@ public:
 		parse_buffer.reserve(256);
 	}
 	void start_file(std::string file);
-	const std::vector<poly_t>& get_result();
+	void construct_mesh(VertexArray& va, VertexArray& edges);
+
+
+	const std::vector<vec3>& get_verts() const {
+		return verts;
+	}
+	const std::vector<mface_t>& get_brush_faces() const {
+		return faces;
+	}
+	const std::vector<std::string>& get_textures() const {
+		return textures;
+	}
+	const std::vector<mentity_t>& get_entities() const {
+		return entities;
+	}
 private:
 
 	enum Result { R_GOOD, R_FAIL, R_EOF };
 
 	void parse_file();
 
-	void compute_intersections(brush_t*);
-	void sort_verticies();
-	void construct_mesh();
+	void compute_intersections(mbrush_t*);
+	void sort_verticies(mface_t*);
 
 	Result parse_entity();
 	Result parse_brush();
+
+
 	Result parse_face();
+	Result parse_face_quake();
+
 	Result parse_vec3(vec3& v);
 
 	Result read_token();
@@ -110,9 +120,8 @@ private:
 
 	int get_texture();
 
-	std::vector<brush_t> brushes;	// Groups of faces
-	std::vector<face_t> faces;		// Half-face data, 3 verts, texture info
-	std::vector<poly_t> polys;		// Groups of verticies, same index as faces
+	std::vector<mbrush_t> brushes;	// Groups of faces
+	std::vector<mface_t> faces;		// Half-face data, 3 verts, texture info
 
 
 	std::vector<vec3> verts;		// Verticies
@@ -121,7 +130,7 @@ private:
 	std::vector<std::string> textures;
 	std::unordered_map<std::string, int> str_to_tex_index;
 
-	std::vector<parse_entity_t> entities;
+	std::vector<mentity_t> entities;
 
 	std::ifstream infile;
 

@@ -53,6 +53,9 @@ void Editor::on_render()
 	if (ImGui::RadioButton("Downsample", global_app.r->down_sample)) {
 		global_app.r->down_sample = !global_app.r->down_sample;
 	}
+	if (ImGui::RadioButton("Draw world", global_app.r->draw_world)) {
+		global_app.r->draw_world = !global_app.r->draw_world;
+	}
 
 
 	ImGui::DragFloat("Gamma: ", &global_app.r->gamma, 0.1, 0.5, 4);

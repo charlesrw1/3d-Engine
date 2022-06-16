@@ -266,6 +266,7 @@ VertexArray::VertexArray()
 
 	glBindVertexArray(0);
 }
+
 void VertexArray::draw_array()
 {
 	static const GLenum to_glenum[] = { GL_TRIANGLES, GL_LINES, GL_LINE_STRIP, GL_POINTS };
@@ -278,6 +279,23 @@ void VertexArray::draw_array()
 	else {
 		glBufferSubData(GL_ARRAY_BUFFER, 0, verts.size()*sizeof(VertexP), verts.data());
 	}
+	glDrawArrays(to_glenum[type], 0, verts.size());
+}
+void VertexArray::upload_data()
+{
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	if (verts.size() > allocated_size) {
+		allocated_size = verts.size() * 1.5;
+		glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(VertexP), verts.data(), GL_STATIC_DRAW);
+	}
+	else {
+		glBufferSubData(GL_ARRAY_BUFFER, 0, verts.size() * sizeof(VertexP), verts.data());
+	}
+}
+void VertexArray::draw_array_static()
+{
+	static const GLenum to_glenum[] = { GL_TRIANGLES, GL_LINES, GL_LINE_STRIP, GL_POINTS };
 	glDrawArrays(to_glenum[type], 0, verts.size());
 }
 void VertexArray::add_quad(vec2 upper, vec2 size)

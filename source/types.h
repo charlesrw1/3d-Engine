@@ -97,6 +97,9 @@ struct SceneData
 	float wind_strength = 1;
 	float wind_speed = 1;
 	vec2 wind_dir = vec2(1, 0);
+
+	VertexArray map_geo;
+	VertexArray map_geo_edges;
 };
 
 struct MoveCircular

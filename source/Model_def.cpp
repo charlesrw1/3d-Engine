@@ -14,7 +14,7 @@ const std::string model_path = "resources/models/";
 
 
 
-void upload_to_gpu(RenderMesh* rm, const RenderVert* verticies, const uint32_t* elements, int vert_count, int element_count)
+void M_upload_mesh(RenderMesh* rm, const RenderVert* verticies, const uint32_t* elements, int vert_count, int element_count)
 {
 	assert(verticies && elements);
 	rm->num_indices = element_count;
@@ -125,7 +125,7 @@ RenderMesh process_mesh(aiMesh* mesh, const aiScene* scene)
 	}
 
 	RenderMesh submesh;
-	upload_to_gpu(&submesh, verts.data(), indicies.data(), verts.size(), indicies.size());
+	M_upload_mesh(&submesh, verts.data(), indicies.data(), verts.size(), indicies.size());
 	
 
 	if (mesh->mMaterialIndex >= 0) {

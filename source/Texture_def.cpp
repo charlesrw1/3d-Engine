@@ -71,13 +71,14 @@ void Texture::init_from_file(std::string filename, int params)
 	height = y;
 	this->params = params;
 	name = filename;
-	raw_data = data;
 
 	if (params & TParams::LOAD_NOW) {
 		internal_init(data);
 		stbi_image_free(data);
 	}
 	else {
+		raw_data = data;
+
 		std::lock_guard<std::mutex> lock(tmanager_queue);
 		global_textures.queue_for_upload(this);
 	}
@@ -116,6 +117,6 @@ void Texture::upload_raw_data()
 {
 	internal_init(raw_data);
 	stbi_image_free(raw_data);
-
+	raw_data = nullptr;
 	print();
 }

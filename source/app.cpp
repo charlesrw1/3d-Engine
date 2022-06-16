@@ -19,6 +19,7 @@
 
 #include "MapParser.h"
 
+#include "WorldGeometry.h"
 App global_app;
 
 void App::init()
@@ -54,8 +55,15 @@ vec3 make_color(uint8_t r, uint8_t b, uint8_t g) {
 void App::create_scene()
 {
 	MapParser mp;
-	mp.start_file("resources/maps/test.map");
-	exit(1);
+	u32 map_start = SDL_GetTicks();
+	mp.start_file("resources/maps/e1m1.map");
+
+	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
+	global_world.load_map(mp);
+
+	u32 map_end = SDL_GetTicks();
+	printf("Loaded map in: %i ms\n", map_end - map_start);
+	//exit(1);
 
 	u32 start = SDL_GetTicks();
 
@@ -146,9 +154,9 @@ void App::create_scene()
 	scene->objects.back()->position = vec3(2, 0, 1);
 	scene->objects.back()->euler_x = - 3.14 / 2;
 
-	Model* geo = global_models.find_or_load("TUNNELS.obj");
-	scene->objects.push_back(new GameObject(geo));
-	scene->objects.back()->scale = vec3(0.2);
+	//Model* geo = global_models.find_or_load("TUNNELS.obj");
+	//scene->objects.push_back(new GameObject(geo));
+	//scene->objects.back()->scale = vec3(0.2);
 
 	scene->num_lights = 5;
 	scene->lights[0].color = 2.f*vec3(1, 0, 0);
@@ -168,7 +176,11 @@ void App::create_scene()
 
 	u32 end = SDL_GetTicks();
 
+	global_textures.update();
 	printf("\n\n\n     TIME: %u\n\n\n", end - start);
+
+	global_models.print_info();
+	global_textures.print_info();
 
 }
 
@@ -197,7 +209,7 @@ void App::init_window()
 	gladLoadGLLoader(SDL_GL_GetProcAddress);
 	printf("Vendor: %s\n", glGetString(GL_VENDOR));
 	printf("Renderer: %s\n", glGetString(GL_RENDERER));
-	printf("Version: %s\n", glGetString(GL_VERSION));
+	printf("Version: %s\n\n", glGetString(GL_VERSION));
 
 	SDL_GL_SetSwapInterval(0);
 

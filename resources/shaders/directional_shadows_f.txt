@@ -73,8 +73,8 @@ void main()
     vec3 lightDir = normalize(-light.direction);			// IF A POINT LIGHT: normalize(lightpos - fragpos)
 	
 	// N dot L
-    //float diff = max(dot(norm, lightDir),0.0); 
-	float diff = pow(dot(norm, lightDir)*0.5+0.5,2);// half lambert from valve, doesnt clamp the dark tones
+    float diff = max(dot(norm, lightDir),0.0); 
+	//float diff = pow(dot(norm, lightDir)*0.5+0.5,2);// half lambert from valve, doesnt clamp the dark tones
     vec3 diffuse = light.diffuse * diff * col.rgb;
 	
 	// specular
@@ -111,6 +111,8 @@ void main()
 	float shadow = shadow_calc(FragPosLightSpace,0.005);
 	
 	vec3 result = (diffuse + specular)*(1-shadow) + ambient*0.5;
+	
+	//result = norm;
 	
     FragColor = vec4(result, 1.0);
 } 

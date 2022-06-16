@@ -43,6 +43,7 @@ public:
 	Shader leaf;
 	Shader model_primitives;
 	Shader fresnel;
+	Shader overdraw;
 
 	// Skybox temp stuff
 	//Mesh cube;
@@ -80,6 +81,8 @@ public:
 	float threshold = 2.f;
 	float exposure = 1;
 	float gamma = 2.2;
+
+	bool draw_world = true;
 
 	struct ShadowMapProjection
 	{
@@ -119,7 +122,12 @@ private:
 	void init_bloom();
 	void bloom_pass();
 
+	void visualize_overdraw(SceneData& scene);
+
 	void scene_pass(SceneData& scene, Shader& shader);
+
+	void draw_world_geo(Shader& shader);
+
 	void upload_point_lights(SceneData& scene);
 
 	void primitive_debug_pass();

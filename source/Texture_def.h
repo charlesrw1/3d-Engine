@@ -1,6 +1,7 @@
 #ifndef TEXTUREDEF_H
 #define TEXTUREDEF_H
 #include <string>
+#include "glm/glm.hpp"
 
 using u32 = uint32_t;
 using u8 = uint8_t;
@@ -16,7 +17,7 @@ enum TParams
 
 	LOAD_NOW	=128
 };
-
+using glm::ivec2;
 
 class Texture
 {
@@ -39,6 +40,8 @@ public:
 	const std::string& get_name() const { return name; }
 
 	void upload_raw_data();
+
+	ivec2 get_dimensions() const { return ivec2(width, height); }
 
 private:
 	// OpenGL calls, thread unsafe

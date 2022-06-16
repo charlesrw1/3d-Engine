@@ -39,10 +39,11 @@ void ModelManager::add_model(Model* model) {
 }
 void ModelManager::print_info() {
 
+	printf("********* MODELS *********");
 	printf("\nLoaded models (%d): \n", models.size());
 	for (auto model : models) {
-		printf("%s\n", model.second->get_name().c_str());
+		printf("\t%s\n", model.second->get_name().c_str());
 	}
-	printf("---------------------\n\n");
+	printf("**************************\n\n");
 
 }

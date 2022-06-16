@@ -50,11 +50,13 @@ void TextureManager::add_texture(Texture* texture) {
 }
 void TextureManager::print_info() {
 
+	printf("******** TEXTURES ********");
 	printf("\nLoaded textures (%d): \n", (int)textures.size());
 	for (auto t : textures) {
+		printf("\t");
 		t.second->print();
 	}
-	printf("---------------------\n\n");
+	printf("**************************\n\n");
 
 }
 Texture* TextureManager::create_scratch(const char* internal_name, int width, int height, int params)
