@@ -121,10 +121,10 @@ private:
 	int get_texture();
 
 	std::vector<mbrush_t> brushes;	// Groups of faces
-	std::vector<mface_t> faces;		// Half-face data, 3 verts, texture info
+	std::vector<mface_t> faces;	
 
 
-	std::vector<vec3> verts;		// Verticies
+	std::vector<vec3> verts;		// Indexed into by faces
 
 
 	std::vector<std::string> textures;

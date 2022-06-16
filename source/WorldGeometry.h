@@ -33,6 +33,8 @@ struct trace_t
 	vec3 normal;
 	float d;
 	
+	vec3 dir;
+	vec3 start;
 	float length;
 
 	// material hit
@@ -54,7 +56,7 @@ public:
 	void load_map(const MapParser& mp);
 	void free_map();
 
-	trace_t test_ray(const ray_t& r) const;
+	trace_t test_ray(const ray_t& r);
 
 	void debug_draw();
 
@@ -80,6 +82,9 @@ private:
 
 	// hack for now cause static creation
 	VertexArray* line_va;
+
+	VertexArray* hit_faces;
+	VertexArray* hit_points;
 };
 
 extern WorldGeometry global_world;

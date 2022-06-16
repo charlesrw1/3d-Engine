@@ -192,11 +192,13 @@ skip_light:
 	//glDisable(GL_CULL_FACE);
 	glFrontFace(GL_CW);
 	primitive_debug_pass();
-	glEnable(GL_DEPTH_TEST);
 	//scene.map_geo.draw_array();
 	//scene.map_geo_edges.draw_array();
 	//bounding_sphere_pass(scene);
-	//global_world.debug_draw();
+	glLineWidth(3);
+	glDisable(GL_DEPTH_TEST);
+	global_world.debug_draw();
+	glEnable(GL_DEPTH_TEST);
 	glFrontFace(GL_CCW);
 	
 	//glEnable(GL_CULL_FACE);
@@ -285,14 +287,18 @@ void Renderer::draw_world_geo(Shader& s)
 		const RenderMesh* rm = m->mesh(i);
 
 		if (rm->diffuse) {
-			rm->diffuse->bind(0);
+			white_tex->bind(0);
+
+			//rm->diffuse->bind(0);
 		}
 		else {
 			white_tex->bind(0);
 		}
 
 		if (rm->specular) {
-			rm->specular->bind(1);
+			white_tex->bind(1);
+
+			//rm->specular->bind(1);
 		}
 		else {
 			white_tex->bind(1);

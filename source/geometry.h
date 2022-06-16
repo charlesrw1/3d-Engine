@@ -39,6 +39,8 @@ struct AABB
 		res.min = matrix * vec4(res.min, 1.0);
 		return res;
 	}*/
+
+	void create_from_points(vec3* points, unsigned num_points);
 };
 using u16 = uint16_t;
 struct sector_t

@@ -113,10 +113,19 @@ void WorldGeometry::load_map(const MapParser& mp)
 //	line_va->upload_data();
 
 	print_info();
+
+	hit_faces = new VertexArray;
+	hit_faces->set_primitive(VertexArray::Primitive::lines);
+	hit_points = new VertexArray;
+	hit_points->set_primitive(VertexArray::Primitive::points);
+
 }
 
 void WorldGeometry::debug_draw() {
-	line_va->draw_array();
+	//line_va->draw_array();
+	hit_faces->draw_array();
+	glPointSize(10);
+	hit_points->draw_array();
 }
 
 void WorldGeometry::print_info() const {
@@ -127,4 +136,65 @@ void WorldGeometry::print_info() const {
 	printf("	Triangles: %u\n", num_triangles);
 
 	printf("**************************\n\n");
+}
+
+trace_t WorldGeometry::test_ray(const ray_t& r)
+{
+	trace_t res;
+	res.start = r.origin;
+	res.dir = r.dir;
+
+	const face_t* best = nullptr;
+	// Will add a BSP or acceleration structure later
+	for (int i = 0; i < static_faces.size(); i++) {
+		face_t& f = static_faces.at(i);
+		f.plane.init(world_verts.at(f.v_start), world_verts.at(f.v_start + 1), world_verts.at(f.v_start + 2));
+		f.plane.normal = f.plane.normal * -1.f;
+		f.plane.d = -dot(f.plane.normal, world_verts.at(f.v_start));
+
+		float denom = dot(f.plane.normal, r.dir);
+		if (abs(denom) < 0.1f) {
+			continue;
+		}
+		float t = -(dot(f.plane.normal, r.origin) + f.plane.d) / denom;
+		if (t < 0) {
+			continue;
+		}
+		if (t > r.length) {
+			continue;
+		}
+		// point on the plane
+		vec3 point = r.origin + r.dir * t;
+		int v_count = f.v_end - f.v_start;
+		bool hit = true;
+		for (int i = 0; i < v_count; i++) {
+			vec3 v =  point -world_verts.at(f.v_start+i);
+			vec3 c = cross(world_verts.at(f.v_start + (i + 1) % v_count)-world_verts.at(f.v_start + i),v);
+			float angle = dot(-f.plane.normal, c);
+			if (angle < 0) {
+				// point is outside the edges of the polygon
+				hit = false;
+				break;
+			}
+		}
+
+		if (hit && (!res.hit||t<res.length)) {
+			res.hit = true;
+			res.end_pos = point;
+			res.length = t;
+			res.normal = f.plane.normal;
+			res.d = f.plane.d;
+
+			best = &f;
+		}
+	}
+
+	if (best) {
+		int count = best->v_end - best->v_start;
+		for (int i = 0; i < count; i++) {
+			hit_faces->push_2({ world_verts.at(best->v_start + i), vec3(1.f,0.0,0.0) }, { world_verts.at(best->v_start + ((i + 1) % count)), vec3(1.f,0.0,0.0) });
+		}
+	}
+
+	return res;
 }

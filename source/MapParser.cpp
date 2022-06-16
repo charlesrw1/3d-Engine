@@ -15,14 +15,6 @@ constexpr float EPSILON = 0.1;
 
 #define NOT_EQUALS(v1,v2) abs(v1-v2) >= EPSILON
 
-#define VERBOSE
-
-#ifdef VERBOSE
-#define PRINT printf
-#else
-#define PRINT
-#endif
-
 
 bool equals(vec3& v1, vec3& v2) {
 	return abs(v1.x - v2.x) < EPSILON && abs(v1.y - v2.y) < EPSILON && abs(v1.z - v2.z) < EPSILON;
@@ -89,7 +81,7 @@ void MapParser::compute_intersections(mbrush_t* brush)
 					//std::cout << "		intersection: " << res.x << ' ' << res.y << ' ' << res.z << " : " << i << ' ' << j << ' ' << k << '\n';
 					// Good vertex, index to verts is stored in poly[face_index]
 					
-					// Terrible hack
+					// should be moved to end of loop
 					for (int i = 0; i < added_verts; i++) {
 						if (equals(verts.at(v_start + i), res)) {
 							goto outside_vertex;
@@ -203,6 +195,7 @@ void MapParser::parse_file()
 	for (int i = 0; i < brushes.size(); i++) {
 		compute_intersections(&brushes.at(i));
 	}
+	// Sorts verticies in CW winding order
 	printf("Sorting verts...\n");
 	for (int i = 0; i < brushes.size(); i++) {
 		//printf("	Brush num: % d\n", i);
@@ -292,7 +285,7 @@ MapParser::Result MapParser::parse_brush()
 				return R_FAIL;
 			}
 			
-			Result r = parse_face_quake();
+			Result r = parse_face();
 			if (r == R_FAIL) {
 				return R_FAIL;
 			}
@@ -312,6 +305,7 @@ MapParser::Result MapParser::parse_brush()
 
 	return R_GOOD;
 }
+// parses face for valve's format
 MapParser::Result MapParser::parse_face()
 {
 	faces.resize(faces.size() + 1);

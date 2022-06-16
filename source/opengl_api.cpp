@@ -273,8 +273,8 @@ void VertexArray::draw_array()
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	if (verts.size() > allocated_size) {
-		allocated_size = verts.size() * 1.5;
-		glBufferData(GL_ARRAY_BUFFER, verts.size()*sizeof(VertexP), verts.data(), GL_STATIC_DRAW);
+		//allocated_size = verts.size() * 1.5;
+		glBufferData(GL_ARRAY_BUFFER, verts.size()*sizeof(VertexP), verts.data(), GL_STREAM_DRAW);
 	}
 	else {
 		glBufferSubData(GL_ARRAY_BUFFER, 0, verts.size()*sizeof(VertexP), verts.data());

@@ -13,6 +13,8 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
+#include <iostream>
+
 
 Editor::Editor()
 {
@@ -146,32 +148,45 @@ void Editor::on_render()
 		corners[2] = shadow_map_start - up_vec * width + side_vec * width;
 		corners[3] = shadow_map_start - up_vec * width - side_vec * width;
 
-		global_app.r->debug_line(corners[0], corners[1], vec3(1, 0, 0));
-		global_app.r->debug_line(corners[1], corners[2], vec3(1, 0, 0));
-		global_app.r->debug_line(corners[2], corners[3], vec3(1, 0, 0));
-		global_app.r->debug_line(corners[3], corners[0], vec3(1, 0, 0));
+		//global_app.r->debug_line(corners[0], corners[1], vec3(1, 0, 0));
+		//global_app.r->debug_line(corners[1], corners[2], vec3(1, 0, 0));
+		//global_app.r->debug_line(corners[2], corners[3], vec3(1, 0, 0));
+		//global_app.r->debug_line(corners[3], corners[0], vec3(1, 0, 0));
 
 
 		// back quad
-		global_app.r->debug_line(shadow_map_start, shadow_map_end, vec3(1.0, 0.0, 0));
+	//	global_app.r->debug_line(shadow_map_start, shadow_map_end, vec3(1.0, 0.0, 0));
 	}
 	//global_app.r->add_line(shadow_map_start, shadow_map_start + side_vec * 3.f, vec3(0, 0, 1));
 	//global_app.r->add_line(shadow_map_start, shadow_map_start + up_vec * 3.f, vec3(0, 1, 0));
 	if (show_light_lines) {
 
 		for (int i = 0; i < global_app.scene->num_lights; i++) {
-			global_app.r->debug_line(vec3(0), global_app.scene->lights[i].position, global_app.scene->lights[i].color);
-			global_app.r->debug_point(global_app.scene->lights[i].position, global_app.scene->lights[i].color);
+		//	global_app.r->debug_line(vec3(0), global_app.scene->lights[i].position, global_app.scene->lights[i].color);
+		//	global_app.r->debug_point(global_app.scene->lights[i].position, global_app.scene->lights[i].color);
 		}
 	}
 	
 	Camera* c = &global_app.scene->cams[0];
 	c->frust.update(*c);
 	for (int i = 0; i < 5; i++) {
-		global_app.r->debug_line(vec3(0), c->frust.normals[i] * c->frust.offsets[i], vec3(i / 5.f, i/5.f, .5));
+		//global_app.r->debug_line(vec3(0), c->frust.normals[i] * c->frust.offsets[i], vec3(i / 5.f, i/5.f, .5));
 	}
 
-	global_app.r->debug_line(vec3(0), 10.f*-global_app.scene->sun.direction, vec3(1, 0, 0));
+	//global_app.r->debug_line(vec3(0), 10.f*-global_app.scene->sun.direction, vec3(1, 0, 0));
+
+	for (const auto& hit : world_hits) {
+		global_app.r->debug_line(hit.start, hit.end_pos, vec3(1.0, 0.0, 0.0));
+		global_app.r->debug_point(hit.end_pos, vec3(1.f));
+		global_app.r->debug_line(hit.end_pos, hit.end_pos + hit.normal, vec3(0.5, 1.0, 0.0));
+
+
+		global_app.r->debug_line(vec3(0), hit.end_pos, vec3(0.0, 1.0, 0.0));
+		global_app.r->debug_line(vec3(0), hit.start, vec3(0.0, 1.0, 0.0));
+
+
+	}
+	global_app.r->debug_line(global_app.scene->cams[0].position, vec3(0), vec3(0, 0, 1));
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -190,6 +205,9 @@ void Editor::handle_event(SDL_Event& event)
 			case SDLK_1:
 				cam_num = (cam_num + 1) % 2;
 				global_app.scene->cam_num = cam_num;
+				break;
+			case SDLK_SPACE:
+				shoot_ray();
 				break;
 			}
 			break;
@@ -221,5 +239,28 @@ void Editor::on_update()
 {
 	if (game_focused) {
 		global_app.scene->active_camera()->keyboard_update(SDL_GetKeyboardState(0));
+	}
+}
+#include <chrono>
+void Editor::shoot_ray()
+{
+	ray_t ray;
+	ray.dir = normalize(global_app.scene->active_camera()->front);
+	ray.length = 200.f;
+	ray.origin = global_app.scene->active_camera()->position;
+
+	auto start = std::chrono::steady_clock::now();
+	trace_t result = global_world.test_ray(ray);
+	auto end = std::chrono::steady_clock::now();
+	auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>( end - start);
+
+
+
+	if (result.hit) {
+		std::cout << "Ray hit: (" << elapsed.count() / 1000.f << " ms)\n"
+			<< "	Pos: " << result.end_pos.x << ' ' << result.end_pos.y << ' ' << result.end_pos.z << '\n'
+			<< "	Length: " << result.length << '\n'
+			<< "	Origin: " << result.start.x << ' ' << result.start.y << ' ' << result.start.z << '\n';
+		world_hits.push_back(result);
 	}
 }
