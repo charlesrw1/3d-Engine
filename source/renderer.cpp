@@ -548,9 +548,10 @@ void Renderer::primitive_debug_pass()
 	debug_points.clear();
 	glPointSize(1);
 
-	glLineWidth(1);
+	glLineWidth(2);
 	debug_lines.draw_array();
 	debug_lines.clear();
+	glLineWidth(1);
 
 	//glEnable(GL_DEPTH_TEST);
 
@@ -583,6 +584,20 @@ VertexP make_point(vec3 pos, vec3 color)
 void Renderer::debug_point(vec3 point, vec3 color)
 {
 	debug_points.append(make_point(point, color));
+}
+void Renderer::debug_box(vec3 min, vec3 max, vec3 color)
+{
+	vec3 corners[8] = { max, vec3(max.x,max.y,min.z),vec3(min.x,max.y,min.z),vec3(min.x,max.y,max.z),	// top CCW
+						vec3(max.x,min.y,max.z), vec3(max.x,min.y,min.z),min,vec3(min.x,min.y,max.z) };	// bottom
+	// top + bottom
+	for (int i = 0; i < 4; i++) {
+		debug_lines.push_2(make_point(corners[i], color), make_point(corners[(i + 1) % 4], color));
+		debug_lines.push_2(make_point(corners[4+i], color), make_point(corners[4 + ((i + 1) % 4)], color));
+	}
+	// connecting
+	for (int i = 0; i < 4; i++) {
+		debug_lines.push_2(make_point(corners[i], color), make_point(corners[i+4], color));
+	}
 }
 void Renderer::debug_line(vec3 start, vec3 end, vec3 color)
 {

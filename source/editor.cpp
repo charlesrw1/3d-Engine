@@ -176,17 +176,23 @@ void Editor::on_render()
 	//global_app.r->debug_line(vec3(0), 10.f*-global_app.scene->sun.direction, vec3(1, 0, 0));
 
 	for (const auto& hit : world_hits) {
-		global_app.r->debug_line(hit.start, hit.end_pos, vec3(1.0, 0.0, 0.0));
+	//	global_app.r->debug_line(hit.start, hit.end_pos, vec3(1.0, 0.0, 0.0));
 		global_app.r->debug_point(hit.end_pos, vec3(1.f));
 		global_app.r->debug_line(hit.end_pos, hit.end_pos + hit.normal, vec3(0.5, 1.0, 0.0));
 
 
-		global_app.r->debug_line(vec3(0), hit.end_pos, vec3(0.0, 1.0, 0.0));
-		global_app.r->debug_line(vec3(0), hit.start, vec3(0.0, 1.0, 0.0));
+		//global_app.r->debug_line(vec3(0), hit.end_pos, vec3(0.0, 1.0, 0.0));
+		//global_app.r->debug_line(vec3(0), hit.start, vec3(0.0, 1.0, 0.0));
 
 
 	}
-	global_app.r->debug_line(global_app.scene->cams[0].position, vec3(0), vec3(0, 0, 1));
+	//global_app.r->debug_line(global_app.scene->cams[0].position, vec3(0), vec3(0, 0, 1));
+
+	vec3 min, max;
+	//global_world.tree.find_leaf(global_app.scene->active_camera()->position, min, max);
+	//global_app.r->debug_box(min, max, vec3(0, 0, 1));
+
+
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -240,6 +246,7 @@ void Editor::on_update()
 	if (game_focused) {
 		global_app.scene->active_camera()->keyboard_update(SDL_GetKeyboardState(0));
 	}
+	//shoot_ray();
 }
 #include <chrono>
 void Editor::shoot_ray()
@@ -249,15 +256,31 @@ void Editor::shoot_ray()
 	ray.length = 200.f;
 	ray.origin = global_app.scene->active_camera()->position;
 
+	trace_t result;
+	
 	auto start = std::chrono::steady_clock::now();
-	trace_t result = global_world.test_ray(ray);
+	for (int i = 0; i < 1000; i++) {
+		result = global_world.tree.test_ray(ray);
+	}
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>( end - start);
+	global_world.tree.print_trace_stats();
+	auto start2 = std::chrono::steady_clock::now();
+	for (int i = 0; i < 1000; i++) {
+		 result = global_world.test_ray(ray);
+	}
+	auto end2 = std::chrono::steady_clock::now();
+	auto elapsed2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
+	
+	auto start3 = std::chrono::steady_clock::now();
+	for (int i = 0; i < 1000; i++) {
+		result = global_world.tree.test_ray(ray.origin,ray.origin+ray.dir*1000.f);
+	}
+	auto end3 = std::chrono::steady_clock::now();
+	auto elapsed3 = std::chrono::duration_cast<std::chrono::microseconds>(end3 - start3);
 
-
-
-	if (result.hit) {
-		std::cout << "Ray hit: (" << elapsed.count() / 1000.f << " ms)\n"
+	if (1) {
+		std::cout << "Ray hit: (" << elapsed3.count() / (1000.f) << " ms) (" << elapsed.count() / (1000.f) << " ms prev) (" << elapsed2.count() / (1000.f)  << " ms brute force)\n"
 			<< "	Pos: " << result.end_pos.x << ' ' << result.end_pos.y << ' ' << result.end_pos.z << '\n'
 			<< "	Length: " << result.length << '\n'
 			<< "	Origin: " << result.start.x << ' ' << result.start.y << ' ' << result.start.z << '\n';

@@ -3,6 +3,7 @@
 
 // A parser for Quake era .map files
 
+#define QUAKE_FROMAT 1
 
 #include "glm/glm.hpp"
 using namespace glm;
@@ -16,6 +17,7 @@ using namespace glm;
 class Texture;
 class VertexArray;
 
+enum SideType { FRONT, BACK, ON_PLANE, SPLIT };
 struct plane_t
 {
 	vec3 normal;
@@ -32,22 +34,53 @@ struct plane_t
 		normal = normalize(normal);
 		d = -dot(normal, v1);
 	}
-	float distance(const vec3& v) {
+	float distance(const vec3& v) const {
 		return dot(normal, v) + d;
 	}
 	// true= in front or on the plane, false= behind
-	bool classify(const vec3& p) {
+	bool classify(const vec3& p) const {
 		return dist(p) > -0.001;
 	}
-	float dist(const vec3& p) {
+	float dist(const vec3& p) const {
 		return dot(normal,p) + d;
 	}
+	SideType classify_full(const vec3& p) const {
+		float d = dist(p);
+		if (d < -0.01f) {
+			return BACK;
+		}
+		else if (d > 0.01f) {
+			return FRONT;
+		}
+		else {
+			return ON_PLANE;
+		}
+	}
+	bool get_intersection(const vec3& start, const vec3& end, vec3& result, float& percentage) const
+	{
+		vec3 dir = end - start;
+		dir = normalize(dir);
+
+		float denom = dot(normal, dir);
+		if (fabs(denom) < 0.01) {
+			return false;
+		}
+		float dis = distance(start);
+		float t = -dis / denom;
+		result = start + dir * t;
+
+		percentage = t / length(end - start);
+		
+		return true;
+	}
+
+
 };
 
 // Parsed from .map file
 struct mface_t
 {
-	vec3 v[3];
+	vec3 vert[3];
 
 	int t_index{};
 	vec2 uv_scale;
@@ -57,7 +90,7 @@ struct mface_t
 	int v_start{}, v_end{};
 	plane_t plane;
 };
-#define MAX_FACES 20
+#define MAX_FACES 24
 // Collection of faces
 struct mbrush_t
 {
@@ -72,6 +105,7 @@ struct mentity_t
 	// associated brush (optional)
 	u16 brush_start{}, brush_end{};
 };
+
 
 class MapParser
 {
@@ -103,6 +137,16 @@ private:
 
 	void compute_intersections(mbrush_t*);
 	void sort_verticies(mface_t*);
+	
+	void CSG_union();
+	void clip_to_brush(mbrush_t& to_clip, const mbrush_t& b, bool clip_to_plane, std::vector<mface_t>& final_faces);
+	std::vector<mface_t> clip_to_list(const mbrush_t& a, int start_index, const mface_t& b, bool clip_to_plane);
+	void split_face(const mface_t& b, const mface_t& a, mface_t& front, mface_t& back);
+	mface_t copy_face(const mface_t& f1);
+
+	void make_clipping_hull();
+
+	SideType classify_face(const mface_t& face, const mface_t& other) const;
 
 	Result parse_entity();
 	Result parse_brush();
@@ -116,15 +160,20 @@ private:
 	Result read_token();
 	Result read_str(bool in_quotes=true);
 
-	void fail(const char* msg);
+	void parse_fail(const char* msg);
+	void csg_fail(const char* msg);
 
 	int get_texture();
 
 	std::vector<mbrush_t> brushes;	// Groups of faces
 	std::vector<mface_t> faces;	
-
-
 	std::vector<vec3> verts;		// Indexed into by faces
+
+
+	// Used as temporary buffers during CSG stage
+	std::vector<vec3> clipped_verts;
+	std::vector<mbrush_t> clipped_brushes;
+	std::vector<mface_t> clipped_faces;
 
 
 	std::vector<std::string> textures;

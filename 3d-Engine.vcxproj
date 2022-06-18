@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="source\camera.cpp" />
+    <ClCompile Include="source\ClippingHull.cpp" />
     <ClCompile Include="source\deps\glad.c" />
     <ClCompile Include="source\deps\imgui.cpp" />
     <ClCompile Include="source\deps\imgui_demo.cpp" />
@@ -39,6 +40,7 @@
     <ClCompile Include="source\renderer.cpp" />
     <ClCompile Include="source\TextureManager.cpp" />
     <ClCompile Include="source\Texture_def.cpp" />
+    <ClCompile Include="source\Trace.cpp" />
     <ClCompile Include="source\WorldGeometry.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -59,8 +61,10 @@
     <ClInclude Include="source\deps\include\stb_image\stb_image.h" />
     <ClInclude Include="source\editor.h" />
     <ClInclude Include="source\Files.h" />
+    <ClInclude Include="source\FreeList.h" />
     <ClInclude Include="source\geometry.h" />
     <ClInclude Include="source\IGame.h" />
+    <ClInclude Include="source\KDTree.h" />
     <ClInclude Include="source\loader.h" />
     <ClInclude Include="source\MapParser.h" />
     <ClInclude Include="source\ModelManager.h" />
@@ -72,6 +76,7 @@
     <ClInclude Include="source\Scene.h" />
     <ClInclude Include="source\TextureManager.h" />
     <ClInclude Include="source\Texture_def.h" />
+    <ClInclude Include="source\Trace.h" />
     <ClInclude Include="source\types.h" />
     <ClInclude Include="source\WorldGeometry.h" />
   </ItemGroup>

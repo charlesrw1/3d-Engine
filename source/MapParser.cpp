@@ -41,17 +41,23 @@ void MapParser::start_file(std::string file)
 	infile.open(file);
 	if (!infile) {
 		std::cout << "Couldn't open .map file, " << file << '\n';
-		return;
+		exit(1);
 	}
 	
 	parse_file();
 
 	std::cout << "Finished parse. Entities: " << entities.size() << "; Brushes: " << brushes.size() << "; Faces: " << faces.size() << '\n';
+	printf("Performing CSG union...\n");
+	CSG_union();
+	std::cout << "Faces after CSG: "<< faces.size() << '\n';
+
+
 	infile.close();
 }
 
 void MapParser::compute_intersections(mbrush_t* brush)
 {
+	
 	//std::cout << "new brush: " << (int)brush->num_i << " faces\n";
 	for (int i = 0; i < brush->num_i; i++) {
 		const int face_index = brush->indices[i];
@@ -62,7 +68,7 @@ void MapParser::compute_intersections(mbrush_t* brush)
 		int added_verts = 0;
 		int v_start = faces.at(face_index).v_start;
 		for (int j = 0; j < brush->num_i; j++) {
-			for (int k = j; k < brush->num_i; k++) {
+			for (int k = 0; k < brush->num_i; k++) {
 				if (i != j && i != k && j != k) {
 					vec3 res = vec3(0);
 					bool good = intersect_3_planes(faces.at(brush->indices[i]).plane, faces.at(brush->indices[j]).plane, faces.at(brush->indices[k]).plane, res);
@@ -96,8 +102,9 @@ void MapParser::compute_intersections(mbrush_t* brush)
 
 			}
 		}
-
+		
 		faces.at(face_index).v_end = verts.size();
+		
 		//std::cout << "	verts on face: " << polys.at(face_and_poly_index).v_end - polys.at(face_and_poly_index).v_start << '\n';
 	}
 }
@@ -166,12 +173,38 @@ void MapParser::sort_verticies(mface_t* face)
 		}
 	}
 
+
+	face->plane.normal = -(face->plane.normal);
+	face->plane.d = -dot(face->plane.normal, face->vert[0]);
+
 	//printf("Ending verts:\n");
 	//for (int i = face->v_start; i < face->v_end; i++) {
 	//	printf("	%f %f %f\n", verts.at(i).x, verts.at(i).y, verts.at(i).z);
 	//}
 
 }
+
+static const vec3 axis_dir[]
+{
+{0,0,1}	,		// floor
+{0,0,-1},		// ceiling
+{0,1,0}, 		// south wall
+{0,-1,0},		// north wall
+{1,0,0}, 			// west wall
+{-1,0,0}, 		// east wall
+};
+
+// amount to push clip hull
+static const float push_amt[]
+{
+	0,
+	64.f,
+	16.f,
+	16.f,
+	16.f,
+	16.f,
+};
+
 
 void MapParser::parse_file()
 {
@@ -191,10 +224,14 @@ void MapParser::parse_file()
 		}
 	}
 
+	// TEMPORARY: moves verts along normal in direction
+	//make_clipping_hull();
+
 	// Finds verticies that belong to each face
 	for (int i = 0; i < brushes.size(); i++) {
 		compute_intersections(&brushes.at(i));
 	}
+
 	// Sorts verticies in CW winding order
 	printf("Sorting verts...\n");
 	for (int i = 0; i < brushes.size(); i++) {
@@ -206,7 +243,7 @@ void MapParser::parse_file()
 		}
 	}
 }
-void MapParser::fail(const char* msg)
+void MapParser::parse_fail(const char* msg)
 {
 	std::cout << "Failed map parse @ Line, " << line << ", " << msg << '\n';
 }
@@ -220,7 +257,7 @@ MapParser::Result MapParser::parse_entity()
 		return R_FAIL;
 	}
 	if (parse_char != '{') {
-		fail("expected '{'");
+		parse_fail("expected '{'");
 		return R_FAIL;
 	}
 
@@ -241,7 +278,7 @@ MapParser::Result MapParser::parse_entity()
 			read_str();
 			read_token();
 			if (parse_char != '"') {
-				fail("Expected value after key");
+				parse_fail("Expected value after key");
 				return R_FAIL;
 			}
 			std::string key = parse_buffer;
@@ -264,7 +301,7 @@ MapParser::Result MapParser::parse_entity()
 			return R_GOOD;
 
 		default:
-			fail("Unknown character");
+			parse_fail("Unknown character");
 			return R_FAIL;
 		}
 	}
@@ -281,11 +318,11 @@ MapParser::Result MapParser::parse_brush()
 		Result r = read_token();
 		if (parse_char == '(') {
 			if (b->num_i == MAX_FACES) {
-				fail("Too many faces!");
+				parse_fail("Too many faces!");
 				return R_FAIL;
 			}
 			
-			Result r = parse_face();
+			Result r =  parse_face_quake();
 			if (r == R_FAIL) {
 				return R_FAIL;
 			}
@@ -297,7 +334,7 @@ MapParser::Result MapParser::parse_brush()
 			break;
 		}
 		else {
-			fail("Unknown character on brush parse");
+			parse_fail("Unknown character on brush parse");
 			return R_FAIL;
 		}
 	}
@@ -315,29 +352,29 @@ MapParser::Result MapParser::parse_face()
 		if (i != 0) {
 			read_token();
 			if (parse_char != '(') {
-				fail("Expected '(' before vec3");
+				parse_fail("Expected '(' before vec3");
 				return R_FAIL;
 			}
 		}
 		
-		Result r = parse_vec3(f->v[i]);
+		Result r = parse_vec3(f->vert[i]);
 
 		read_token();
 		if (parse_char != ')') {
-			fail("Expected ')' after vec3");
+			parse_fail("Expected ')' after vec3");
 			return R_FAIL;
 		}
 
 	}
 
-	f->plane.init(f->v[0], f->v[1], f->v[2]);
+	f->plane.init(f->vert[0], f->vert[1], f->vert[2]);
 
 	read_str(false);
 	f->t_index = get_texture();
 
 	read_token();
 	if (parse_char != '[') {
-		fail("Expected '['");
+		parse_fail("Expected '['");
 		return R_FAIL;
 	}
 	parse_vec3(f->u_axis);
@@ -345,13 +382,13 @@ MapParser::Result MapParser::parse_face()
 	f->u_offset = std::stoi(parse_buffer);
 	read_token();
 	if (parse_char != ']') {
-		fail("Expected ']'");
+		parse_fail("Expected ']'");
 		return R_FAIL;
 	}
 
 	read_token();
 	if (parse_char != '[') {
-		fail("Expected '['");
+		parse_fail("Expected '['");
 		return R_FAIL;
 	}
 	parse_vec3(f->v_axis);
@@ -359,7 +396,7 @@ MapParser::Result MapParser::parse_face()
 	f->v_offset = std::stoi(parse_buffer);
 	read_token();
 	if (parse_char != ']') {
-		fail("Expected ']'");
+		parse_fail("Expected ']'");
 		return R_FAIL;
 	}
 	// throwaway, "angle"
@@ -381,22 +418,22 @@ MapParser::Result MapParser::parse_face_quake()
 		if (i != 0) {
 			read_token();
 			if (parse_char != '(') {
-				fail("Expected '(' before vec3");
+				parse_fail("Expected '(' before vec3");
 				return R_FAIL;
 			}
 		}
 
-		Result r = parse_vec3(f->v[i]);
+		Result r = parse_vec3(f->vert[i]);
 
 		read_token();
 		if (parse_char != ')') {
-			fail("Expected ')' after vec3");
+			parse_fail("Expected ')' after vec3");
 			return R_FAIL;
 		}
 
 	}
 
-	f->plane.init(f->v[0], f->v[1], f->v[2]);
+	f->plane.init(f->vert[0], f->vert[1], f->vert[2]);
 
 	read_str(false);
 	f->t_index = get_texture();
@@ -550,4 +587,259 @@ void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)
 	}
 
 
+}
+
+//
+// CSG BELOW
+//
+
+void MapParser::CSG_union()
+{
+	// create a copy, these will be modified in the functions
+	//clipped_faces = faces;
+//	clipped_verts = verts;
+
+
+	clipped_brushes = brushes;
+	clipped_verts.clear();
+	clipped_faces.clear();
+
+	bool clip_on_plane;
+	for (int i = 0; i < brushes.size(); i++) {
+
+
+
+		clip_on_plane = false;
+		std::vector<mface_t> final_faces;
+		// copy faces
+		for (int m = 0; m < brushes.at(i).num_i; m++) {
+			final_faces.push_back(faces.at(brushes.at(i).indices[m]));
+			clipped_brushes.at(i).indices[m] = m;
+		}
+
+
+		for (int j = 0; j < brushes.size(); j++) {
+			if (i != j) {
+				clip_to_brush(clipped_brushes.at(i), brushes.at(j), clip_on_plane, final_faces);
+			}
+			else {
+				clip_on_plane = true;
+			}
+		}
+
+
+
+		clipped_faces.insert(clipped_faces.end(), final_faces.begin(), final_faces.end());
+	}
+
+	brushes = std::move(clipped_brushes);
+	//verts = std::move(clipped_verts);
+	faces = std::move(clipped_faces);
+
+}
+// a is being clipped to b
+void MapParser::clip_to_brush(mbrush_t& to_clip, const mbrush_t& b, bool clip_to_plane, std::vector<mface_t>& final_faces)
+{
+	//printf("Clipping brush...\n");
+	//std::vector<mface_t> final_faces;
+	//assert(to_clip.num_i < 12);
+	std::vector<mface_t> temp_list;	
+	temp_list.reserve(final_faces.size());
+	for (int i = 0; i < final_faces.size(); i++) {
+		auto clipped_brush_faces = clip_to_list(b, 0, final_faces.at(i), clip_to_plane);
+		temp_list.insert(temp_list.end(),clipped_brush_faces.begin(), clipped_brush_faces.end());
+	}
+	//int start = clipped_faces.size();
+	//to_clip.num_i = final_faces.size();
+	final_faces = temp_list;
+	// update indicies
+
+	//for (int i = 0; i < to_clip.num_i ; i++) {
+		//to_clip.indices[i] = start + i;
+	//}
+}
+// clips face b to the faces in brush a
+std::vector<mface_t> MapParser::clip_to_list(const mbrush_t& a, int start_index, const mface_t& b, bool clip_on_plane)
+{
+	//printf("	Clipping face...\n");
+	std::vector<mface_t> result;
+	assert(start_index < a.num_i);
+	for (int i = start_index; i < a.num_i; i++) {
+		switch (classify_face(faces.at(a.indices[i]), b))
+		{
+		case FRONT:
+			// face is in front of one of a's, due to convexity, its front of all of a's
+			result.push_back(copy_face(b));
+			return result;
+			break;
+		case BACK:
+			// no conlusion
+			// continue
+			break;
+		case ON_PLANE: {
+			float angle = dot(faces.at(a.indices[i]).plane.normal, b.plane.normal) - 1.f;
+			// same normal
+			if (angle < 0.1 && angle > -0.1) {
+				if (!clip_on_plane) {
+					// return polys
+					result.push_back(copy_face(b));
+					return result;
+				}
+			}
+			// continue
+		}break;
+		case SPLIT:
+		{
+			mface_t front, back;
+			split_face(faces.at(a.indices[i]), b, front, back);
+
+			if (i == a.num_i-1) {
+				// discard back clipped
+				result.push_back(front);
+				return result;
+			}
+			auto check_back = clip_to_list(a, i+1, back, clip_on_plane);
+			if (check_back.empty()) {
+				result.push_back(front);
+				return result;
+			}
+			if (check_back.at(0).v_start == back.v_start) {
+				result.push_back(copy_face(b));
+				return result;
+			}
+			result.push_back(front);
+			result.insert(result.end(),check_back.begin(),check_back.end());
+			return result;
+		}break;
+		}
+	}
+	return result;
+}
+// face(param 1) = plane to check other's verticies on
+SideType MapParser::classify_face(const mface_t& face, const mface_t& other) const
+{
+	bool front = false, back = false;
+	int other_v_count = other.v_end - other.v_start;
+	for (int i = 0; i < other_v_count; i++) {
+		const vec3& v = verts.at(other.v_start + i);
+		float dist = face.plane.dist(v);
+		if (dist > 0.1) {
+
+			if (back) {
+				return SPLIT;
+			}
+			front = true;
+		}
+		else if (dist < -0.1) {
+			if (front) {
+				return SPLIT;
+			}
+			back = true;
+		}
+	}
+	if (front) {
+		return FRONT;
+	}
+	else if (back) {
+		return BACK;
+	}
+
+	return ON_PLANE;
+}
+// face a being split by plane b
+void MapParser::split_face(const mface_t& b, const mface_t& a, mface_t& front, mface_t& back)
+{
+	//printf("		Splitting face...\n");
+	int v_count = a.v_end - a.v_start;
+	std::vector<SideType> classified(v_count);
+	for (int i = 0; i <v_count; i++) {
+		classified.at(i) = b.plane.classify_full(verts.at(a.v_start + i));
+	}
+
+	std::vector<vec3> front_verts;
+	std::vector<vec3> back_verts;
+
+	// new faces
+	//mface_t front;
+	//mface_t back;
+	front.plane = a.plane;
+	back.plane = a.plane;
+	front.t_index = a.t_index;
+	back.t_index = a.t_index;
+// Remeber texture info here!
+
+	for (int i = 0; i < v_count; i++) {
+		int idx = a.v_start + i;
+		
+		switch (classified.at(i))
+		{
+		case FRONT:
+			front_verts.push_back(verts.at(idx));
+			break;
+		case BACK:
+			back_verts.push_back(verts.at(idx));
+			break;
+		case ON_PLANE:
+			front_verts.push_back(verts.at(idx));
+			back_verts.push_back(verts.at(idx));
+			break;
+		}
+
+		int next_idx = idx + 1;
+		if (next_idx == a.v_end) next_idx = a.v_start;
+		assert(next_idx != idx);
+
+		bool ignore = false;
+
+		if (classified.at(idx-a.v_start) == ON_PLANE && classified.at(next_idx - a.v_start) != ON_PLANE) {
+			ignore = true;
+		}
+		if (classified.at(idx - a.v_start) != ON_PLANE && classified.at(next_idx - a.v_start) == ON_PLANE) {
+			ignore = true;
+		}
+		if (!ignore && classified.at(idx-a.v_start)!=classified.at(next_idx-a.v_start)) {
+			vec3 vert=vec3(0);
+			float percentage;
+			
+			if (!b.plane.get_intersection(verts.at(idx), verts.at(next_idx), vert, percentage)) {
+				
+				// should never happen, but it does...
+				vert = verts.at(idx);
+				//continue;
+				////printf("Split edge not parallel!\n");
+				//exit(1);
+			}
+
+			front_verts.push_back(vert);
+			back_verts.push_back(vert);
+			// texture calc here
+
+
+		}
+	}
+	assert(front_verts.size() >= 3);
+	assert(back_verts.size() >= 3);
+	assert(front_verts.size() + back_verts.size() >= v_count);
+
+	front.v_start = verts.size();
+	verts.insert(verts.end(),front_verts.begin(), front_verts.end());
+	front.v_end = verts.size();
+
+	back.v_start = verts.size();
+	verts.insert(verts.end(), back_verts.begin(), back_verts.end());
+	back.v_end = verts.size();
+}
+
+mface_t MapParser::copy_face(const mface_t& f1)
+{
+	mface_t res = f1;
+	/*
+	res.v_start = clipped_verts.size();
+	int v_count = f1.v_end - f1.v_start;
+	for (int i = 0; i < v_count; i++) {
+		clipped_verts.push_back(verts.at(f1.v_start + i));
+	}
+	res.v_end = clipped_verts.size();
+	*/
+	return res;
 }

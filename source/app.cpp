@@ -56,7 +56,7 @@ void App::create_scene()
 {
 	MapParser mp;
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/house-arch.map");
+	mp.start_file("resources/maps/e1m1.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
 	global_world.load_map(mp);
@@ -64,6 +64,7 @@ void App::create_scene()
 	u32 map_end = SDL_GetTicks();
 	printf("Loaded map in: %i ms\n", map_end - map_start);
 	//exit(1);
+	//return;
 
 	u32 start = SDL_GetTicks();
 
@@ -85,7 +86,7 @@ void App::create_scene()
 	}
 	*/
 
-	GameObject* temp;
+	//GameObject* temp;
 	/*
 	Model* plane = new Model;
 	Texture* grid = new Texture;
@@ -133,11 +134,11 @@ void App::create_scene()
 	scene->sun.direction = normalize(-vec3(cos(azimuth) * sin(altidude), cos(altidude),sin(azimuth) * sin(altidude)));
 
 
-	Model* soldier = global_models.find_or_load("soldier/soldier.dae");
-	//load_model_assimp(soldier, "soldier/soldier.dae", false);
-	scene->objects.push_back(new GameObject(soldier));
-	scene->objects.back()->scale = vec3(0.03);
-	scene->objects.back()->position = vec3(1, 0, 0);
+	//Model* soldier = global_models.find_or_load("soldier/soldier.dae");
+	////load_model_assimp(soldier, "soldier/soldier.dae", false);
+	//scene->objects.push_back(new GameObject(soldier));
+	//scene->objects.back()->scale = vec3(0.03);
+	//scene->objects.back()->position = vec3(1, 0, 0);
 
 //	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
 	//Model* sponza = global_models.find_or_load("sponza/sponza.obj");
@@ -147,12 +148,12 @@ void App::create_scene()
 	//scene->objects.push_back(new GameObject(sponza));
 	//scene->objects.back()->scale = vec3(0.01);
 	
-	Model* revant = global_models.find_or_load("Revenant/revenant.dae");
-	//load_model_assimp(revant, "Revenant/revenant.dae",false);
-	scene->objects.push_back(new GameObject(revant));
-	scene->objects.back()->scale = vec3(0.015);
-	scene->objects.back()->position = vec3(2, 0, 1);
-	scene->objects.back()->euler_x = - 3.14 / 2;
+	//Model* revant = global_models.find_or_load("Revenant/revenant.dae");
+	////load_model_assimp(revant, "Revenant/revenant.dae",false);
+	//scene->objects.push_back(new GameObject(revant));
+	//scene->objects.back()->scale = vec3(0.015);
+	//scene->objects.back()->position = vec3(2, 0, 1);
+	//scene->objects.back()->euler_x = - 3.14 / 2;
 
 	//Model* geo = global_models.find_or_load("TUNNELS.obj");
 	//scene->objects.push_back(new GameObject(geo));
@@ -179,8 +180,8 @@ void App::create_scene()
 	global_textures.update();
 	printf("\n\n\n     TIME: %u\n\n\n", end - start);
 
-	global_models.print_info();
-	global_textures.print_info();
+	//global_models.print_info();
+	//global_textures.print_info();
 
 }
 

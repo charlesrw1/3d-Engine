@@ -97,6 +97,7 @@ public:
 	// Temporary Debug Stuff
 	void debug_line(vec3 start, vec3 end, vec3 color);
 	void debug_point(vec3 pos, vec3 color);
+	void debug_box(vec3 min, vec3 max, vec3 color);
 
 	VertexArray debug_lines;
 	VertexArray debug_points;

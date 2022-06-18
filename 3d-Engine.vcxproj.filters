@@ -87,6 +87,12 @@
     <ClCompile Include="source\WorldGeometry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source\ClippingHull.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Trace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\app.h">
@@ -183,6 +189,15 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="source\WorldGeometry.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\FreeList.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\KDTree.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Trace.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
