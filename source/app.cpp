@@ -56,7 +56,7 @@ void App::create_scene()
 {
 	MapParser mp;
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/e1m1.map");
+	mp.start_file("resources/maps/dm4.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
 	global_world.load_map(mp);

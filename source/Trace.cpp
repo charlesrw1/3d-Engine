@@ -56,12 +56,12 @@ trace_t KDTree::test_ray(vec3 start, vec3 end)
 		float back_dist = p->distance(back);
 
 		// both in front
-		if (front_dist > -0.1 && back_dist > -0.1) {
+		if (front_dist > -0.01 && back_dist > -0.01) {
 			node_n = node->first_child;
 			continue;
 		}
 		// both behind
-		if (front_dist < 0.1 && back_dist < 0.1) {
+		if (front_dist < 0.01 && back_dist < 0.01) {
 			node_n = node->first_child + 1;
 			continue;
 		}

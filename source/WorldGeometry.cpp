@@ -519,6 +519,7 @@ void KDTree::test_ray_internal(bool uptree, int caller_node, int node_idx, const
 	// node has faces attached to it, check them
 	if (node.num_faces != -1) {
 		check_ray_leaf_node(node, ray, trace);
+		if (trace.hit) trace.node = node_idx;
 	}
 	// node is a parent, determine where to go next
 	else {

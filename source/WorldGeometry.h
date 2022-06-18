@@ -15,8 +15,8 @@ const float SCALE_FACTOR = 1 / 32.f;
 #define SOLID_BLOCK	 2
 #define SOLID_TRIGGER 3
 
-
-#define MAX_PER_LEAF 25
+//80
+#define MAX_PER_LEAF 50
 #define MAX_DEPTH 10
 
 struct face_t
@@ -43,6 +43,7 @@ struct trace_t
 	vec3 start;
 	float length;
 
+	int node{};
 	// material hit
 	Texture* tex = nullptr;
 };
