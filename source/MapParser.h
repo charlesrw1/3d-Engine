@@ -80,8 +80,6 @@ struct plane_t
 // Parsed from .map file
 struct mface_t
 {
-	vec3 vert[3];
-
 	int t_index{};
 	vec2 uv_scale;
 	vec3 u_axis, v_axis;
@@ -94,8 +92,8 @@ struct mface_t
 // Collection of faces
 struct mbrush_t
 {
-	uint16 indices[MAX_FACES];
-	uint8 num_i = 0;
+	int face_start = 0;
+	uint8 num_faces = 0;
 };
 
 struct mentity_t
@@ -103,7 +101,7 @@ struct mentity_t
 	// Key value pairs for properties
 	std::unordered_map<std::string, std::string> properties;
 	// associated brush (optional)
-	u16 brush_start{}, brush_end{};
+	int brush_start{}, brush_count{};
 };
 
 
@@ -144,6 +142,8 @@ private:
 	void split_face(const mface_t& b, const mface_t& a, mface_t& front, mface_t& back);
 	mface_t copy_face(const mface_t& f1);
 
+	uint64 get_surface_area();
+
 	void make_clipping_hull();
 
 	SideType classify_face(const mface_t& face, const mface_t& other) const;
@@ -161,8 +161,7 @@ private:
 	Result read_str(bool in_quotes=true);
 
 	void parse_fail(const char* msg);
-	void csg_fail(const char* msg);
-
+	
 	int get_texture();
 
 	std::vector<mbrush_t> brushes;	// Groups of faces

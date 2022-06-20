@@ -8,11 +8,11 @@ using u8 = uint8_t;
 
 enum TParams
 {
-	FILP_Y		=1,
-	GEN_MIPS	=2,
-	HAS_ALPHA	=4,
-	NEAREST		=8,
-	CLAMP		=16,
+	FILP_Y		=(1<<0),
+	GEN_MIPS	=(1<<1),
+	HAS_ALPHA	=(1<<2),
+	NEAREST		=(1<<3),
+	CLAMP		=(1<<4),
 
 
 	LOAD_NOW	=128

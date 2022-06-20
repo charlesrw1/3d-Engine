@@ -9,7 +9,7 @@
 #include "TextureManager.h"
 
 #include "WorldGeometry.h"
-
+#include "Light.h"
 #include <iostream>
 
 const int SHADOW_WIDTH = 2048;
@@ -113,14 +113,15 @@ void Renderer::render_scene(SceneData& scene)
 
 	//halt_and_render_to_screen(temp->get_ID());
 	//return;
-
 	glViewport(0, 0, global_app.width, global_app.height);
+	/*
 	debug_depth.use();
 	glDisable(GL_CULL_FACE);
 	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
 	quad.draw_array();
-	glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);*/
 
+	glEnable(GL_CULL_FACE);
 	//return;
 	HDRbuffer.bind();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -287,18 +288,18 @@ void Renderer::draw_world_geo(Shader& s)
 		const RenderMesh* rm = m->mesh(i);
 
 		if (rm->diffuse) {
-			white_tex->bind(0);
+			//white_tex->bind(0);
 
-			//rm->diffuse->bind(0);
+			rm->diffuse->bind(0);
 		}
 		else {
 			white_tex->bind(0);
 		}
 
 		if (rm->specular) {
-			white_tex->bind(1);
+			//white_tex->bind(1);
 
-			//rm->specular->bind(1);
+			rm->specular->bind(1);
 		}
 		else {
 			white_tex->bind(1);
@@ -546,7 +547,6 @@ void Renderer::primitive_debug_pass()
 	glPointSize(5);
 	debug_points.draw_array();
 	debug_points.clear();
-	glPointSize(1);
 
 	glLineWidth(2);
 	debug_lines.draw_array();
@@ -554,7 +554,8 @@ void Renderer::primitive_debug_pass()
 	glLineWidth(1);
 
 	//glEnable(GL_DEPTH_TEST);
-
+	draw_lightmap_debug();
+	glPointSize(1);
 }
 void Renderer::bounding_sphere_pass(SceneData& scene)
 {

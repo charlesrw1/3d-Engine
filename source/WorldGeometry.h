@@ -26,8 +26,11 @@ struct face_t
 
 	plane_t plane;
 
-	u8 type;
-	u32 id{};
+	vec3 texture_axis[2];
+	float texture_scale[2];
+	short texture_offset[2];
+	//u8 type;
+	//u32 id{};
 };
 struct trace_t
 {
@@ -57,7 +60,6 @@ struct ray_t
 
 
 
-using leaf_handle = u32;
 class KDTree
 {
 public:
@@ -75,8 +77,10 @@ public:
 	// finds leaf and includes the box that surrounds the leaf
 	int find_leaf(vec3 point, vec3& min_box, vec3& max_box) const;
 
+	// bad version
 	trace_t test_ray(const ray_t& r);
 
+	// faster version
 	trace_t test_ray(vec3 start, vec3 end);
 private:
 	enum { CUT_X, CUT_Y, CUT_Z};
@@ -94,9 +98,6 @@ private:
 	void subdivide(int cut_dir, int node_idx, int depth);
 
 	void create_va_internal(int node_idx, vec3 min, vec3 max);
-	
-	int binary_search(int node_idx, const vec3& point) const;
-	int binary_search(int node_idx, const vec3& point, vec3& min, vec3& max) const;
 
 	void test_ray_internal(bool upstack, int caller_node, int node_idx, const ray_t& r, trace_t& t);
 	inline void check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t);
@@ -147,6 +148,13 @@ public:
 	 Model* get_model()  {
 		return model;
 	}
+
+	 std::vector<vec3>& get_verts() {
+		 return world_verts;
+	 }
+	 std::vector<face_t>& get_faces() {
+		 return static_faces;
+	 }
 
 	 void print_info() const;
 	 // for editor access

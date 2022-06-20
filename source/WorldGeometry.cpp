@@ -22,7 +22,7 @@ void WorldGeometry::load_map(const MapParser& mp)
 	std::vector<ivec2> texture_sizes;
 	// first load textures, non-async because width/height is needed for uv coords
 	for (const auto& t : texs) {
-		face_textures.push_back(global_textures.find_or_load((t + ".png").c_str(), TParams::LOAD_NOW));
+		face_textures.push_back(global_textures.find_or_load((t + ".png").c_str(), TParams::LOAD_NOW | TParams::GEN_MIPS | TParams::NEAREST));
 		if (face_textures.back()->is_loaded()) {
 			texture_sizes.push_back(face_textures.back()->get_dimensions());
 		}
@@ -61,6 +61,13 @@ void WorldGeometry::load_map(const MapParser& mp)
 		new_face.plane.init(world_verts.at(face.v_start), world_verts.at(face.v_start + 1), world_verts.at(face.v_start + 2));
 		new_face.plane.normal = new_face.plane.normal * -1.f;
 		new_face.plane.d = -dot(new_face.plane.normal, world_verts.at(face.v_start));
+		new_face.texture_axis[0] = face.u_axis;
+		new_face.texture_axis[1] = face.v_axis;
+		new_face.texture_scale[0] = face.uv_scale.x;
+		new_face.texture_scale[1] = face.uv_scale.y;
+		new_face.texture_offset[0] = face.u_offset;
+		new_face.texture_offset[1] = face.v_offset;
+
 		
 		// Generate verts for GPU
 
@@ -74,10 +81,15 @@ void WorldGeometry::load_map(const MapParser& mp)
 			wrv.position = world_verts.at(new_face.v_start + j);
 			
 			// Texture coordinates
-			wrv.uv.x = dot(wrv.position, face.u_axis) / texture_sizes.at(face.t_index).x * face.uv_scale.x + face.u_offset / texture_sizes.at(face.t_index).x;
-			wrv.uv.y = dot(wrv.position, face.v_axis) / texture_sizes.at(face.t_index).y * face.uv_scale.y + face.v_offset / texture_sizes.at(face.t_index).y;
-			wrv.uv.x = 0;
-			wrv.uv.y = 0;
+			wrv.uv.x = dot(wrv.position*32.f, face.u_axis) / texture_sizes.at(face.t_index).x /face.uv_scale.x + face.u_offset / texture_sizes.at(face.t_index).x;
+			wrv.uv.y = dot(wrv.position*32.f, face.v_axis) / texture_sizes.at(face.t_index).y /face.uv_scale.y + face.v_offset / texture_sizes.at(face.t_index).y;
+			if (abs(wrv.uv.x) > 50) {
+				wrv.uv.x = 0;
+			}
+			if (abs(wrv.uv.y) > 50) {
+				wrv.uv.y = 0;
+			}
+		
 			// Arbitrary scaling, quake maps are very big
 			//wrv.position /= 16.f;
 
@@ -129,7 +141,7 @@ void WorldGeometry::load_map(const MapParser& mp)
 void WorldGeometry::debug_draw() {
 	glLineWidth(1);
 	glEnable(GL_DEPTH_TEST);
-	line_va->draw_array();
+	//line_va->draw_array();
 	glDisable(GL_DEPTH_TEST);
 	hit_faces->draw_array();
 	glPointSize(10);
@@ -435,52 +447,47 @@ void KDTree::create_va()
 }
 int KDTree::find_leaf(vec3 point) const
 {
-	return binary_search(0, point);
+	int node_n = 0;
+	const node_t* node = &nodes.at(node_n);
+	while (node->num_faces == -1)
+	{
+		const plane_t* p = &planes.at(node->plane_num);
+		bool back = !p->classify(point);
+
+		node_n = node->first_child + back;
+		node = &nodes.at(node_n);
+	}
+	return node_n;
 }
 int KDTree::find_leaf(vec3 point, vec3& min_box, vec3& max_box) const
 {
 	min_box = vec3(-64);
 	max_box = vec3(64);
-	return binary_search(0, point, min_box, max_box);
-}
-int KDTree::binary_search(int node_idx, const vec3& point) const
-{
-	const node_t& node = nodes.at(node_idx);
-	if (node.num_faces != -1) {
-		return node_idx;
-	}
 
-	const plane_t& p = planes.at(node.plane_num);
-	if (p.classify(point)) {
-		return binary_search(node.first_child, point);
+	int node_n = 0;
+	const node_t* node = &nodes.at(node_n);
+	while (node->num_faces == -1)
+	{
+		const plane_t* p = &planes.at(node->plane_num);
+		bool front = p->classify(point);
+		
+		int dig = 0;
+		if (p->normal.y > 0.5) dig = 1;
+		else if (p->normal.z > 0.5) dig = 2;
+		
+		if (front) {
+			min_box[dig] = -p->d;
+			node_n = node->first_child;
+		}
+		else {
+			max_box[dig] = -p->d;
+			node_n = node->first_child + 1;
+		}
+		node = &nodes.at(node_n);
 	}
-	else {
-		return binary_search(node.first_child + 1, point);
-	}
-}
-int KDTree::binary_search(int node_idx, const vec3& point, vec3& min, vec3& max) const
-{
-	const node_t& node = nodes.at(node_idx);
-	if (node.num_faces != -1) {
-		return node_idx;
-	}
-	const plane_t& p = planes.at(node.plane_num);
+	return node_n;
 
-	int dig = 0;
-	if (p.normal.y > 0.5) dig = 1;
-	else if (p.normal.z > 0.5) dig = 2;
-	vec3 new_min = min, new_max = max;
-	new_min[dig] = -p.d;
-	new_max[dig] = -p.d;
-
-	if (p.classify(point)) {
-		min = new_min;
-		return binary_search(node.first_child, point, min, max);
-	}
-	else {
-		max = new_max;
-		return binary_search(node.first_child + 1, point, min, max);
-	}
+	//return binary_search(0, point, min_box, max_box);
 }
 static u32 total_compares = 0;
 static u32 total_func_calls = 0;
@@ -493,6 +500,7 @@ void KDTree::print_trace_stats()
 	printf("Leafs: %u\n", total_leafs);
 	printf("Skipped: %u\n", skipped);
 }
+
 trace_t KDTree::test_ray(const ray_t& ray)
 {
 	total_compares = 0;
@@ -500,7 +508,7 @@ trace_t KDTree::test_ray(const ray_t& ray)
 	total_leafs = 0;
 	skipped = 0;
 	curr_compare++;
-	leaf_handle start_node = find_leaf(ray.origin);
+	int start_node = find_leaf(ray.origin);
 	trace_t t;
 	t.start = ray.origin;
 	t.dir = ray.dir;

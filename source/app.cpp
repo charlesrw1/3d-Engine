@@ -20,6 +20,7 @@
 #include "MapParser.h"
 
 #include "WorldGeometry.h"
+#include "Light.h"
 App global_app;
 
 void App::init()
@@ -56,10 +57,12 @@ void App::create_scene()
 {
 	MapParser mp;
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/dm4.map");
+	mp.start_file("resources/maps/indoors.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
 	global_world.load_map(mp);
+	create_light_map();
+
 
 	u32 map_end = SDL_GetTicks();
 	printf("Loaded map in: %i ms\n", map_end - map_start);
@@ -141,12 +144,12 @@ void App::create_scene()
 	//scene->objects.back()->position = vec3(1, 0, 0);
 
 //	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
-	//Model* sponza = global_models.find_or_load("sponza/sponza.obj");
+	Model* sponza = global_models.find_or_load("sponza/sponza.obj");
 	//load_model_assimp(sponza, "sponza/sponza.obj", true);
 	//load_model_qobj(sponza, "sponza.qobj");
 	//
-	//scene->objects.push_back(new GameObject(sponza));
-	//scene->objects.back()->scale = vec3(0.01);
+	scene->objects.push_back(new GameObject(sponza));
+	scene->objects.back()->scale = vec3(0.01);
 	
 	//Model* revant = global_models.find_or_load("Revenant/revenant.dae");
 	////load_model_assimp(revant, "Revenant/revenant.dae",false);

@@ -25,6 +25,7 @@ class IGamee
 
 int main(int argc, char* argv[])
 {
+
 	App& app = global_app;
 	app.init();
 

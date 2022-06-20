@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\app.cpp" />
+    <ClCompile Include="source\BrushCSG.cpp" />
     <ClCompile Include="source\camera.cpp" />
     <ClCompile Include="source\ClippingHull.cpp" />
     <ClCompile Include="source\deps\glad.c" />
@@ -31,6 +32,7 @@
     <ClCompile Include="source\deps\imgui_tables.cpp" />
     <ClCompile Include="source\deps\imgui_widgets.cpp" />
     <ClCompile Include="source\editor.cpp" />
+    <ClCompile Include="source\Light.cpp" />
     <ClCompile Include="source\loader.cpp" />
     <ClCompile Include="source\main.cpp" />
     <ClCompile Include="source\MapParser.cpp" />
@@ -65,8 +67,10 @@
     <ClInclude Include="source\geometry.h" />
     <ClInclude Include="source\IGame.h" />
     <ClInclude Include="source\KDTree.h" />
+    <ClInclude Include="source\Light.h" />
     <ClInclude Include="source\loader.h" />
     <ClInclude Include="source\MapParser.h" />
+    <ClInclude Include="source\MapProcess.h" />
     <ClInclude Include="source\ModelManager.h" />
     <ClInclude Include="source\Model_def.h" />
     <ClInclude Include="source\Object.h" />

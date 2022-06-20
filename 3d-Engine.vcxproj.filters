@@ -22,6 +22,9 @@
     <Filter Include="Source Files\Scene">
       <UniqueIdentifier>{ba39baf2-f97d-46ef-a3da-2c1c23d6706a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Lightmapping">
+      <UniqueIdentifier>{6b1b170b-ca35-4e93-b4af-a6505331d700}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\app.cpp">
@@ -92,6 +95,12 @@
     </ClCompile>
     <ClCompile Include="source\Trace.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\BrushCSG.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Light.cpp">
+      <Filter>Source Files\Lightmapping</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -199,6 +208,12 @@
     </ClInclude>
     <ClInclude Include="source\Trace.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\MapProcess.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Light.h">
+      <Filter>Source Files\Lightmapping</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -15,7 +15,7 @@ trace_t KDTree::test_ray(vec3 start, vec3 end)
 	ray_t r;
 	r.dir = trace.dir;
 	r.origin = start;
-	r.length = 1000.f;
+	r.length = length(end-start);
 	int node_n;
 	vec3 front;
 	vec3 back;
@@ -34,12 +34,15 @@ trace_t KDTree::test_ray(vec3 start, vec3 end)
 		while (node->num_faces != -1) {
 			check_ray_leaf_node(*node, r, trace);
 			if (trace.hit) {
+//va->push_2({ start,vec3(1.f,0.0,0.0) }, { end,vec3(1.f,0.0,0.0) });
+
 				return trace;
 			}
 
 			// no more nodes to check, no hit
 			top--;
 			if (top < stack) {
+//va->push_2({ start,vec3(0,1.f,0) }, { end,vec3(0,1.f,0) });
 				return trace;
 			}
 
@@ -91,9 +94,10 @@ inline void KDTree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& e
 		leaf = &leaves[i];
 		face_t& f = faces.at(leaf->face_index);
 
-		float denom = dot(f.plane.normal, dir);
+		double denom = dot(f.plane.normal, dir);
 		// backface or parallel
-		if (denom > -0.1f) {
+		if (abs(denom) < 0.00001f) {
+			//printf("PARALELL\n");
 			continue;
 		}
 		//if (abs(denom) < 0.1f) {
@@ -101,7 +105,7 @@ inline void KDTree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& e
 		//}
 		float t = -(dot(f.plane.normal, start) + f.plane.d) / denom;
 
-		if (t < 0) {
+		if (t <= 0) {
 			continue;
 		}
 		float length = glm::length(end - start);
@@ -145,12 +149,12 @@ void KDTree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& tr
 
 		float denom = dot(f.plane.normal, r.dir);
 		// backface
-		if (denom > -0.1f) {
-			continue;
-		}
-		//if (abs(denom) < 0.1f) {
+		//if (denom > -0.1f) {
 		//	continue;
 		//}
+		if (abs(denom) < 0.01f) {
+			continue;
+		}
 		float t = -(dot(f.plane.normal, r.origin) + f.plane.d) / denom;
 
 		if (t < 0) {

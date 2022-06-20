@@ -86,9 +86,9 @@ public:
 
 	struct ShadowMapProjection
 	{
-		float width=10.f;
-		float near=49.f, far=64.f;
-		float distance=52.f;
+		float width=27.f;
+		float near=0.f, far=80.f;
+		float distance=53.f;
 	}shadow_map;
 
 	// Matricies for the current frame
