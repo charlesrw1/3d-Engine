@@ -58,18 +58,18 @@ void MapParser::start_file(std::string file)
 	infile.close();
 }
 
-void MapParser::compute_intersections(mbrush_t* brush)
+void MapParser::compute_intersections(mapbrush_t* brush)
 {
 	
 	//std::cout << "new brush: " << (int)brush->num_i << " faces\n";
 	for (int i = 0; i < brush->num_faces; i++) {
 		const int face_index = brush->face_start + i;
-		faces.at(face_index).v_start = verts.size();
-
+		//faces.at(face_index).v_start = verts.size();
+		mapface_t* f = &faces.at(brush->face_start + i);
 		//std::cout << "	new face: " << faces.at(face_and_poly_index).plane.normal.x << ' ' 
 			//<< faces.at(face_and_poly_index).plane.normal.y << ' ' <<  faces.at(face_and_poly_index).plane.normal.z << '\n';
 		int added_verts = 0;
-		int v_start = faces.at(face_index).v_start;
+		//int v_start = faces.at(face_index).v_start;
 		for (int j = 0; j < brush->num_faces; j++) {
 			for (int k = 0; k < brush->num_faces; k++) {
 				if (i != j && i != k && j != k) {
@@ -92,11 +92,12 @@ void MapParser::compute_intersections(mbrush_t* brush)
 					
 					// should be moved to end of loop
 					for (int i = 0; i < added_verts; i++) {
-						if (equals(verts.at(v_start + i), res)) {
+						if (equals(f->wind.v[i], res)) {
 							goto outside_vertex;
 						}
 					}
-					verts.push_back(res);
+					f->wind.add_vert(res);
+					//verts.push_back(res);
 					added_verts++;
 
 				}
@@ -106,16 +107,16 @@ void MapParser::compute_intersections(mbrush_t* brush)
 			}
 		}
 		
-		faces.at(face_index).v_end = verts.size();
+		//faces.at(face_index).v_end = verts.size();
 		
 		//std::cout << "	verts on face: " << polys.at(face_and_poly_index).v_end - polys.at(face_and_poly_index).v_start << '\n';
 	}
 }
-void MapParser::sort_verticies(mface_t* face)
+void MapParser::sort_verticies(mapface_t* face)
 {
-	int v_count = face->v_end - face->v_start;
+	//int v_count = face->v_end - face->v_start;
 	//assert(v_count >= 3);
-	if (v_count < 3) {
+	if (face->wind.num_verts < 3) {
 		printf("Not enough verts!\n");
 		return;
 	}
@@ -128,26 +129,26 @@ void MapParser::sort_verticies(mface_t* face)
 
 	vec3 center = vec3(0);
 	vec3 p_norm = face->plane.normal;//normalize(cross(verts.at(poly->v_start+2) - verts.at(poly->v_start + 1), verts.at(poly->v_start) - verts.at(poly->v_start + 1)));
-	for (int s = face->v_start; s < face->v_end; s++) {
-		center += verts.at(s);
+	for (int s = 0; s < face->wind.num_verts; s++) {
+		center += face->wind.v[s];
 	}
-	center /= v_count;
+	center /= face->wind.num_verts;
 
-	for (int n = face->v_start; n < face->v_end-2; n++)
+	for (int n = 0; n < face->wind.num_verts-2; n++)
 	{
-		vec3 a = normalize(verts.at(n) - center);
+		vec3 a = normalize(face->wind.v[n] - center);
 		plane_t p;
 		// Constructs a plane that is perpendicular to the face, test wether points are behind
-		p.init(verts.at(n), center, center + p_norm);
+		p.init(face->wind.v[n], center, center + p_norm);
 
 		int smallest = -1;
 		float smallest_angle = -1;
 
-		for (int m = n + 1; m < face->v_end; m++) {
-			float dist = dot(p.normal, verts.at(m)) + p.d;
+		for (int m = n + 1; m < face->wind.num_verts; m++) {
+			float dist = dot(p.normal, face->wind.v[m]) + p.d;
 			// Point is in front of the plane
 			if (dist > -0.1) {
-				vec3 b = normalize(verts.at(m) - center);
+				vec3 b = normalize(face->wind.v[m] - center);
 				float angle = dot(a, b);
 				if (angle > smallest_angle) {
 					smallest_angle = angle;
@@ -155,30 +156,33 @@ void MapParser::sort_verticies(mface_t* face)
 				}
 			}
 		}
+		assert(smallest != -1);
 
-		vec3 temp = verts.at(n + 1);
-		verts.at(n + 1) = verts.at(smallest);
-		verts.at(smallest) = temp;
+		vec3 temp = face->wind.v[n + 1];
+		face->wind.v[n + 1] = face->wind.v[smallest];
+		face->wind.v[smallest] = temp;
 
 	}
 
 	// Get normal of resulting verts
-	vec3 new_normal = normalize(cross(verts.at(face->v_start + 2) - verts.at(face->v_start + 1), verts.at(face->v_start) - verts.at(face->v_start + 1)));
+	vec3 new_normal = normalize(cross(face->wind.v[2] - face->wind.v[1], face->wind.v[0] - face->wind.v[1]));
+
+	//vec3 new_normal = normalize(cross(verts.at(face->v_start + 2) - verts.at(face->v_start + 1), verts.at(face->v_start) - verts.at(face->v_start + 1)));
 
 	if (dot(new_normal, face->plane.normal) < 0) {
 		//printf("*reversed winding*\n");
 
 		// Plane is facing opposite way, reverse winding
-		for (int i = 0;i< v_count/2; i++) {
-			vec3 temp = verts.at(face->v_start + i);
-			verts.at(face->v_start + i) = verts.at(face->v_end - 1 - i);
-			verts.at(face->v_end - 1 - i) = temp;
+		for (int i = 0;i< face->wind.num_verts/2; i++) {
+			vec3 temp = face->wind.v[i];// verts.at(face->v_start + i);
+			face->wind.v[i] = face->wind.v[face->wind.num_verts - 1 - i];// verts.at(face->v_end - 1 - i);
+			face->wind.v[face->wind.num_verts - 1 - i] = temp;
 		}
 	}
 
 
 	face->plane.normal = -(face->plane.normal);
-	face->plane.d = -dot(face->plane.normal, verts.at(face->v_start));
+	face->plane.d = -dot(face->plane.normal, face->wind.v[0]); //verts.at(face->v_start));
 
 	//printf("Ending verts:\n");
 	//for (int i = face->v_start; i < face->v_end; i++) {
@@ -265,7 +269,7 @@ MapParser::Result MapParser::parse_entity()
 	}
 
 	entities.resize(entities.size() + 1);
-	mentity_t* ent = &entities.back();
+	mapentity_t* ent = &entities.back();
 	ent->brush_start = brushes.size();
 	//u16 b_start = brushes.size();
 
@@ -314,7 +318,7 @@ MapParser::Result MapParser::parse_entity()
 MapParser::Result MapParser::parse_brush()
 {
 	brushes.resize(brushes.size() + 1);
-	mbrush_t* b = &brushes.back();
+	mapbrush_t* b = &brushes.back();
 	b->face_start = faces.size();
 	while (true)
 	{
@@ -349,7 +353,9 @@ MapParser::Result MapParser::parse_brush()
 MapParser::Result MapParser::parse_face()
 {
 	faces.resize(faces.size() + 1);
-	mface_t* f = &faces.back();
+	mapface_t* f = &faces.back();
+	texture_info_t t_info;
+
 
 	vec3 verts[3];
 	for (int i = 0; i < 3; i++) {
@@ -373,16 +379,16 @@ MapParser::Result MapParser::parse_face()
 	f->plane.init(verts[0], verts[1], verts[2]);
 
 	read_str(false);
-	f->t_index = get_texture();
+	t_info.t_index = get_texture();
 
 	read_token();
 	if (parse_char != '[') {
 		parse_fail("Expected '['");
 		return R_FAIL;
 	}
-	parse_vec3(f->u_axis);
+	parse_vec3(t_info.u_axis);
 	read_str(false);
-	f->u_offset = std::stoi(parse_buffer);
+	t_info.u_offset = std::stoi(parse_buffer);
 	read_token();
 	if (parse_char != ']') {
 		parse_fail("Expected ']'");
@@ -394,9 +400,9 @@ MapParser::Result MapParser::parse_face()
 		parse_fail("Expected '['");
 		return R_FAIL;
 	}
-	parse_vec3(f->v_axis);
+	parse_vec3(t_info.v_axis);
 	read_str(false);
-	f->v_offset = std::stoi(parse_buffer);
+	t_info.v_offset = std::stoi(parse_buffer);
 	read_token();
 	if (parse_char != ']') {
 		parse_fail("Expected ']'");
@@ -405,9 +411,9 @@ MapParser::Result MapParser::parse_face()
 	// throwaway, "angle"
 	read_str(false);
 	read_str(false);
-	f->uv_scale.x = std::stof(parse_buffer);
+	t_info.uv_scale.x = std::stof(parse_buffer);
 	read_str(false);
-	f->uv_scale.y = std::stof(parse_buffer);
+	t_info.uv_scale.y = std::stof(parse_buffer);
 
 	return R_GOOD;
 }
@@ -415,7 +421,8 @@ MapParser::Result MapParser::parse_face()
 MapParser::Result MapParser::parse_face_quake()
 {
 	faces.resize(faces.size() + 1);
-	mface_t* f = &faces.back();
+	mapface_t* f = &faces.back();
+	texture_info_t t_info;
 	vec3 verts[3];
 	for (int i = 0; i < 3; i++) {
 		if (i != 0) {
@@ -439,7 +446,7 @@ MapParser::Result MapParser::parse_face_quake()
 	f->plane.init(verts[0], verts[1], verts[2]);
 
 	read_str(false);
-	f->t_index = get_texture();
+	t_info.t_index = get_texture();
 
 	read_str(false);
 	read_str(false);
@@ -556,7 +563,7 @@ MapParser::Result MapParser::read_str(bool in_quotes)
 
 	return R_EOF;
 }
-
+/*
 void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)
 {
 	va.set_primitive(VertexArray::Primitive::triangle);
@@ -593,7 +600,6 @@ void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)
 
 
 }
-
 uint64 MapParser::get_surface_area()
 {
 	uint64 area = 0;
@@ -606,3 +612,4 @@ uint64 MapParser::get_surface_area()
 	}
 	return area;
 }
+*/

@@ -18,7 +18,7 @@ const float SCALE_FACTOR = 1 / 32.f;
 //80
 #define MAX_PER_LEAF 50
 #define MAX_DEPTH 10
-
+/*
 struct face_t
 {
 	u32 v_start{};
@@ -31,7 +31,7 @@ struct face_t
 	short texture_offset[2];
 	//u8 type;
 	//u32 id{};
-};
+};*/
 struct trace_t
 {
 	bool hit = false;
@@ -63,7 +63,7 @@ struct ray_t
 class KDTree
 {
 public:
-	KDTree(const std::vector<vec3>& v, std::vector<face_t>& f) : verts{v} , faces{f} {}
+	KDTree(const std::vector<face_t>& f, const std::vector<vec3>& verts) : faces{ f }, verts{ verts } {}
 	void init();
 	void create_va();
 	void draw() {
@@ -115,29 +115,24 @@ private:
 		int face_index = -1;	// index into faces from world_geo
 	};
 	std::vector<face_ex_t> face_extended;
-	int max_depth = 16;
-	int max_per_leaf = 10;
 	vec3 min = vec3(-128), max = vec3(128);
 	
 	std::vector<node_t> nodes;
 	std::vector<plane_t> planes;
 	std::vector<leaf_t> leaves;
 
-	// From world geometry, not elegant
 	const std::vector<vec3>& verts;
-	std::vector<face_t>& faces;
+	const std::vector<face_t>& faces;
 
 	std::vector<float> work_buffer;
 
-	VertexArray* va;
-
-	u32 curr_compare = 1;
+	VertexArray* va=nullptr;
 };
 
 class WorldGeometry
 {
 public:
-	WorldGeometry() : tree(world_verts,static_faces) {}
+	WorldGeometry() : tree(faces,verts) {}
 	void load_map(const MapParser& mp);
 	void free_map();
 
@@ -149,22 +144,14 @@ public:
 		return model;
 	}
 
-	 std::vector<vec3>& get_verts() {
-		 return world_verts;
-	 }
-	 std::vector<face_t>& get_faces() {
-		 return static_faces;
-	 }
-
 	 void print_info() const;
 	 // for editor access
 	KDTree tree;
 private:
-	// All verticies used in the world, accessed by faces
-	std::vector<vec3> world_verts;
-
-	// Static world geometry, drawn every frame
-	std::vector<face_t> static_faces;
+	std::vector<vec3> verts;
+	std::vector<face_t> faces;
+	std::vector<brush_model_t> models;
+	std::vector<texture_info_t> tinfo;
 
 	// Geometry is batched per texture
 	std::vector<Texture*> face_textures;

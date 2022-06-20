@@ -44,19 +44,7 @@ struct AABB
 
 	void create_from_points(vec3* points, unsigned num_points);
 };
-using u16 = uint16_t;
-struct sector_t
-{
-	u16 id{};
-	
-	// Collection of planes defining sector
-	u16 s_start{};
-	u16 s_end{};
 
-
-
-
-};
 
 
 #endif
