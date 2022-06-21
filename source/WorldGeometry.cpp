@@ -118,8 +118,9 @@ void WorldGeometry::create_mesh()
 				float u = dot(ti->axis[i], wrv.position - origin);
 				u = (u - face.exact_min[i]) / face.exact_span[i];// 0-1 coords on small lightmap image
 				//u = (u - 0.5) * 0.90 + 0.5;
-				u = face.lightmap_min[i] + u * face.lightmap_size[i];
-				wrv.lightmap_uv[i] = u/800.f;//256 = lightmap dimensions
+				
+				u = face.lightmap_min[i]+0.5 + u * (face.lightmap_size[i]-1);	// hack for now to remove pink borders
+				wrv.lightmap_uv[i] = u/1012;//256 = lightmap dimensions
 			}
 
 			gpu_verts.push_back(wrv);
@@ -168,7 +169,7 @@ void WorldGeometry::debug_draw() {
 	hit_points->draw_array();
 	glLineWidth(1);
 	glEnable(GL_DEPTH_TEST);
-	tree.draw();
+	//tree.draw();
 }
 
 void WorldGeometry::print_info() const {

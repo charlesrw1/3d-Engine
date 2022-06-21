@@ -59,12 +59,12 @@ trace_t KDTree::test_ray(vec3 start, vec3 end)
 		float back_dist = p->distance(back);
 
 		// both in front
-		if (front_dist > -0.01 && back_dist > -0.01) {
+		if (front_dist > -0.05 && back_dist > -0.05) {
 			node_n = node->first_child;
 			continue;
 		}
 		// both behind
-		if (front_dist < 0.01 && back_dist < 0.01) {
+		if (front_dist < 0.05 && back_dist < 0.05) {
 			node_n = node->first_child + 1;
 			continue;
 		}
@@ -121,7 +121,7 @@ inline void KDTree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& e
 			vec3 v = point - geo->verts[f.v_start + i];
 			vec3 c = cross(geo->verts[f.v_start + (i + 1) % v_count] - geo->verts[f.v_start + i], v);
 			float angle = dot(-f.plane.normal, c);
-			if (angle < 0) {
+			if (angle < -0.05) {
 				// point is outside the edges of the polygon
 				hit = false;
 				break;

@@ -189,8 +189,8 @@ void Editor::on_render()
 	//global_app.r->debug_line(global_app.scene->cams[0].position, vec3(0), vec3(0, 0, 1));
 
 	vec3 min, max;
-	global_world.tree.find_leaf(global_app.scene->active_camera()->position, min, max);
-	global_app.r->debug_box(min, max, vec3(0, 0, 1));
+	//global_world.tree.find_leaf(global_app.scene->active_camera()->position, min, max);
+	//global_app.r->debug_box(min, max, vec3(0, 0, 1));
 
 
 

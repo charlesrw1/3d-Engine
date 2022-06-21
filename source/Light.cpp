@@ -13,23 +13,24 @@ int num_verts;
 texture_info_t* tinfo;
 int num_tinfo;
 
-std::vector<u16> heights;
 
 std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
 
-int lm_width = 800;
-int lm_height = 800;
-
-float density_per_unit = 4.f;
+int lm_width = 1012;
+int lm_height = 1012;
+// how many texels per 1.0 meters/units
+// 32 quake units = 1 my units
+float density_per_unit = 1.f;
 
 VertexArray* va;
 
-bool alloc_block(int block_w, int block_h, int* x, int* y)
+vec3 lerp(const vec3& a, const vec3& b, float percentage)
 {
-	return true;
+	return a + (b-a) * percentage;
 }
+
 
 struct Rectangle
 {
@@ -87,9 +88,11 @@ void add_color(int start, int offset, vec3 color)
 	}
 }
 
-#define MAP_PTS 128*128
+const int MAP_PTS = 256 * 256;
+std::vector<vec3> points(MAP_PTS);
 struct LightmapState
 {
+	//std::vector<vec3> points;
 	vec3 face_middle = vec3(0);
 
 	vec3 tex_normal;
@@ -99,7 +102,6 @@ struct LightmapState
 	vec3 tex_to_world[2];	// world_pos = tex_origin + u * tex_to_world[0]
 
 	int numpts = 0;
-	vec3 points[MAP_PTS];
 
 	int tex_min[2];
 	int tex_size[2];
@@ -114,13 +116,13 @@ struct light_t
 	vec3 pos;
 	vec3 color;
 };
-std::vector<light_t> lights = { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } , { {-5.f,5.f,8.f},{0.1f,0.3f,1.0f} },{{0,1,0},{1,1,1}} , { {0.f,10.f,0.f},{2.f,2.0f,2.0f} }, { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} }, { {0.f,5.f,0.f},{1.f,0.0f,0.0f} } };
-
+std::vector<light_t> lights; //= { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } };// , { {-5.f,5.f,8.f},{0.1f,0.3f,1.0f} }, { {0,1,0},{1,1,1} }, { {0.f,10.f,0.f},{2.f,2.0f,2.0f} }, { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} }, { {0.f,5.f,0.f},{1.f,0.0f,0.0f} } };
 static u32 total_pixels = 0;
 // Lots of help from Quake's LTFACE.c 
 void light_face(int num)
 {
 	LightmapState l;
+	//l.points.resize(MAP_PTS);
 	Image img;
 	assert(num < num_faces);
 	l.face = &faces[num];
@@ -214,17 +216,21 @@ void light_face(int num)
 		}
 	}
 	{
-		int h = l.tex_size[1]*density_per_unit + 0;
-		int w = l.tex_size[0]*density_per_unit + 0;
-		float start_u = l.exact_min[0]-0.2;
-		float start_v = l.exact_min[1]-0.2;
+		int h = l.tex_size[1]*density_per_unit + 2;
+		int w = l.tex_size[0]*density_per_unit + 2;
+		float start_u = l.exact_min[0];
+		float start_v = l.exact_min[1];
 		l.numpts = h * w;
 		total_pixels += l.numpts;
 		
 		img.height = h;
 		img.width = w;
 
-		int step = 1;
+		float step[2];
+		step[0] = (l.exact_max[0] - l.exact_min[0]) / w;
+		step[1] = (l.exact_max[1] - l.exact_min[1]) / h;
+
+		
 		int top_point = 0;
 
 		float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
@@ -233,19 +239,20 @@ void light_face(int num)
 		face_mid = l.face_middle + l.face->plane.normal*0.01f;
 		for (int y = 0; y < h; y++) {
 			for (int x = 0; x < w; x++) {
-				float u = start_u+x/density_per_unit;
-				float v = start_v+y/density_per_unit;
+				float u = start_u+x*step[0];
+				float v = start_v+y*step[1];
 
 				vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal*0.01f;
 				
 				// move point towards middle of face
 				vec3 move_mid = normalize(face_mid	 - point);
-				point = point + move_mid * 0.25f;
+				//point = point + move_mid * 0.25f;
 				if (top_point >= MAP_PTS) {
+					l.numpts = MAP_PTS - 1;
 					goto face_too_big;
 				}
 				assert(top_point < MAP_PTS);
-				l.points[top_point++]=point;
+				points[top_point++]=point;
 			}
 		}
 	face_too_big:;
@@ -263,18 +270,20 @@ void light_face(int num)
 			vec3 light_p = lights[i].pos;
 
 			float dist = l.face->plane.distance(light_p);
-			if (dist < 0) {
+			if (dist < 0 || dist > 30) {// either behind or too far away
 				continue;
 			}
-			for (int j = 0; j < l.numpts; j++) {
-				trace_t res = global_world.tree.test_ray(l.points[j], light_p);
+			for (int j = 0; j < l.numpts; j++) {	
+				
+				
+				trace_t res = global_world.tree.test_ray(points[j], light_p);
 				if (res.hit) {
-					va->append({ l.points[j],vec3(1,0,0) });
+				//	va->append({ l.points[j],vec3(1,0,0) });
 					continue;
 				}
 				//va->append({ l.points[j],vec3(0,1,0) });
 
-				vec3 light_dir = light_p - l.points[j];
+				vec3 light_dir = light_p - points[j];
 				float dist = length(light_dir);
 				light_dir = normalize(light_dir);
 				float dif = dot(light_dir, l.face->plane.normal);
@@ -354,9 +363,36 @@ void append_to_lightmap(const PackNode* pn, const Image* img)
 	}
 }
 
+void add_lights(worldmodel_t* wm)
+{
+	std::string work_str;
+	work_str.reserve(64);
+	for (int i = 0; i < wm->entities.size(); i++) {
+		entity_t* ent = &wm->entities.at(i);
+		auto find = ent->properties.find("classname");
+		if (find->second != "light") {
+			continue;
+		}
+		work_str = ent->properties.find("origin")->second;
+		vec3 org;
+		sscanf_s(work_str.c_str(), "%f %f %f", &org.x, &org.y, &org.z);
+		org /= 32.f;	// scale down
+
+		org = vec3(-org.x, org.z, org.y);
+
+		work_str = ent->properties.find("color")->second;
+		vec3 color;
+		sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
+
+		lights.push_back({ org,color });
+
+	}
+}
+
 #include <algorithm>
 void create_light_map(worldmodel_t* wm)
 {
+	printf("Starting lightmap...\n");
 	va = new VertexArray;
 	va->set_primitive(VertexArray::Primitive::points);
 
@@ -369,10 +405,10 @@ void create_light_map(worldmodel_t* wm)
 	tinfo = wm->t_info.data();
 	num_tinfo = wm->t_info.size();
 
+	add_lights(wm);
 
-	//data_buffer.resize(lm_width * lm_height * 3,0);
-	heights.resize(0);
 
+	printf("Lighting faces...\n");
 	for (int i = 0; i < num_faces; i++) {
 		light_face(i);
 	}
@@ -380,12 +416,13 @@ void create_light_map(worldmodel_t* wm)
 
 	final_lightmap.resize(lm_width * lm_height * 3,0);
 	for (int i = 0; i < final_lightmap.size(); i += 3) {
-		final_lightmap[i] = 255;
-		final_lightmap[i+1] = 0;
-		final_lightmap[i+2] = 255;
+		//final_lightmap[i] = 255;
+		//final_lightmap[i+1] = 0;
+		//final_lightmap[i+2] = 255;
 
 	}
 
+	printf("Writing output...\n");
 
 	std::sort(images.begin(), images.end(), [](const Image& i1, const Image& i2)
 		{ return i1.height * i1.width > i2.height* i2.width; });
@@ -421,5 +458,5 @@ void create_light_map(worldmodel_t* wm)
 }
 void draw_lightmap_debug()
 {
-	//va->draw_array();
+	va->draw_array();
 }

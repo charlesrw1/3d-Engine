@@ -59,7 +59,7 @@ void App::create_scene()
 	
 	MapParser mp;
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/house-arch.map");
+	mp.start_file("resources/maps/pillars.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
 	mp.add_to_worldmodel(&world);
@@ -67,7 +67,7 @@ void App::create_scene()
 	global_world.load_map(&world);
 	create_light_map(&world);
 
-	r->lightmap_tex = global_textures.find_or_load("lightmap.bmp", TParams::GEN_MIPS);
+	r->lightmap_tex = global_textures.find_or_load("lightmap.bmp");
 
 	global_world.create_mesh();
 
