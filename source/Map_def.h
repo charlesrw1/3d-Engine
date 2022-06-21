@@ -5,7 +5,7 @@
 #include <vector>
 
 using namespace glm;
-
+class Texture;
 enum side_t { FRONT, BACK, ON_PLANE, SPLIT };
 struct plane_t
 {
@@ -80,10 +80,10 @@ struct texture_info_t
 {
 	int t_index=0;
 	vec2 uv_scale;
-	vec3 u_axis, v_axis;
-	int u_offset, v_offset;
+	vec3 axis[2];
+	int offset[2];
 
-	vec3 world_to_tex;
+	int flags = 0;
 };
 
 struct mapface_t
@@ -110,11 +110,11 @@ struct mapbrush_t
 	vec3 min, max;
 };
 
-struct mapentity_t
+struct entity_t
 {
 	// Key value pairs for properties
 	std::unordered_map<std::string, std::string> properties;
-	// associated brush (optional)
+	// associated brush (optional); Only used in parse phase
 	int brush_start{}, brush_count{};
 };
 
@@ -127,6 +127,8 @@ struct face_t
 
 	short lightmap_min[2];
 	short lightmap_size[2];
+	float exact_min[2];
+	float exact_span[2];
 };
 // collection of all faces for an entity/collision hull
 struct brush_model_t
@@ -137,13 +139,31 @@ struct brush_model_t
 	vec3 min, max;
 };
 
-struct generic_lightmapped_vert_t
+struct LightmapVert
 {
 	vec3 position;
 	vec3 normal;
 	vec2 texture_uv;
 	vec2 lightmap_uv;
 };
+
+struct worldmodel_t
+{
+	std::vector<brush_model_t> models;	// 0 is world model, rest are indexed by entity key: "model"
+
+	std::vector<vec3> verts;
+
+	std::vector<face_t> faces;
+
+	std::vector<texture_info_t> t_info;
+
+	std::vector<Texture*> textures;
+
+	std::vector<std::string> texture_names;
+
+	std::vector<entity_t> entities;
+};
+
 
 
 #endif // !MAP_DEF_H

@@ -10,6 +10,8 @@
 
 #include "glad/glad.h"
 
+#include "Map_def.h"
+
 const std::string model_path = "resources/models/";
 
 
@@ -38,6 +40,39 @@ void M_upload_mesh(RenderMesh* rm, const RenderVert* verticies, const uint32_t* 
 	// UV
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
+
+	glBindVertexArray(0);
+}
+
+
+
+void M_upload_lightmap_mesh(RenderMesh* rm, const LightmapVert* verticies, const uint32_t* elements, int vert_count, int element_count)
+{
+	assert(verticies && elements);
+	rm->num_indices = element_count;
+	rm->num_verts = vert_count;
+
+	glGenVertexArrays(1, &rm->vao);
+	glGenBuffers(1, &rm->vbo);
+	glGenBuffers(1, &rm->ebo);
+
+	glBindVertexArray(rm->vao);
+	glBindBuffer(GL_ARRAY_BUFFER, rm->vbo);
+	glBufferData(GL_ARRAY_BUFFER, vert_count * sizeof(LightmapVert), verticies, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rm->ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, element_count * sizeof(uint32_t), elements, GL_STATIC_DRAW);
+	// POSITION
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	// NORMALS
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	// UV
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+	// LIGHTMAP UV
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(8 * sizeof(float)));
+	glEnableVertexAttribArray(3);
 
 	glBindVertexArray(0);
 }

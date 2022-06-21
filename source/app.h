@@ -3,6 +3,7 @@
 
 #include <SDL2/SDL.h>
 #include "glm/glm.hpp"
+#include "Map_def.h"
 class Renderer;
 class Editor;
 struct SceneData;
@@ -47,6 +48,8 @@ public:
 	Renderer* r;
 	SceneData* scene;
 	Editor* editor;
+
+	worldmodel_t world;
 };
 
 extern App global_app;

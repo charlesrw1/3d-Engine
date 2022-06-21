@@ -16,6 +16,7 @@
 #include "ModelManager.h"
 
 #include "TextureManager.h"
+#include "Texture_def.h"
 
 #include "MapParser.h"
 
@@ -55,13 +56,20 @@ vec3 make_color(uint8_t r, uint8_t b, uint8_t g) {
 
 void App::create_scene()
 {
+	
 	MapParser mp;
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/indoors.map");
+	mp.start_file("resources/maps/house-arch.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
-	global_world.load_map(mp);
-	create_light_map();
+	mp.add_to_worldmodel(&world);
+
+	global_world.load_map(&world);
+	create_light_map(&world);
+
+	r->lightmap_tex = global_textures.find_or_load("lightmap.bmp", TParams::GEN_MIPS);
+
+	global_world.create_mesh();
 
 
 	u32 map_end = SDL_GetTicks();
@@ -144,12 +152,12 @@ void App::create_scene()
 	//scene->objects.back()->position = vec3(1, 0, 0);
 
 //	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
-	Model* sponza = global_models.find_or_load("sponza/sponza.obj");
+	//Model* sponza = global_models.find_or_load("sponza/sponza.obj");
 	//load_model_assimp(sponza, "sponza/sponza.obj", true);
 	//load_model_qobj(sponza, "sponza.qobj");
 	//
-	scene->objects.push_back(new GameObject(sponza));
-	scene->objects.back()->scale = vec3(0.01);
+	//scene->objects.push_back(new GameObject(sponza));
+	//scene->objects.back()->scale = vec3(0.01);
 	
 	//Model* revant = global_models.find_or_load("Revenant/revenant.dae");
 	////load_model_assimp(revant, "Revenant/revenant.dae",false);

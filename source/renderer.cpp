@@ -57,6 +57,8 @@ Renderer::Renderer()
 	fresnel = Shader("point_light_v.txt", "fresnel_f.txt");
 	overdraw = Shader("point_light_v.txt", "overdraw_f.txt");
 
+	lightmap = Shader("lightmap_generic_v.txt", "lightmap_generic_f.txt");
+
 	debug_lines.set_primitive(VertexArray::Primitive::lines);
 	debug_points.set_primitive(VertexArray::Primitive::points);
 
@@ -188,6 +190,8 @@ void Renderer::render_scene(SceneData& scene)
 	glDisable(GL_BLEND);
 	glDepthMask(GL_TRUE);
 	
+	//lightmap_geo();
+
 skip_light:
 
 	//glDisable(GL_CULL_FACE);
@@ -290,7 +294,7 @@ void Renderer::draw_world_geo(Shader& s)
 		if (rm->diffuse) {
 			//white_tex->bind(0);
 
-			rm->diffuse->bind(0);
+			//rm->diffuse->bind(0);
 		}
 		else {
 			white_tex->bind(0);
@@ -603,6 +607,38 @@ void Renderer::debug_box(vec3 min, vec3 max, vec3 color)
 void Renderer::debug_line(vec3 start, vec3 end, vec3 color)
 {
 	debug_lines.push_2(make_point(start, color), make_point(end, color));
+}
+void Renderer::lightmap_geo()
+{
+	glFrontFace(GL_CW);
+	lightmap.use();
+	lightmap.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix)
+		.set_int("baseTex", 0).set_int("lightmap", 1).set_mat4("u_model",mat4(1));
+
+	lightmap_tex->bind(1);
+	 Model* m = global_world.get_model();
+	for (int i = 0; i < m->num_meshes(); i++) {
+
+		const RenderMesh* rm = m->mesh(i);
+
+		if (rm->diffuse) {
+			rm->diffuse->bind(0);
+		}
+		else {
+			white_tex->bind(0);
+		}
+
+
+		//shader.set_mat4("u_model", obj->model_matrix).set_mat4("normal_mat", obj->inverse_matrix);
+
+		//	sm.mesh.bind();
+		glBindVertexArray(rm->vao);
+		glDrawElements(GL_TRIANGLES, rm->num_indices, GL_UNSIGNED_INT, NULL);
+		//sm.mesh.draw_indexed_primitive();
+
+	}
+	glFrontFace(GL_CCW);
+
 }
 void Renderer::init_basic_sphere()
 {

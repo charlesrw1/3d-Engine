@@ -20,7 +20,6 @@ class Texture;
 class VertexArray;
 
 
-
 class MapParser
 {
 public:
@@ -28,17 +27,37 @@ public:
 		parse_buffer.reserve(256);
 	}
 	void start_file(std::string file);
+
+
+
 	void construct_mesh(VertexArray& va, VertexArray& edges);
 
+	// Non-destructive towards parsed face/brush data
+	// Can call CSG union with a new filter to make a collision mesh with clip brushes
+	void add_to_worldmodel(worldmodel_t* wm) {
+		assert(wm);
+		wm->faces = std::move(face_list);
+		wm->entities = std::move(entities);
+		wm->models = std::move(model_list);
+		wm->texture_names = std::move(textures);
+		wm->verts = std::move(vertex_list);
+		wm->t_info = std::move(t_info);
+	}
+
+	// Pass in a lambada to define a filter to use on brushes for the final model
+	// Takes in a mapbrush_t as a param
+
 	// Final data
-	std::vector<mapentity_t> entities;
+	std::vector<entity_t> entities;
 	std::vector<texture_info_t> t_info;	// holds axis info and index into 'texture' strings
 	std::vector<std::string> textures;
 	std::vector<face_t> face_list;
 	std::vector<brush_model_t> model_list;
 	std::vector<vec3> vertex_list;
 private:
+	void CSG_union();
 
+	void post_process_pass();
 	enum Result { R_GOOD, R_FAIL, R_EOF };
 
 	void parse_file();
@@ -46,7 +65,6 @@ private:
 	void compute_intersections(mapbrush_t*);
 	void sort_verticies(mapface_t*);
 	
-	void CSG_union();
 	void clip_to_brush(mapbrush_t& to_clip, const mapbrush_t& b, bool clip_to_plane, std::vector<mapface_t>& final_faces);
 	std::vector<mapface_t> clip_to_list(const mapbrush_t& a, int start_index, const mapface_t& b, bool clip_to_plane);
 	void split_face(const mapface_t& b, const mapface_t& a, mapface_t& front, mapface_t& back);

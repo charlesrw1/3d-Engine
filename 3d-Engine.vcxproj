@@ -22,7 +22,6 @@
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="source\BrushCSG.cpp" />
     <ClCompile Include="source\camera.cpp" />
-    <ClCompile Include="source\ClippingHull.cpp" />
     <ClCompile Include="source\deps\glad.c" />
     <ClCompile Include="source\deps\imgui.cpp" />
     <ClCompile Include="source\deps\imgui_demo.cpp" />
@@ -46,7 +45,6 @@
     <ClCompile Include="source\WorldGeometry.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Dict.h" />
     <ClInclude Include="source\app.h" />
     <ClInclude Include="source\camera.h" />
     <ClInclude Include="source\deps\include\glad\glad.h" />
@@ -71,6 +69,7 @@
     <ClInclude Include="source\loader.h" />
     <ClInclude Include="source\MapParser.h" />
     <ClInclude Include="source\MapProcess.h" />
+    <ClInclude Include="source\Map_def.h" />
     <ClInclude Include="source\ModelManager.h" />
     <ClInclude Include="source\Model_def.h" />
     <ClInclude Include="source\Object.h" />

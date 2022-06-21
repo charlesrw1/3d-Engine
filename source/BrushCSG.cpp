@@ -20,8 +20,6 @@ void MapParser::CSG_union()
 	bool clip_on_plane;
 	for (int i = 0; i < brushes.size(); i++) {
 
-
-
 		clip_on_plane = false;
 		std::vector<mapface_t> final_faces;
 		// copy faces
@@ -33,6 +31,7 @@ void MapParser::CSG_union()
 
 
 		for (int j = 0; j < brushes.size(); j++) {
+
 			if (i != j) {
 				clip_to_brush(clipped_brushes.at(i), brushes.at(j), clip_on_plane, final_faces);
 			}

@@ -44,6 +44,7 @@ public:
 	Shader model_primitives;
 	Shader fresnel;
 	Shader overdraw;
+	Shader lightmap;
 
 	// Skybox temp stuff
 	//Mesh cube;
@@ -113,7 +114,10 @@ public:
 	bool first_blur_pass=false;
 
 
+	Texture* lightmap_tex;
 private:
+	
+	void lightmap_geo();
 	void init_basic_sphere();
 
 	void halt_and_render_to_screen(uint32_t texture_id);

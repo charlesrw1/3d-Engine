@@ -1,0 +1,23 @@
+#version 330 core
+out vec4 FragColor;
+
+in vec3 Normal;  
+in vec3 FragPos;  
+in vec2 TexCoord;
+in vec2 LightMapCoord;
+  
+
+uniform sampler2D baseTex;
+uniform sampler2D lightmap;
+
+
+void main()
+{
+   // vec4 col = texture(baseTex, TexCoord);
+	vec4 lm_color = texture(lightmap, TexCoord);
+	
+	vec3 result = lm_color.rgb;
+	
+	
+    FragColor = vec4(result, 1.0);
+} 

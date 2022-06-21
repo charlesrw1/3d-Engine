@@ -4,11 +4,14 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-const face_t* faces;
+face_t* faces;
 int num_faces;
 
 const vec3* verts;
 int num_verts;
+
+texture_info_t* tinfo;
+int num_tinfo;
 
 std::vector<u16> heights;
 
@@ -16,10 +19,10 @@ std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
 
-int lm_width = 290;
-int lm_height = 290;
+int lm_width = 400;
+int lm_height = 400;
 
-float density_per_unit = 2.f;
+float density_per_unit = 3.f;
 
 VertexArray* va;
 
@@ -60,6 +63,8 @@ struct Image
 {
 	int width, height;
 	int buffer_start;
+
+	int face_num;
 };
 
 std::vector<Image> images;
@@ -82,7 +87,7 @@ void add_color(int start, int offset, vec3 color)
 	}
 }
 
-#define MAP_PTS 64*64
+#define MAP_PTS 128*128
 struct LightmapState
 {
 	vec3 face_middle = vec3(0);
@@ -102,14 +107,14 @@ struct LightmapState
 	float exact_max[2];
 
 	int surf_num = 0;
-	const face_t* face=nullptr;
+	face_t* face=nullptr;
 };
 struct light_t
 {
 	vec3 pos;
 	vec3 color;
 };
-std::vector<light_t> lights = { {{0.f,10.f,0.f},{1.f,0.8f,0.4f}} };//,{{-5.f,5.f,8.f},{0.1f,0.3f,1.0f}},{{2.f,20.f,-9.f},{0.3f,1.0f,0.4f}},{{0.f,5.f,0.f},{1.f,0.0f,0.0f}} };
+std::vector<light_t> lights = { {{0.f,10.f,0.f},{1.f,0.8f,0.4f}} ,{{-5.f,5.f,8.f},{0.1f,0.3f,1.0f}},{{2.f,20.f,-9.f},{0.3f,1.0f,0.4f}},{{0.f,5.f,0.f},{1.f,0.0f,0.0f}} };
 
 static u32 total_pixels = 0;
 // Lots of help from Quake's LTFACE.c 
@@ -120,19 +125,26 @@ void light_face(int num)
 	assert(num < num_faces);
 	l.face = &faces[num];
 	l.surf_num = num;
+
+	img.face_num = num;
 	
 	//va->push_2({ verts[l.face->v_start],vec3(1,1,0) }, { verts[l.face->v_start] + l.face->plane.normal,vec3(1,1,0) });
 	
+	assert(l.face->t_info_idx >= 0 && l.face->t_info_idx < num_tinfo);
+	texture_info_t* ti = tinfo + l.face->t_info_idx;
 	{
+
 		// face vectors
-		l.world_to_tex[0] = l.face->texture_axis[0];
-		l.world_to_tex[1] = l.face->texture_axis[1];
+		l.world_to_tex[0] = ti->axis[0];
+		l.world_to_tex[1] = ti->axis[1];
+
+
 
 		//va->push_2({ l.face->texture_axis[0],vec3(1,0,0) }, { vec3(0),vec3(1,0,0) });
 		//va->push_2({ l.face->texture_axis[1],vec3(0,1,0) }, { vec3(0),vec3(0,1,0) });
 
 
-		l.tex_normal = normalize(cross(l.face->texture_axis[1],l.face->texture_axis[0]));
+		l.tex_normal = normalize(cross(ti->axis[1],ti->axis[0]));
 
 		//va->push_2({ l.tex_normal,vec3(0,0,1) }, { vec3(0),vec3(0,0,1) });
 
@@ -161,7 +173,7 @@ void light_face(int num)
 		float min[2], max[2];
 		min[0] = min[1] = 50000;
 		max[0] = max[1] = -50000;
-		int vcount = l.face->v_end - l.face->v_start;
+		int vcount = l.face->v_count;
 		l.face_middle = vec3(0);
 		for (int i = 0; i < vcount; i++) {
 
@@ -170,7 +182,7 @@ void light_face(int num)
 
 			for (int j = 0; j < 2; j++) {
 
-				float val = dot(verts[l.face->v_start + i], l.face->texture_axis[j]);
+				float val = dot(verts[l.face->v_start + i], ti->axis[j]);
 				if (val < min[j]) {
 					min[j] = val;
 				}
@@ -196,6 +208,9 @@ void light_face(int num)
 			}
 			l.exact_min[i] = min[i];
 			l.exact_max[i] = max[i];
+
+			l.face->exact_min[i] = min[i];
+			l.face->exact_span[i] = max[i] - min[i];
 		}
 	}
 	{
@@ -225,7 +240,7 @@ void light_face(int num)
 				
 				// move point towards middle of face
 				vec3 move_mid = normalize(face_mid	 - point);
-				point = point + move_mid * 0.25f;
+				//point = point + move_mid * 0.25f;
 				
 				assert(top_point < MAP_PTS);
 				l.points[top_point++]=point;
@@ -331,16 +346,20 @@ void append_to_lightmap(const PackNode* pn, const Image* img)
 }
 
 #include <algorithm>
-void create_light_map()
+void create_light_map(worldmodel_t* wm)
 {
 	va = new VertexArray;
 	va->set_primitive(VertexArray::Primitive::points);
 
-	faces = global_world.get_faces().data();
-	num_faces = global_world.get_faces().size();
+	faces = wm->faces.data();
+	num_faces = wm->faces.size();
 
-	verts = global_world.get_verts().data();
-	num_verts = global_world.get_verts().size();
+	verts = wm->verts.data();
+	num_verts = wm->verts.size();
+
+	tinfo = wm->t_info.data();
+	num_tinfo = wm->t_info.size();
+
 
 	//data_buffer.resize(lm_width * lm_height * 3,0);
 	heights.resize(0);
@@ -377,14 +396,21 @@ void create_light_map()
 		// insert image here
 
 		append_to_lightmap(pnode, &images.at(i));
+
+		face_t* f = &faces[images.at(i).face_num];
+		f->lightmap_min[0] = pnode->rc.x;
+		f->lightmap_min[1] = pnode->rc.y;
+
+		f->lightmap_size[0] = pnode->rc.width;
+		f->lightmap_size[1] = pnode->rc.height;
 	}
 
 	delete root;
 
-	stbi_write_bmp("lightmap.bmp", lm_width, lm_height, 3, final_lightmap.data());
+	stbi_write_bmp("resources/textures/lightmap.bmp", lm_width, lm_height, 3, final_lightmap.data());
 
 }
 void draw_lightmap_debug()
 {
-	va->draw_array();
+	//va->draw_array();
 }

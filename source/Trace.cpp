@@ -92,7 +92,7 @@ inline void KDTree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& e
 	int count = node.num_faces;
 	for (int i = node.first_child; i < node.first_child + count; i++) {
 		leaf = &leaves[i];
-		face_t& f = faces.at(leaf->face_index);
+		const face_t& f = geo->faces.at(leaf->face_index);
 
 		double denom = dot(f.plane.normal, dir);
 		// backface or parallel
@@ -114,11 +114,12 @@ inline void KDTree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& e
 		}
 		// point on the plane
 		vec3 point = start + dir * t;
-		int v_count = f.v_end - f.v_start;
+		int v_count = f.v_count;
+
 		bool hit = true;
 		for (int i = 0; i < v_count; i++) {
-			vec3 v = point - verts[f.v_start + i];
-			vec3 c = cross(verts[f.v_start + (i + 1) % v_count] - verts[f.v_start + i], v);
+			vec3 v = point - geo->verts[f.v_start + i];
+			vec3 c = cross(geo->verts[f.v_start + (i + 1) % v_count] - geo->verts[f.v_start + i], v);
 			float angle = dot(-f.plane.normal, c);
 			if (angle < 0) {
 				// point is outside the edges of the polygon
@@ -144,7 +145,7 @@ void KDTree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& tr
 	int count = node.num_faces;
 	for (int i = node.first_child; i < node.first_child + count; i++) {
 		leaf = &leaves.at(i);
-		face_t& f = faces.at(leaf->face_index);
+		const face_t& f = geo->faces.at(leaf->face_index);
 
 
 		float denom = dot(f.plane.normal, r.dir);
@@ -165,11 +166,11 @@ void KDTree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& tr
 		}
 		// point on the plane
 		vec3 point = r.origin + r.dir * t;
-		int v_count = f.v_end - f.v_start;
+		int v_count = f.v_count;// f.v_end - f.v_start;
 		bool hit = true;
 		for (int i = 0; i < v_count; i++) {
-			vec3 v = point - verts.at(f.v_start + i);
-			vec3 c = cross(verts.at(f.v_start + (i + 1) % v_count) - verts.at(f.v_start + i), v);
+			vec3 v = point - geo->verts.at(f.v_start + i);
+			vec3 c = cross(geo->verts.at(f.v_start + (i + 1) % v_count) - geo->verts.at(f.v_start + i), v);
 			float angle = dot(-f.plane.normal, c);
 			if (angle < 0) {
 				// point is outside the edges of the polygon

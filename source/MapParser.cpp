@@ -50,6 +50,7 @@ void MapParser::start_file(std::string file)
 	std::cout << "Finished parse. Entities: " << entities.size() << "; Brushes: " << brushes.size() << "; Faces: " << faces.size() << "; Surface area: " << surf_area << '\n';
 	printf("Performing CSG union...\n");
 	CSG_union();
+	post_process_pass();
 	std::cout << "Faces after CSG: "<< faces.size() << '\n';
 	surf_area = get_surface_area();
 	std::cout << "Surface area after CSG: " << surf_area << '\n';
@@ -269,7 +270,7 @@ MapParser::Result MapParser::parse_entity()
 	}
 
 	entities.resize(entities.size() + 1);
-	mapentity_t* ent = &entities.back();
+	entity_t* ent = &entities.back();
 	ent->brush_start = brushes.size();
 	//u16 b_start = brushes.size();
 
@@ -354,7 +355,7 @@ MapParser::Result MapParser::parse_face()
 {
 	faces.resize(faces.size() + 1);
 	mapface_t* f = &faces.back();
-	texture_info_t t_info;
+	texture_info_t ti;
 
 
 	vec3 verts[3];
@@ -379,16 +380,16 @@ MapParser::Result MapParser::parse_face()
 	f->plane.init(verts[0], verts[1], verts[2]);
 
 	read_str(false);
-	t_info.t_index = get_texture();
+	ti.t_index = get_texture();
 
 	read_token();
 	if (parse_char != '[') {
 		parse_fail("Expected '['");
 		return R_FAIL;
 	}
-	parse_vec3(t_info.u_axis);
+	parse_vec3(ti.axis[0]);
 	read_str(false);
-	t_info.u_offset = std::stoi(parse_buffer);
+	ti.offset[0] = std::stoi(parse_buffer);
 	read_token();
 	if (parse_char != ']') {
 		parse_fail("Expected ']'");
@@ -400,9 +401,9 @@ MapParser::Result MapParser::parse_face()
 		parse_fail("Expected '['");
 		return R_FAIL;
 	}
-	parse_vec3(t_info.v_axis);
+	parse_vec3(ti.axis[1]);
 	read_str(false);
-	t_info.v_offset = std::stoi(parse_buffer);
+	ti.offset[1] = std::stoi(parse_buffer);
 	read_token();
 	if (parse_char != ']') {
 		parse_fail("Expected ']'");
@@ -411,9 +412,12 @@ MapParser::Result MapParser::parse_face()
 	// throwaway, "angle"
 	read_str(false);
 	read_str(false);
-	t_info.uv_scale.x = std::stof(parse_buffer);
+	ti.uv_scale.x = std::stof(parse_buffer);
 	read_str(false);
-	t_info.uv_scale.y = std::stof(parse_buffer);
+	ti.uv_scale.y = std::stof(parse_buffer);
+
+	t_info.push_back(ti);
+	f->t_info_idx = t_info.size() - 1;
 
 	return R_GOOD;
 }
@@ -563,7 +567,32 @@ MapParser::Result MapParser::read_str(bool in_quotes)
 
 	return R_EOF;
 }
-/*
+void MapParser::post_process_pass()
+{
+	for (int i = 0; i < vertex_list.size(); i++) {
+		auto& v = vertex_list.at(i);
+		v /= 32.f;
+		v = vec3(-v.x, v.z, v.y);
+	}
+	for (int i = 0; i < t_info.size(); i++) {
+		auto& ti = t_info.at(i);
+		for (int j = 0; j < 2; j++) {
+			ti.axis[j] = vec3(-ti.axis[j].x, ti.axis[j].z, ti.axis[j].y);
+		}
+	}
+	for (int i = 0; i < face_list.size(); i++) {
+		auto& f = face_list.at(i);
+		f.plane.normal = vec3(-f.plane.normal.x, f.plane.normal.z, f.plane.normal.y);
+		f.plane.init(vertex_list.at(f.v_start), vertex_list.at(f.v_start + 1), vertex_list.at(f.v_start + 2));
+		f.plane.normal *= -1.f;
+		f.plane.d = -dot(f.plane.normal, vertex_list.at(f.v_start));
+	}
+
+	//new_face.plane.init(world_verts.at(face.v_start), world_verts.at(face.v_start + 1), world_verts.at(face.v_start + 2));
+	//new_face.plane.normal = new_face.plane.normal * -1.f;
+	//new_face.plane.d = -dot(new_face.plane.normal, world_verts.at(face.v_start));
+
+}
 void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)
 {
 	va.set_primitive(VertexArray::Primitive::triangle);
@@ -571,21 +600,24 @@ void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)
 
 	// Scale verts to something reasonable
 	// Also change from xyz to xzy
-	for (int i = 0; i < verts.size(); i++) {
-		verts.at(i) /= 32.f;
-		verts.at(i) = vec3(-verts.at(i).x, verts.at(i).z, verts.at(i).y);
-	}
+	auto verts = vertex_list;
+
+	//for (int i = 0; i < verts.size(); i++) {
+	//	verts.at(i) /= 32.f;
+	//	verts.at(i) = vec3(-verts.at(i).x, verts.at(i).z, verts.at(i).y);
+	//}
 
 
-	for (int i = 0; i < faces.size(); i++) {
+	for (int i = 0; i < face_list.size(); i++) {
 		//const poly_t& p = polys.at(i);
-		mface_t& f = faces.at(i);	// faces have same index
-		f.u_axis = vec3(-f.u_axis.x, f.u_axis.z, f.u_axis.y);
-		f.v_axis = vec3(-f.v_axis.x, f.v_axis.z, f.v_axis.y);
+		face_t& f = face_list.at(i);	// faces have same index
+		//texture_info_t& ti = t_info.at(f.t_info_idx);
+		//f.u_axis = vec3(-f.u_axis.x, f.u_axis.z, f.u_axis.y);
+		//f.v_axis = vec3(-f.v_axis.x, f.v_axis.z, f.v_axis.y);
 
-		f.plane.normal = vec3(-f.plane.normal.x, f.plane.normal.z, f.plane.normal.y);
+		//f.plane.normal = vec3(-f.plane.normal.x, f.plane.normal.z, f.plane.normal.y);
 
-		int v_count = f.v_end - f.v_start;
+		int v_count = f.v_count;// v_end - f.v_start;
 
 		// Construct V-2 triangles (ie tri is 1, quad is 2, pent is 3)
 		for (int j = 0; j < v_count - 2; j++) {
@@ -602,6 +634,8 @@ void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)
 }
 uint64 MapParser::get_surface_area()
 {
+	return 0;
+	/*
 	uint64 area = 0;
 	for (int i = 0; i < faces.size(); i++) {
 		int v_count = faces.at(i).v_end - faces.at(i).v_start;
@@ -611,5 +645,6 @@ uint64 MapParser::get_surface_area()
 		}
 	}
 	return area;
+	*/
 }
-*/
+

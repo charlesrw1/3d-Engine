@@ -63,8 +63,8 @@ struct ray_t
 class KDTree
 {
 public:
-	KDTree(const std::vector<face_t>& f, const std::vector<vec3>& verts) : faces{ f }, verts{ verts } {}
-	void init();
+	KDTree() {}
+	void init(const worldmodel_t* model);
 	void create_va();
 	void draw() {
 		va->draw_array();
@@ -121,24 +121,25 @@ private:
 	std::vector<plane_t> planes;
 	std::vector<leaf_t> leaves;
 
-	const std::vector<vec3>& verts;
-	const std::vector<face_t>& faces;
+	const worldmodel_t* geo = nullptr;
 
 	std::vector<float> work_buffer;
 
 	VertexArray* va=nullptr;
 };
 
+
 class WorldGeometry
 {
 public:
-	WorldGeometry() : tree(faces,verts) {}
-	void load_map(const MapParser& mp);
+	WorldGeometry() {}
+	void load_map(worldmodel_t* worldmodel);
 	void free_map();
 
 	trace_t test_ray(const ray_t& r);
 
 	void debug_draw();
+	void create_mesh();
 
 	 Model* get_model()  {
 		return model;
@@ -147,12 +148,15 @@ public:
 	 void print_info() const;
 	 // for editor access
 	KDTree tree;
-private:
-	std::vector<vec3> verts;
-	std::vector<face_t> faces;
-	std::vector<brush_model_t> models;
-	std::vector<texture_info_t> tinfo;
 
+
+	worldmodel_t* wm = nullptr;
+
+	//std::vector<face_t> faces;
+	//std::vector<vec3> verts;
+	//std::vector<brush_model_t> models;
+	//std::vector<texture_info_t> tinfo;
+private:
 	// Geometry is batched per texture
 	std::vector<Texture*> face_textures;
 
@@ -160,6 +164,7 @@ private:
 
 	// For now just store the world in a "model"
 	Model* model=nullptr;
+
 
 	// hack for now cause static creation
 	VertexArray* line_va;

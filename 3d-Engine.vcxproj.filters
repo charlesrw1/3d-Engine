@@ -90,9 +90,6 @@
     <ClCompile Include="source\WorldGeometry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\ClippingHull.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="source\Trace.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -194,9 +191,6 @@
     <ClInclude Include="source\MapParser.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Dict.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="source\WorldGeometry.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -214,6 +208,9 @@
     </ClInclude>
     <ClInclude Include="source\Light.h">
       <Filter>Source Files\Lightmapping</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Map_def.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
