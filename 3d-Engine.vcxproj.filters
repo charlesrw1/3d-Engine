@@ -84,9 +84,6 @@
     <ClCompile Include="source\TextureManager.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="source\MapParser.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="source\WorldGeometry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -98,6 +95,9 @@
     </ClCompile>
     <ClCompile Include="source\Light.cpp">
       <Filter>Source Files\Lightmapping</Filter>
+    </ClCompile>
+    <ClCompile Include="source\MapParser.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
