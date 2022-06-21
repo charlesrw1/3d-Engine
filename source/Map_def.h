@@ -125,6 +125,8 @@ struct face_t
 
 	int t_info_idx = 0;
 
+	// lightmapping info
+	// these should be hoisted out into a seperate array
 	short lightmap_min[2];
 	short lightmap_size[2];
 	float exact_min[2];

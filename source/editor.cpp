@@ -259,15 +259,15 @@ void Editor::shoot_ray()
 	trace_t result;
 	
 	auto start2 = std::chrono::steady_clock::now();
-	for (int i = 0; i < 1000; i++) {
-		 //result = global_world.test_ray(ray);
+	for (int i = 0; i < 1; i++) {
+		 result = global_world.test_ray(ray);
 	}
 	auto end2 = std::chrono::steady_clock::now();
 	auto elapsed2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
 	
 	auto start3 = std::chrono::steady_clock::now();
-	for (int i = 0; i < 1000; i++) {
-		//result = global_world.tree.test_ray(ray.origin,ray.origin+ray.dir*200.f);
+	for (int i = 0; i < 1; i++) {
+		result = global_world.tree.test_ray(ray.origin,ray.origin+ray.dir*200.f);
 	}
 	auto end3 = std::chrono::steady_clock::now();
 	auto elapsed3 = std::chrono::duration_cast<std::chrono::microseconds>(end3 - start3);

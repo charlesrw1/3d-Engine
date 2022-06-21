@@ -117,9 +117,9 @@ void WorldGeometry::create_mesh()
 			for (int i = 0; i < 2; i++) {
 				float u = dot(ti->axis[i], wrv.position - origin);
 				u = (u - face.exact_min[i]) / face.exact_span[i];// 0-1 coords on small lightmap image
-
+				//u = (u - 0.5) * 0.90 + 0.5;
 				u = face.lightmap_min[i] + u * face.lightmap_size[i];
-				wrv.lightmap_uv[i] = u/400.f;//256 = lightmap dimensions
+				wrv.lightmap_uv[i] = u/800.f;//256 = lightmap dimensions
 			}
 
 			gpu_verts.push_back(wrv);

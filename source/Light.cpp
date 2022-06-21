@@ -19,10 +19,10 @@ std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
 
-int lm_width = 400;
-int lm_height = 400;
+int lm_width = 800;
+int lm_height = 800;
 
-float density_per_unit = 3.f;
+float density_per_unit = 4.f;
 
 VertexArray* va;
 
@@ -114,7 +114,7 @@ struct light_t
 	vec3 pos;
 	vec3 color;
 };
-std::vector<light_t> lights = { {{0.f,10.f,0.f},{1.f,0.8f,0.4f}} ,{{-5.f,5.f,8.f},{0.1f,0.3f,1.0f}},{{2.f,20.f,-9.f},{0.3f,1.0f,0.4f}},{{0.f,5.f,0.f},{1.f,0.0f,0.0f}} };
+std::vector<light_t> lights = { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } , { {-5.f,5.f,8.f},{0.1f,0.3f,1.0f} },{{0,1,0},{1,1,1}} , { {0.f,10.f,0.f},{2.f,2.0f,2.0f} }, { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} }, { {0.f,5.f,0.f},{1.f,0.0f,0.0f} } };
 
 static u32 total_pixels = 0;
 // Lots of help from Quake's LTFACE.c 
@@ -240,16 +240,25 @@ void light_face(int num)
 				
 				// move point towards middle of face
 				vec3 move_mid = normalize(face_mid	 - point);
-				//point = point + move_mid * 0.25f;
-				
+				point = point + move_mid * 0.25f;
+				if (top_point >= MAP_PTS) {
+					goto face_too_big;
+				}
 				assert(top_point < MAP_PTS);
 				l.points[top_point++]=point;
 			}
 		}
+	face_too_big:;
 	}
 	{
 		img.buffer_start = data_buffer.size();
 		make_space(img.height* img.width);
+		// ambient term
+		for (int i = 0; i < l.numpts;i++) {
+			//add_color(img.buffer_start, i, vec3(0.05, 0.05, 0.05));
+		}
+
+
 		for (int i = 0; i < lights.size(); i++) {
 			vec3 light_p = lights[i].pos;
 
@@ -263,7 +272,7 @@ void light_face(int num)
 					va->append({ l.points[j],vec3(1,0,0) });
 					continue;
 				}
-				va->append({ l.points[j],vec3(0,1,0) });
+				//va->append({ l.points[j],vec3(0,1,0) });
 
 				vec3 light_dir = light_p - l.points[j];
 				float dist = length(light_dir);
@@ -273,7 +282,7 @@ void light_face(int num)
 					continue;
 				}
 
-				vec3 final_color = lights[i].color * dif * max((30-dist)/30.f,0.f);
+				vec3 final_color = lights[i].color * dif *max(1/(dist*dist+90)*(90-dist),0.f);
 				
 				add_color(img.buffer_start, j, final_color);
 			}

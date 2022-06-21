@@ -1,7 +1,23 @@
 #include "MapParser.h"
 
 
-#define EQUALS_0(a,b) fabs(a.x-b.x)<0.1&&fabs(a.y-b.y)<0.1&&fabs(a.z-b.z)<0.1
+#define EQUALS_0(a,b) fabs(a.x-b.x)<0.01&&fabs(a.y-b.y)<0.01&&fabs(a.z-b.z)<0.01
+
+static bool equals(winding_t& a, winding_t& b) {
+	if (a.num_verts == b.num_verts) {
+		for (int i = 0; i < a.num_verts;i++) {
+			for (int j = 0; j < 3; j++) {
+				if (abs(a.v[i][j] - b.v[i][j]) > 0.01) {
+					return false;
+				}
+			}
+		}
+	}
+	else {
+		return false;
+	}
+	return true;
+}
 
 void MapParser::CSG_union()
 {
@@ -137,7 +153,7 @@ std::vector<mapface_t> MapParser::clip_to_list(const mapbrush_t& a, int start_in
 				result.push_back(front);
 				return result;
 			}
-			if (EQUALS_0(check_back.at(0).wind.v[0], back.wind.v[0])) {
+			if (equals(check_back.at(0).wind,back.wind)) {
 				result.push_back(b);
 				return result;
 			}
@@ -242,8 +258,8 @@ void MapParser::split_face(const mapface_t& b, const mapface_t& a, mapface_t& fr
 		}
 
 		int next_idx = (i + 1)%a.wind.num_verts;
-		//if (next_idx == a.v_end) next_idx = a.v_start;
-		//assert(next_idx != idx);
+		if (next_idx == a.wind.num_verts) next_idx = 0;
+		assert(next_idx != i);
 
 		bool ignore = false;
 
