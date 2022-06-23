@@ -17,7 +17,7 @@ const float SCALE_FACTOR = 1 / 32.f;
 
 //80
 #define MAX_PER_LEAF 50
-#define MAX_DEPTH 10
+#define MAX_DEPTH 32
 /*
 struct face_t
 {

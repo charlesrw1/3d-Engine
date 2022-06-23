@@ -255,31 +255,34 @@ void Editor::shoot_ray()
 	ray.dir = normalize(global_app.scene->active_camera()->front);
 	ray.length = 200.f;
 	ray.origin = global_app.scene->active_camera()->position;
+	vec3 d = vec3(-7.5, 11, 0) - ray.origin;
+	ray.length = length(d);
+	ray.dir = normalize(d);
 
 	trace_t result;
 	
 	auto start2 = std::chrono::steady_clock::now();
 	for (int i = 0; i < 1; i++) {
-		 result = global_world.test_ray(ray);
+		// result = global_world.test_ray(ray);
 	}
 	auto end2 = std::chrono::steady_clock::now();
 	auto elapsed2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
 	
 	auto start3 = std::chrono::steady_clock::now();
 	for (int i = 0; i < 1; i++) {
-		result = global_world.tree.test_ray(ray.origin,ray.origin+ray.dir*200.f);
 	}
 	auto end3 = std::chrono::steady_clock::now();
 	auto elapsed3 = std::chrono::duration_cast<std::chrono::microseconds>(end3 - start3);
 	
 	auto start = std::chrono::steady_clock::now();
 	for (int i = 0; i < 1; i++) {
-		result = global_world.tree.test_ray(ray);
+		//result = global_world.tree.test_ray(ray);
 	}
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>( end - start);
-	global_world.tree.print_trace_stats();
+//	global_world.tree.print_trace_stats();
 
+		result = global_world.tree.test_ray(ray.origin,vec3(-7.5,11,0));
 	if (1) {
 		std::cout << "Ray hit: (" << elapsed3.count() / (1000.f) << " ms) (" << elapsed.count() / (1000.f) << " ms prev) (" << elapsed2.count() / (1000.f)  << " ms brute force)\n"
 			<< "	Pos: " << result.end_pos.x << ' ' << result.end_pos.y << ' ' << result.end_pos.z << '\n'

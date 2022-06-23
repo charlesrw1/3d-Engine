@@ -169,7 +169,7 @@ void WorldGeometry::debug_draw() {
 	hit_points->draw_array();
 	glLineWidth(1);
 	glEnable(GL_DEPTH_TEST);
-	//tree.draw();
+	tree.draw();
 }
 
 void WorldGeometry::print_info() const {
@@ -313,7 +313,7 @@ void KDTree::subdivide(int cut, int node_idx, int depth)
 	std::sort(work_buffer.begin(), work_buffer.end());
 
 	float median = work_buffer.at(work_buffer.size() / 2);
-	p.d = -median - 0.1f; //+ 0.5f; // nudge it
+	p.d = -median- 0.f; // nudge it
 	planes.push_back(p);
 	node.plane_num = planes.size() - 1;
 	

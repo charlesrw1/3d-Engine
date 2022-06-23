@@ -22,7 +22,7 @@ int lm_width = 1012;
 int lm_height = 1012;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 1.f;
+float density_per_unit = 4.f;
 
 VertexArray* va;
 
@@ -235,7 +235,7 @@ void light_face(int num)
 
 		float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
 		float mid_v = (l.exact_min[1] + l.exact_max[1]) / 2.f;
-		vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal*0.01f;
+		vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal*0.1f;
 		face_mid = l.face_middle + l.face->plane.normal*0.01f;
 		for (int y = 0; y < h; y++) {
 			for (int x = 0; x < w; x++) {
