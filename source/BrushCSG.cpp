@@ -196,69 +196,34 @@ side_t MapParser::classify_face(const mapface_t& face, const mapface_t& other) c
 
 	return ON_PLANE;
 }
-// face a being split by plane b
-void MapParser::split_face(const mapface_t& b, const mapface_t& a, mapface_t& front, mapface_t& back)
+void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back)
 {
-	//printf("		Splitting face...\n");
-	//int v_count = a.v_end - a.v_start;
-	std::vector<side_t> classified(a.wind.num_verts);
-	for (int i = 0; i < a.wind.num_verts; i++) {
-		classified.at(i) = b.plane.classify_full(a.wind.v[i]);//verts.at(a.v_start + i));
+	std::vector<side_t> classified(a.num_verts);
+	for (int i = 0; i < a.num_verts; i++) {
+		classified.at(i) = plane.classify_full(a.v[i]);//verts.at(a.v_start + i));
 	}
+	front.num_verts = 0;
+	back.num_verts = 0;
 
-	std::vector<vec3> front_verts;
-	std::vector<vec3> back_verts;
-
-	// new faces
-	//mface_t front;
-	//mface_t back;
-	/*
-	front.plane = a.plane;
-	back.plane = a.plane;
-	front.t_index = a.t_index;
-	back.t_index = a.t_index;
-
-	
-	front.uv_scale = a.uv_scale;
-	front.u_axis = a.u_axis;
-	front.v_axis = a.v_axis;
-	front.v_offset = a.v_offset;
-	front.u_offset = a.u_offset;
-
-	back.uv_scale = a.uv_scale;
-	back.u_axis = a.u_axis;
-	back.v_axis = a.v_axis;
-	back.v_offset = a.v_offset;
-	back.u_offset = a.u_offset;
-	*/
-
-	front = a;
-	back = a;
-	front.wind.num_verts = 0;
-	back.wind.num_verts = 0;
-
-
-	// Remeber texture info here!
-
-	for (int i = 0; i < a.wind.num_verts; i++) {
+	for (int i = 0; i < a.num_verts; i++) {
 		//int idx = a.v_start + i;
 
 		switch (classified.at(i))
 		{
 		case FRONT:
-			front.wind.add_vert(a.wind.v[i]);//verts.at(idx));
+			front.add_vert(a.v[i]);//verts.at(idx));
 			break;
 		case BACK:
-			back.wind.add_vert(a.wind.v[i]);
+			back.add_vert(a.v[i]);
 			break;
 		case ON_PLANE:
-			front.wind.add_vert(a.wind.v[i]);
-			back.wind.add_vert(a.wind.v[i]);
+			front.add_vert(a.v[i]);
+			back.add_vert(a.v[i]);
 			break;
 		}
 
-		int next_idx = (i + 1)%a.wind.num_verts;
-		if (next_idx == a.wind.num_verts) next_idx = 0;
+		int next_idx = (i + 1) % a.num_verts;
+		if (next_idx == a.num_verts) next_idx = 0;
 		assert(next_idx != i);
 
 		bool ignore = false;
@@ -273,16 +238,16 @@ void MapParser::split_face(const mapface_t& b, const mapface_t& a, mapface_t& fr
 			vec3 vert = vec3(0);
 			float percentage;
 
-			if (!b.plane.get_intersection(a.wind.v[i],a.wind.v[next_idx],vert,percentage)) {//verts.at(idx), verts.at(next_idx), vert, percentage)) {
+			if (!plane.get_intersection(a.v[i], a.v[next_idx], vert, percentage)) {//verts.at(idx), verts.at(next_idx), vert, percentage)) {
 
 				// should never happen, but it does...
-				vert = a.wind.v[i];//verts.at(idx);
+				vert = a.v[i];//verts.at(idx);
 				//continue;
 				////printf("Split edge not parallel!\n");
 				//exit(1);
 			}
-			front.wind.add_vert(vert);
-			back.wind.add_vert(vert);
+			front.add_vert(vert);
+			back.add_vert(vert);
 			//front_verts.push_back(vert);
 			//back_verts.push_back(vert);
 			// texture calc here
@@ -290,15 +255,28 @@ void MapParser::split_face(const mapface_t& b, const mapface_t& a, mapface_t& fr
 
 		}
 	}
-	assert(front.wind.num_verts >= 3);
-	assert(back.wind.num_verts >= 3);
-	assert(front.wind.num_verts+back.wind.num_verts >= a.wind.num_verts);
+	assert(front.num_verts >= 3);
+	assert(back.num_verts >= 3);
+	assert(front.num_verts + back.num_verts >= a.num_verts);
 
-	//front.v_start = verts.size();
-	//verts.insert(verts.end(), front_verts.begin(), front_verts.end());
-	//front.v_end = verts.size();
+}
+void get_extents(const winding_t& w, vec3& min, vec3& max)
+{
+	min = vec3(5000);
+	max = vec3(-5000);
+	for (int i = 0; i < w.num_verts; i++) {
+		min = glm::min(w.v[i], min);
+		max = glm::max(w.v[i], max);
+	}
+}
 
-	//back.v_start = verts.size();
-	//verts.insert(verts.end(), back_verts.begin(), back_verts.end());
-	//back.v_end = verts.size();
+// face a being split by plane b
+void MapParser::split_face(const mapface_t& b, const mapface_t& a, mapface_t& front, mapface_t& back)
+{
+
+	front = a;
+	back = a;
+
+	split_winding(a.wind, b.plane, front.wind, back.wind);
+	
 }

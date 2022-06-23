@@ -99,6 +99,9 @@
     <ClCompile Include="source\MapParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source\BSPtree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\app.h">
@@ -197,7 +200,7 @@
     <ClInclude Include="source\FreeList.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\KDTree.h">
+    <ClInclude Include="source\BSPtree.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="source\Trace.h">

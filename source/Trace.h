@@ -3,7 +3,7 @@
 #include "WorldGeometry.h"
 
 trace_t test_line(vec3 start, vec3 end);
-void init_nodes(KDTree& tree);
+void init_nodes(BSPtree& tree);
 
 #endif
 

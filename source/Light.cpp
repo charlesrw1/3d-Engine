@@ -1,6 +1,6 @@
 #include "Light.h"
 #include "WorldGeometry.h"
-
+#include "SDL2/SDL_timer.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -18,11 +18,11 @@ std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
 
-int lm_width = 1012;
-int lm_height = 1012;
+int lm_width = 1500;
+int lm_height = 1500;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 4.f;
+float density_per_unit = 8.f;
 
 VertexArray* va;
 
@@ -235,7 +235,7 @@ void light_face(int num)
 
 		float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
 		float mid_v = (l.exact_min[1] + l.exact_max[1]) / 2.f;
-		vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal*0.1f;
+		vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal*0.01f;
 		face_mid = l.face_middle + l.face->plane.normal*0.01f;
 		for (int y = 0; y < h; y++) {
 			for (int x = 0; x < w; x++) {
@@ -392,6 +392,7 @@ void add_lights(worldmodel_t* wm)
 #include <algorithm>
 void create_light_map(worldmodel_t* wm)
 {
+	u32 start = SDL_GetTicks();
 	printf("Starting lightmap...\n");
 	va = new VertexArray;
 	va->set_primitive(VertexArray::Primitive::points);
@@ -454,9 +455,9 @@ void create_light_map(worldmodel_t* wm)
 	delete root;
 
 	stbi_write_bmp("resources/textures/lightmap.bmp", lm_width, lm_height, 3, final_lightmap.data());
-
+	printf("Lightmap finished in %u ms", SDL_GetTicks() - start);
 }
 void draw_lightmap_debug()
 {
-	va->draw_array();
+	//va->draw_array();
 }

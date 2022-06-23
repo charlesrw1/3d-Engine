@@ -19,7 +19,9 @@ using namespace glm;
 class Texture;
 class VertexArray;
 
-
+// BrushCSG uses this but so does BSPtree for splitting windings
+void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);
+void get_extents(const winding_t& w, vec3& min, vec3& max);
 class MapParser
 {
 public:

@@ -7,7 +7,7 @@ struct tracestack_t
 	bool side;	// true = front
 };
 
-trace_t KDTree::test_ray(vec3 start, vec3 end)
+trace_t BSPtree::test_ray(vec3 start, vec3 end)
 {
 	trace_t trace;
 	trace.dir = normalize(end - start);
@@ -88,7 +88,7 @@ trace_t KDTree::test_ray(vec3 start, vec3 end)
 
 	return trace_t();
 }
-inline void KDTree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& end, trace_t& trace)
+inline void BSPtree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& end, trace_t& trace)
 {
 	const leaf_t* leaf;
 	vec3 dir = normalize(end - start);
@@ -140,7 +140,7 @@ inline void KDTree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& e
 		}
 	}
 }
-void KDTree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& trace)
+void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& trace)
 {
 	assert(node.num_faces > 0);
 	const leaf_t* leaf;

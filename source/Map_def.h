@@ -28,7 +28,7 @@ struct plane_t
 	}
 	// true= in front or on the plane, false= behind
 	bool classify(const vec3& p) const {
-		return dist(p) > -0.001;
+		return dist(p) > -0.01;
 	}
 	float dist(const vec3& p) const {
 		return dot(normal, p) + d;

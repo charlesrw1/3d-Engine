@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="source\BrushCSG.cpp" />
+    <ClCompile Include="source\BSPtree.cpp" />
     <ClCompile Include="source\camera.cpp" />
     <ClCompile Include="source\deps\glad.c" />
     <ClCompile Include="source\deps\imgui.cpp" />
@@ -64,7 +65,7 @@
     <ClInclude Include="source\FreeList.h" />
     <ClInclude Include="source\geometry.h" />
     <ClInclude Include="source\IGame.h" />
-    <ClInclude Include="source\KDTree.h" />
+    <ClInclude Include="source\BSPtree.h" />
     <ClInclude Include="source\Light.h" />
     <ClInclude Include="source\loader.h" />
     <ClInclude Include="source\MapParser.h" />
