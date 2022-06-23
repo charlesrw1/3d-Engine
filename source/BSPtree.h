@@ -46,7 +46,7 @@ private:
 
 	void test_ray_internal(bool upstack, int caller_node, int node_idx, const ray_t& r, trace_t& t);
 	inline void check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t);
-	inline void check_ray_leaf_node(const node_t& node, vec3& start, vec3& end, trace_t& t);
+	//inline void check_ray_leaf_node(const node_t& node, vec3& start, vec3& end, trace_t& t);
 
 	void flatten_arrays();
 

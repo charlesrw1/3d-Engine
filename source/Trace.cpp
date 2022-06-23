@@ -32,6 +32,8 @@ trace_t BSPtree::test_ray(vec3 start, vec3 end)
 		node = &nodes[node_n];
 
 		while (node->num_faces != -1) {
+			//r.origin = front;
+			//r.length = length(back - front)+1.f;
 			check_ray_leaf_node(*node, r, trace);
 			if (trace.hit) {
 //va->push_2({ start,vec3(1.f,0.0,0.0) }, { end,vec3(1.f,0.0,0.0) });
@@ -42,11 +44,11 @@ trace_t BSPtree::test_ray(vec3 start, vec3 end)
 			// no more nodes to check, no hit
 			top--;
 			if (top < stack) {
-//va->push_2({ start,vec3(0,1.f,0) }, { end,vec3(0,1.f,0) });
+//a->push_2({ start,vec3(0,1.f,0) }, { end,vec3(0,1.f,0) });
 				return trace;
 			}
 
-			front = back;
+			front = back;//-(r.dir*0.05f);
 			back = top->backpt;
 			node_n = top->node;
 
@@ -71,7 +73,7 @@ trace_t BSPtree::test_ray(vec3 start, vec3 end)
 			node_n = node->first_child + 1;
 			continue;
 		}
-		bool front_side = front_dist < 0;
+		bool front_side = front_dist < 0.01;
 		// split, cache mid to back, set next to front to mid
 		top->backpt = back;
 		top->node = node_n;
@@ -88,6 +90,7 @@ trace_t BSPtree::test_ray(vec3 start, vec3 end)
 
 	return trace_t();
 }
+/*
 inline void BSPtree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& end, trace_t& trace)
 {
 	const leaf_t* leaf;
@@ -137,12 +140,15 @@ inline void BSPtree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& 
 			trace.length = t;
 			trace.normal = f.plane.normal;
 			trace.d = f.plane.d;
+			trace.face = leaf->face_index;
 		}
 	}
 }
+*/
+
 void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& trace)
 {
-	assert(node.num_faces > 0);
+	assert(node.num_faces > -1);
 	const leaf_t* leaf;
 
 	int count = node.num_faces;
@@ -188,6 +194,7 @@ void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t
 			trace.length = t;
 			trace.normal = f.plane.normal;
 			trace.d = f.plane.d;
+			trace.face = leaf->face_index;
 		}
 	}
 }

@@ -95,7 +95,7 @@ void BSPtree::subdivide(int cut, int node_idx, int depth)
 	std::sort(work_buffer.begin(), work_buffer.end());
 
 	float median = work_buffer.at(work_buffer.size() / 2);
-	p.d = -median - 0.f; // nudge it
+	p.d = -median; 
 	planes.push_back(p);
 	node.plane_num = planes.size() - 1;
 
@@ -117,13 +117,13 @@ void BSPtree::subdivide(int cut, int node_idx, int depth)
 
 		int next = l->next;
 		// face in front
-		if (first > -0.01 && second > -0.01) {
+		if (first > -0.005 && second > -0.005) {
 			l->next = child[0].first_child;
 			child[0].first_child = current_idx;
 			child[0].num_faces++;
 		}
 		// face behind
-		else if (first < 0.01 && second < 0.01) {
+		else if (first < 0.005 && second < 0.005) {
 			l->next = child[1].first_child;
 			child[1].first_child = current_idx;
 			child[1].num_faces++;
@@ -343,8 +343,10 @@ void BSPtree::test_ray_internal(bool uptree, int caller_node, int node_idx, cons
 	const node_t& node = nodes.at(node_idx);
 	// node has faces attached to it, check them
 	if (node.num_faces != -1) {
+		int face = trace.face;
 		check_ray_leaf_node(node, ray, trace);
-		if (trace.hit) trace.node = node_idx;
+		if (trace.hit && face != trace.face) 
+			trace.node = node_idx;
 	}
 	// node is a parent, determine where to go next
 	else {
