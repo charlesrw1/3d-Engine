@@ -166,31 +166,33 @@ void Renderer::render_scene(SceneData& scene)
 	
 	//goto skip_light;
 
+	if (!render_lightmap) {
+		// Directional light pass + ambient
+		directional_shadows.use();
+		directional_shadows.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix).set_vec3("light.direction", scene.sun.direction)
+			.set_vec3("light.ambient", scene.sun.ambient).set_vec3("light.diffuse", scene.sun.diffuse)
+			.set_vec3("light.specular", scene.sun.specular).set_int("baseTex", 0).set_int("shinyTex", 1).set_int("shadow_map", 2)
+			.set_vec3("viewPos", scene.active_camera()->position).set_float("shininess", 30).set_mat4("u_light_space_matrix", light_space_matrix);
 
-	// Directional light pass + ambient
-	directional_shadows.use();
-	directional_shadows.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix).set_vec3("light.direction", scene.sun.direction)
-		.set_vec3("light.ambient", scene.sun.ambient).set_vec3("light.diffuse", scene.sun.diffuse)
-		.set_vec3("light.specular", scene.sun.specular).set_int("baseTex", 0).set_int("shinyTex", 1).set_int("shadow_map",2)
-		.set_vec3("viewPos", scene.active_camera()->position).set_float("shininess", 30).set_mat4("u_light_space_matrix", light_space_matrix);
+		glActiveTexture(GL_TEXTURE0 + 2);
+		glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
+		scene_pass(scene, directional_shadows);
 
-	glActiveTexture(GL_TEXTURE0 + 2);
-	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
-	scene_pass(scene, directional_shadows);
-
-	// Point lights pass
-	upload_point_lights(scene);
-	point_lights.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix)
-		.set_vec3("view_pos", scene.active_camera()->position).set_int("diffuse_tex", 0).set_int("shiny_tex", 1);
-	// Enable additive blending
-	glDepthMask(GL_FALSE);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE);
-	scene_pass(scene, point_lights);
-	glDisable(GL_BLEND);
-	glDepthMask(GL_TRUE);
-	
-	//lightmap_geo();
+		// Point lights pass
+		upload_point_lights(scene);
+		point_lights.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix)
+			.set_vec3("view_pos", scene.active_camera()->position).set_int("diffuse_tex", 0).set_int("shiny_tex", 1);
+		// Enable additive blending
+		glDepthMask(GL_FALSE);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE);
+		scene_pass(scene, point_lights);
+		glDisable(GL_BLEND);
+		glDepthMask(GL_TRUE);
+	}
+	else {
+		lightmap_geo();
+	}
 
 skip_light:
 

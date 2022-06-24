@@ -13,8 +13,11 @@ void BSPtree::init(const worldmodel_t* wm)
 
 	work_buffer.reserve(geo->faces.size());
 
+	// only append "worldspawn"
+	const brush_model_t* bm = &wm->models[0];
+
 	// Get mins/maxes for all faces
-	for (int i = 0; i < geo->faces.size(); i++) {
+	for (int i = bm->face_start; i < bm->face_start+bm->face_count; i++) {
 		const face_t& f = geo->faces.at(i);
 		face_ex_t fx;
 		fx.face_index = i;
@@ -26,17 +29,17 @@ void BSPtree::init(const worldmodel_t* wm)
 		face_extended.push_back(fx);
 	}
 	// add all the starting leaves
-	for (int i = 0; i < geo->faces.size(); i++) {
+	for (int i = 0; i < bm->face_count; i++) {
 		leaf_t l;
-		l.face_index = i;
+		l.face_index = i;// this index's into face_extended
 		l.next = i + 1;
 		leaves.push_back(l);
 	}
 	leaves.back().next = -1;
-	int cut = CUT_X;
-	subdivide(cut, 0, 1);
+	subdivide(0, 0, 1);
 
 	flatten_arrays();
+	make_fast_list();
 
 	face_extended = std::vector<face_ex_t>();
 
@@ -440,15 +443,59 @@ void BSPtree::test_ray_internal(bool uptree, int caller_node, int node_idx, cons
 #include "glad/glad.h"
 void BSPtree::draw()
 {
-	va->draw_array();
+	//va->draw_array();
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
-	box_array->draw_array();
+	//box_array->draw_array();
 	glEnable(GL_CULL_FACE);
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
+}
+void BSPtree::make_fast_list()
+{
+	// first is index to old nodes, 2nd is index to new nodes
+	std::vector< std::pair<int,int> > temp_nodes;
+	temp_nodes.push_back({ 0,0 });
+	fast_list.resize(1);
+	while (!temp_nodes.empty())
+	{
+		auto node_pair = temp_nodes.back();
+		const node_t* node = &nodes.at(node_pair.first);
+		temp_nodes.pop_back();
 
+		BSPNode& new_node = fast_list.at(node_pair.second);
+
+		if (node->num_faces != -1) {
+
+			new_node.data1 |= (1 << 31);
+			u32 start = face_index.size();
+			new_node.data1 |= (start & ~(1 << 31));
+			new_node.data2 = node->num_faces;
+
+			for (int i = 0; i < node->num_faces; i++) {
+				const leaf_t* leaf = &leaves.at(node->first_child + i);
+				face_index.push_back(leaf->face_index);
+			}
+		}
+		else {
+			const plane_t* plane = &planes.at(node->plane_num);
+			int dig = 0;
+			if (plane->normal.y > 0.5) dig = 1;
+			else if (plane->normal.z > 0.5) dig = 2;
+
+			new_node.data1 |= dig;
+			int offset_to_child = fast_list.size();
+			new_node.data1 |= (offset_to_child << 2) & ~(1 << 31);
+			new_node.data2 = *(u32*)&plane->d;
+
+			fast_list.resize(fast_list.size() + 2);
+
+			temp_nodes.push_back({ node->first_child,offset_to_child });
+			temp_nodes.push_back({ node->first_child + 1, offset_to_child + 1 });
+
+		}
+	}
 
 }

@@ -330,7 +330,7 @@ MapParser::Result MapParser::parse_brush()
 				return R_FAIL;
 			}
 			
-			Result r =  parse_face();
+			Result r =  parse_face_quake();
 			if (r == R_FAIL) {
 				return R_FAIL;
 			}
@@ -421,7 +421,33 @@ MapParser::Result MapParser::parse_face()
 
 	return R_GOOD;
 }
-// Have to implement texture axis!!, should just be the grestest abs() axis of the normal
+static const vec3 baseaxis[18] =
+{
+{0,0,1}, {1,0,0}, {0,-1,0},			// floor
+{0,0,-1}, {1,0,0}, {0,-1,0},		// ceiling
+{1,0,0}, {0,1,0}, {0,0,-1},			// west wall
+{-1,0,0}, {0,1,0}, {0,0,-1},		// east wall
+{0,1,0}, {1,0,0}, {0,0,-1},			// south wall
+{0,-1,0}, {1,0,0}, {0,0,-1}			// north wall
+};
+static void get_texture_axis(const plane_t& plane, vec3& u, vec3& v)
+{
+	float best = 0;
+	int best_axis = 0;
+	for (int i = 0; i < 6; i++) {
+		float mag = dot(plane.normal, baseaxis[i * 3]);
+		if (mag > best) {
+			best = mag;
+			best_axis = i;
+		}
+	}
+
+	u = baseaxis[best_axis * 3 + 1];
+	v = baseaxis[best_axis * 3 + 2];
+
+}
+
+// Quake .map format: (v1) (v2) (v3) texture x_offset y_offset rotation x_scale y_scale
 MapParser::Result MapParser::parse_face_quake()
 {
 	faces.resize(faces.size() + 1);
@@ -453,10 +479,49 @@ MapParser::Result MapParser::parse_face_quake()
 	t_info.t_index = get_texture();
 
 	read_str(false);
+	t_info.offset[0] = std::stoi(parse_buffer);
 	read_str(false);
+	t_info.offset[1] = std::stoi(parse_buffer);
+
 	read_str(false);
+	float rotation = std::stof(parse_buffer);
+
 	read_str(false);
+	t_info.uv_scale[0] = std::stof(parse_buffer);
 	read_str(false);
+	t_info.uv_scale[1] = std::stof(parse_buffer);
+	vec3 uaxis, vaxis;
+	get_texture_axis(f->plane, uaxis, vaxis);
+	/*
+	if (abs(rotation) > 0.01) {
+
+		float cos_ang = cos(radians(rotation));
+		float sin_ang = cos(radians(rotation));
+
+
+		int digu = 0;
+		if (abs(uaxis[1]) > 0.5) digu = 1;
+		else if (abs(uaxis[2]) > 0.5) digu = 2;
+		int digv = 0;
+		if (abs(vaxis[1]) > 0.5) digv = 1;
+		else if (abs(vaxis[2]) > 0.5) digv = 2;
+
+		float rotu = uaxis[digu] * cos_ang - uaxis[digv] * sin_ang;
+		float rotv = uaxis[digu] * sin_ang + uaxis[digv] * cos_ang;
+		uaxis[digu] = rotu;
+		uaxis[digv] = rotv;
+
+		rotu = vaxis[digu] * cos_ang - vaxis[digv] * sin_ang;
+		rotv = vaxis[digu] * sin_ang + vaxis[digv] * cos_ang;
+		vaxis[digu] = rotu;
+		vaxis[digv] = rotv;
+	}
+	*/
+	t_info.axis[0] = uaxis;
+	t_info.axis[1] = vaxis;
+
+	this->t_info.push_back(t_info);
+	f->t_info_idx = this->t_info.size() - 1;
 
 	return R_GOOD;
 }

@@ -105,6 +105,7 @@ public:
 
 	VertexArray basic_sphere;
 
+	bool render_lightmap = true;
 
 	bool bloom_debug = false;
 	// TEMP

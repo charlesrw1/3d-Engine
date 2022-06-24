@@ -156,7 +156,7 @@ trace_t BSPtree::test_ray_debug(vec3 start, vec3 end)
 				return trace;
 			}
 
-			front = back;//-(r.dir*0.05f);
+			front = back;
 			back = top->backpt;
 			node_n = top->node;
 			max_box = top->box_max;
@@ -218,6 +218,95 @@ trace_t BSPtree::test_ray_debug(vec3 start, vec3 end)
 	return trace;
 }
 
+#define ISLEAF(a) (a&0x80000000)
+#define AXIS(a) (a&3)
+#define INSIDE_OFFSET(a) ((a&0x7FFFFFFF)>>2)
+#define LEAF_OFFSET(a) (a&0x7FFFFFFF)
+
+
+trace_t BSPtree::test_ray_fast(vec3 start, vec3 end)
+{
+	trace_t trace;
+	trace.dir = normalize(end - start);
+	trace.start = start;
+	ray_t r;
+	r.dir = trace.dir;
+	r.origin = start;
+	r.length = length(end - start);
+	int node_n;
+	vec3 front;
+	vec3 back;
+	tracestack_t stack[64];
+	tracestack_t* top;
+	const BSPNode* node;
+	node_n = 0;
+	top = stack;
+	front = start;
+	back = end;
+
+	while (1)
+	{
+		node = &fast_list.at(node_n);
+		while (ISLEAF(node->data1)) {
+			r.origin = front;
+			r.length = length(back - front) + 0.01f;
+			check_ray_bsp_node(*node, r, trace);
+			if (trace.hit) {
+				//va->push_2({ start,vec3(1.f,0.0,0.0) }, { end,vec3(1.f,0.0,0.0) });
+				trace.node = node_n;
+				return trace;
+			}
+
+			// no more nodes to check, no hit
+			top--;
+			if (top < stack) {
+				//a->push_2({ start,vec3(0,1.f,0) }, { end,vec3(0,1.f,0) });
+				return trace;
+			}
+
+			front = back;//-(r.dir*0.05f);
+			back = top->backpt;
+			node_n = top->node;
+
+			//node_n = node->first_child + top->side;
+			node = &fast_list[node_n];
+			int temp = INSIDE_OFFSET(node->data1) + top->side;
+			node = &fast_list[temp];
+			node_n = temp;
+		}
+
+		//const plane_t* p = &planes[node->plane_num];
+		int axis = AXIS(node->data1);
+		float dist = *(float*)&node->data2;
+		float front_dist = front[axis] + dist;// p->distance(front);
+		float back_dist = back[axis] + dist;// p->distance(back);
+
+		// both in front
+		if (front_dist > -0.01 && back_dist > -0.01) {
+			node_n = INSIDE_OFFSET(node->data1);//node->first_child;
+			continue;
+		}
+		// both behind
+		if (front_dist < 0.01 && back_dist < 0.01) {
+			node_n = INSIDE_OFFSET(node->data1) + 1;
+			continue;
+		}
+		bool front_side = front_dist < 0.01;
+		// split, cache mid to back, set next to front to mid
+		top->backpt = back;
+		top->node = node_n;
+		top->side = !front_side;
+
+		top++;
+
+		front_dist = front_dist / (front_dist - back_dist);
+		back = front + front_dist * (back - front);
+
+		node_n = INSIDE_OFFSET(node->data1) + front_side;
+	}
+
+
+}
 
 /*
 inline void BSPtree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& end, trace_t& trace)
@@ -324,6 +413,59 @@ void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t
 			trace.normal = f.plane.normal;
 			trace.d = f.plane.d;
 			trace.face = leaf->face_index;
+		}
+	}
+}
+void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& trace)
+{
+	int count = node.data2;
+	int offset = LEAF_OFFSET(node.data1);
+	assert(count >= 0);
+	//const leaf_t* leaf;
+
+	for (int i = offset; i <offset + count; i++) {
+		//leaf = &leaves.at(i);
+		const face_t& f = geo->faces.at(face_index.at(i));//leaf->face_index);
+
+
+		float denom = dot(f.plane.normal, r.dir);
+		// backface
+		//if (denom > -0.1f) {
+		//	continue;
+		//}
+		if (abs(denom) < 0.01f) {
+			continue;
+		}
+		float t = -(dot(f.plane.normal, r.origin) + f.plane.d) / denom;
+
+		if (t < 0) {
+			continue;
+		}
+		if (t > r.length) {
+			continue;
+		}
+		// point on the plane
+		vec3 point = r.origin + r.dir * t;
+		int v_count = f.v_count;// f.v_end - f.v_start;
+		bool hit = true;
+		for (int i = 0; i < v_count; i++) {
+			vec3 v = point - geo->verts.at(f.v_start + i);
+			vec3 c = cross(geo->verts.at(f.v_start + (i + 1) % v_count) - geo->verts.at(f.v_start + i), v);
+			float angle = dot(-f.plane.normal, c);
+			if (angle < 0) {
+				// point is outside the edges of the polygon
+				hit = false;
+				break;
+			}
+		}
+
+		if (hit && (!trace.hit || t < trace.length)) {
+			trace.hit = true;
+			trace.end_pos = point;
+			trace.length = t;
+			trace.normal = f.plane.normal;
+			trace.d = f.plane.d;
+			//trace.face = i;//leaf->face_index;
 		}
 	}
 }

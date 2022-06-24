@@ -41,7 +41,9 @@ void Editor::on_render()
 		// Temporary, should delete shader
 		global_app.r->directional_shadows = Shader("directional_shadows_v.txt", "directional_shadows_f.txt");
 	}
-
+	if (ImGui::RadioButton("Render lightmap", global_app.r->render_lightmap)) {
+		global_app.r->render_lightmap = !global_app.r->render_lightmap;
+	}
 	if (ImGui::RadioButton("Bloom debug", global_app.r->bloom_debug)) {
 		global_app.r->bloom_debug = !global_app.r->bloom_debug;
 	}
@@ -259,7 +261,7 @@ void Editor::shoot_ray()
 	trace_t result;
 	
 	auto start2 = std::chrono::steady_clock::now();
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 0; i++) {
 		result = global_world.test_ray(ray);
 	}
 	auto end2 = std::chrono::steady_clock::now();
@@ -267,7 +269,7 @@ void Editor::shoot_ray()
 	
 	result = global_world.tree.test_ray_debug(ray.origin,ray.origin+ray.dir*100.f);
 	auto start3 = std::chrono::steady_clock::now();
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 1'000'000; i++) {
 		result = global_world.tree.test_ray(ray.origin, ray.origin + ray.dir * 100.f);
 	}
 	auto end3 = std::chrono::steady_clock::now();
@@ -277,8 +279,8 @@ void Editor::shoot_ray()
 
 
 	auto start = std::chrono::steady_clock::now();
-	for (int i = 0; i < 1; i++) {
-		//result = global_world.tree.test_ray(ray);
+	for (int i = 0; i < 1'000'000; i++) {
+		result = global_world.tree.test_ray_fast(ray.origin, ray.origin + ray.dir * 100.f);
 	}
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>( end - start);

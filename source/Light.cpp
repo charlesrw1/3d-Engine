@@ -22,7 +22,7 @@ int lm_width = 1500;
 int lm_height = 1500;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 1.f;
+float density_per_unit = 2.f;
 
 VertexArray* va;
 
@@ -90,6 +90,7 @@ void add_color(int start, int offset, vec3 color)
 
 const int MAP_PTS = 256 * 256;
 std::vector<vec3> points(MAP_PTS);
+std::vector<vec3> temp_image_buffer(MAP_PTS);
 struct LightmapState
 {
 	//std::vector<vec3> points;
@@ -134,6 +135,7 @@ void light_face(int num)
 	
 	assert(l.face->t_info_idx >= 0 && l.face->t_info_idx < num_tinfo);
 	texture_info_t* ti = tinfo + l.face->t_info_idx;
+	// "Calc vectors"
 	{
 
 		// face vectors
@@ -170,6 +172,7 @@ void light_face(int num)
 		//va->push_2({ l.tex_origin,vec3(0.2,0.5,1) }, { vec3(0),vec3(0.2,0.5,1) });
 
 	}
+	// "Calc extents"
 	{
 		// Calc face min and max
 		float min[2], max[2];
@@ -215,6 +218,7 @@ void light_face(int num)
 			l.face->exact_span[i] = max[i] - min[i];
 		}
 	}
+	// "Calc points"
 	{
 		int h = l.tex_size[1]*density_per_unit + 2;
 		int w = l.tex_size[0]*density_per_unit + 2;
@@ -249,6 +253,7 @@ void light_face(int num)
 				//point = point + move_mid * 0.25f;
 				if (top_point >= MAP_PTS) {
 					l.numpts = MAP_PTS - 1;
+					img.height = y - 1;
 					goto face_too_big;
 				}
 				assert(top_point < MAP_PTS);
@@ -262,23 +267,27 @@ void light_face(int num)
 		make_space(img.height* img.width);
 		// ambient term
 		for (int i = 0; i < l.numpts;i++) {
+			temp_image_buffer[i] = vec3(0);
 			//add_color(img.buffer_start, i, vec3(0.05, 0.05, 0.05));
 		}
-
 
 		for (int i = 0; i < lights.size(); i++) {
 			vec3 light_p = lights[i].pos;
 
 			float dist = l.face->plane.distance(light_p);
-			if (dist < 0 || dist > 30) {// either behind or too far away
+			if (dist < 0) {
 				continue;
 			}
+			dist = length(light_p - points[0]);
+			if (dist > 30) {
+				continue;
+			}
+
 			for (int j = 0; j < l.numpts; j++) {	
 				
 				
-				trace_t res = global_world.tree.test_ray(points[j], light_p);
+				trace_t res = global_world.tree.test_ray_fast(points[j], light_p);
 				if (res.hit) {
-				//	va->append({ l.points[j],vec3(1,0,0) });
 					continue;
 				}
 				//va->append({ l.points[j],vec3(0,1,0) });
@@ -291,13 +300,38 @@ void light_face(int num)
 					continue;
 				}
 
-				vec3 final_color = lights[i].color * dif *max(1/(dist*dist+90)*(90-dist),0.f);
-				
-				add_color(img.buffer_start, j, final_color);
+				vec3 final_color = lights[i].color * dif * max(1/(dist*dist+20)*(20-dist),0.f);
+				temp_image_buffer[j] += final_color;
+				temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
+				//add_color(img.buffer_start, j, final_color);
 			}
 		}
 	}
-
+	
+	// PCF filtering
+	static const float weights[] = { 0.19, 0.12, 0.07 };
+	for (int y = 0; y < img.height; y++) {
+		for (int x = 0; x < img.width; x++) {
+			vec3 total = vec3(0);
+			int added = 0;
+			for (int i = -1; i <= 1; i++) {
+				for (int j = -1; j <= 1; j++) {
+					int ycoord = y + i;
+					int xcoord = x + j;
+					if (ycoord<1 || ycoord>img.height-1 || xcoord <1 || xcoord> img.width-1) 
+						continue;
+					total +=  temp_image_buffer.at(ycoord* img.width + xcoord);
+					added++;
+				}
+			}
+			total /= added;
+			int offset = y * img.width + x;
+			assert(offset < l.numpts);
+			add_color(img.buffer_start, offset, total);
+		}
+	}
+	
+	
 	images.push_back(img);
 }
 
@@ -370,7 +404,7 @@ void add_lights(worldmodel_t* wm)
 	for (int i = 0; i < wm->entities.size(); i++) {
 		entity_t* ent = &wm->entities.at(i);
 		auto find = ent->properties.find("classname");
-		if (find->second != "light") {
+		if (!(find->second == "light" || find->second == "light_spot")) {
 			continue;
 		}
 		work_str = ent->properties.find("origin")->second;
@@ -380,9 +414,9 @@ void add_lights(worldmodel_t* wm)
 
 		org = vec3(-org.x, org.z, org.y);
 
-		work_str = ent->properties.find("color")->second;
-		vec3 color;
-		sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
+		//work_str = ent->properties.find("color")->second;
+		vec3 color(1.0);
+		//sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
 
 		lights.push_back({ org,color });
 
@@ -410,7 +444,8 @@ void create_light_map(worldmodel_t* wm)
 
 
 	printf("Lighting faces...\n");
-	for (int i = 0; i < num_faces; i++) {
+	const brush_model_t* bm = &wm->models[0];	// "worldspawn"
+	for (int i = bm->face_start; i < bm->face_start+bm->face_count; i++) {
 		light_face(i);
 	}
 	printf("Total pixels: %u\n", total_pixels);
@@ -459,5 +494,5 @@ void create_light_map(worldmodel_t* wm)
 }
 void draw_lightmap_debug()
 {
-	//va->draw_array();
+	va->draw_array();
 }

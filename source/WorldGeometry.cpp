@@ -37,18 +37,19 @@ void WorldGeometry::create_mesh()
 		}
 		else texture_sizes.push_back(ivec2(256, 256));
 	}
-
-	std::vector<u32> indicies(wm->faces.size());
+	const brush_model_t* bm = &wm->models[0];	// "worldspawn"
+	std::vector<u32> indicies(bm->face_count);
 	for (int i = 0; i < indicies.size(); i++) {
-		indicies.at(i) = i;
+		indicies.at(i) = i+bm->face_start;
 	}
+
 	// sort faces by texture
 	std::sort(indicies.begin(), indicies.end(),
 		[this](const int& i1, const int& i2) -> bool
 		{ return wm->t_info.at(wm->faces.at(i1).t_info_idx).t_index < wm->t_info.at(wm->faces.at(i2).t_info_idx).t_index; });
 
 	int current_t = 0;
-	for (int i = 0; i < wm->faces.size(); i++) {
+	for (int i =0; i < bm->face_count; i++) {
 		auto& face = wm->faces.at(indicies.at(i));
 		// We have a new texture, append previous mesh
 		if (current_t != wm->t_info.at(face.t_info_idx).t_index) {

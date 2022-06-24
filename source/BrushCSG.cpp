@@ -34,58 +34,56 @@ void MapParser::CSG_union()
 	//clipped_faces.clear();
 
 	bool clip_on_plane;
-	for (int i = 0; i < brushes.size(); i++) {
-
-		clip_on_plane = false;
-		std::vector<mapface_t> final_faces;
-		// copy faces
-		clipped_brushes.at(i).face_start = 0;
-		for (int m = 0; m < brushes.at(i).num_faces; m++) {
-			final_faces.push_back(faces.at(brushes.at(i).face_start+m));
-			//clipped_brushes.at(i).indices[m] = m;
+	for (int j = 0; j < entities.size(); j++) {
+		if (entities.at(j).brush_count ==0) {
+			continue;
 		}
+		int start = entities.at(j).brush_start;
+		int count = entities.at(j).brush_count;
+		for (int i = start; i < start+count; i++) {
 
-
-		for (int j = 0; j < brushes.size(); j++) {
-
-			if (i != j) {
-				clip_to_brush(clipped_brushes.at(i), brushes.at(j), clip_on_plane, final_faces);
+			clip_on_plane = false;
+			std::vector<mapface_t> final_faces;
+			// copy faces
+			clipped_brushes.at(i).face_start = 0;
+			for (int m = 0; m < brushes.at(i).num_faces; m++) {
+				final_faces.push_back(faces.at(brushes.at(i).face_start + m));
+				//clipped_brushes.at(i).indices[m] = m;
 			}
-			else {
-				clip_on_plane = true;
+
+
+			for (int j = start; j < start+count; j++) {
+
+				if (i != j) {
+					clip_to_brush(clipped_brushes.at(i), brushes.at(j), clip_on_plane, final_faces);
+				}
+				else {
+					clip_on_plane = true;
+				}
 			}
+
+			clipped_faces.insert(clipped_faces.end(), final_faces.begin(), final_faces.end());
 		}
+		brush_model_t bm;
+		bm.face_start = face_list.size();
+		for (int i = 0; i < clipped_faces.size(); i++)
+		{
+			face_t f;
+			f.plane = clipped_faces[i].plane;
+			f.t_info_idx = clipped_faces[i].t_info_idx;
+			f.v_start = vertex_list.size();
+			winding_t* w = &clipped_faces[i].wind;
+			for (int j = 0; j < w->num_verts; j++) {
+				vertex_list.push_back(w->v[j]);
+			}
+			f.v_count = vertex_list.size() - f.v_start;
 
-
-
-		clipped_faces.insert(clipped_faces.end(), final_faces.begin(), final_faces.end());
-	}
-
-	brush_model_t bm;
-	bm.face_start = face_list.size();
-	for (int i = 0; i < clipped_faces.size(); i++)
-	{
-		face_t f;
-		f.plane = clipped_faces[i].plane;
-		f.t_info_idx = clipped_faces[i].t_info_idx;
-		f.v_start = vertex_list.size();
-		winding_t* w = &clipped_faces[i].wind;
-		for (int j = 0; j < w->num_verts; j++) {
-			vertex_list.push_back(w->v[j]);
+			face_list.push_back(f);
 		}
-		f.v_count = vertex_list.size() - f.v_start;
-
-		face_list.push_back(f);
+		bm.face_count = face_list.size() - bm.face_start;
+		model_list.push_back(bm);
+		clipped_faces.clear();
 	}
-	bm.face_count = face_list.size() - bm.face_start;
-	model_list.push_back(bm);
-
-	// convert map brushes/faces to final models/faces/verticies
-
-	//brushes = std::move(clipped_brushes);
-	//verts = std::move(clipped_verts);
-	//faces = std::move(clipped_faces);
-
 }
 // a is being clipped to b
 void MapParser::clip_to_brush(mapbrush_t& to_clip, const mapbrush_t& b, bool clip_to_plane, std::vector<mapface_t>& final_faces)
