@@ -253,21 +253,22 @@ void Editor::shoot_ray()
 {
 	ray_t ray;
 	ray.dir = normalize(global_app.scene->active_camera()->front);
-	ray.length = 200.f;
+	ray.length = 100.f;
 	ray.origin = global_app.scene->active_camera()->position;
 
 	trace_t result;
 	
 	auto start2 = std::chrono::steady_clock::now();
 	for (int i = 0; i < 1; i++) {
-		 // global_world.tree.test_ray(ray);
+		result = global_world.test_ray(ray);
 	}
 	auto end2 = std::chrono::steady_clock::now();
 	auto elapsed2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
 	
+	result = global_world.tree.test_ray_debug(ray.origin,ray.origin+ray.dir*100.f);
 	auto start3 = std::chrono::steady_clock::now();
 	for (int i = 0; i < 1; i++) {
-		result = global_world.tree.test_ray(ray.origin,ray.origin+ray.dir*50.f);
+		result = global_world.tree.test_ray(ray.origin, ray.origin + ray.dir * 100.f);
 	}
 	auto end3 = std::chrono::steady_clock::now();
 	auto elapsed3 = std::chrono::duration_cast<std::chrono::microseconds>(end3 - start3);
@@ -289,6 +290,7 @@ void Editor::shoot_ray()
 
 	if (1) {
 		std::cout << "Ray hit: (" << elapsed3.count() / (1000.f) << " ms) (" << elapsed.count() / (1000.f) << " ms prev) (" << elapsed2.count() / (1000.f)  << " ms brute force)\n"
+			<< "	Node: " << result.node << ' ' << " Face: " << result.face << '\n'
 			<< "	Pos: " << result.end_pos.x << ' ' << result.end_pos.y << ' ' << result.end_pos.z << '\n'
 			<< "	Length: " << result.length << '\n'
 			<< "	Origin: " << result.start.x << ' ' << result.start.y << ' ' << result.start.z << '\n';

@@ -232,13 +232,14 @@ trace_t WorldGeometry::test_ray(const ray_t& r)
 			best = &f;
 		}
 	}
-
+	/*
 	if (best) {
 		//int count = best->v_end - best->v_start;
 		for (int i = 0; i < best->v_count; i++) {
 			hit_faces->push_2({ wm->verts.at(best->v_start + i), vec3(1.f,0.0,0.0) }, {wm->verts.at(best->v_start + ((i + 1) % best->v_count)), vec3(1.f,0.0,0.0) });
 		}
 	}
+	*/
 
 	return res;
 }

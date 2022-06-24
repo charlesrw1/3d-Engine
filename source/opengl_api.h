@@ -58,6 +58,13 @@ struct VertexP
 		g = (color.g > 1) ? 255 : color.g * 255;
 		b = (color.b > 1) ? 255 : color.b * 255;
 	}
+	VertexP(vec3 pos, vec4 color) {
+		position = pos;
+		r = (color.r > 1) ? 255 : color.r * 255;
+		g = (color.g > 1) ? 255 : color.g * 255;
+		b = (color.b > 1) ? 255 : color.b * 255;
+		a = (color.a > 1) ? 255 : color.a * 255;
+	}
 	VertexP() {}
 	vec3 position = vec3(0);
 	vec2 uv = vec2(0);
@@ -104,8 +111,41 @@ struct VertexArray
 		verts.push_back(a);
 		verts.push_back(b);
 	}
+	void push_square(vec3 p1,vec3 p2, vec3 p3, vec3 p4, vec4 color) {
+		using VP = VertexP;
+		push_3(VP(p1, color), VP(p2, color), VP(p3, color));
+		push_3(VP(p1, color), VP(p3, color), VP(p4, color));
+	}
 	void clear() {
 		verts.clear();
+	}
+	void add_solid_box(vec3 min, vec3 max, vec4 color)
+	{
+		vec3 corners[8] = { max, vec3(max.x,max.y,min.z),vec3(min.x,max.y,min.z),vec3(min.x,max.y,max.z),	// top CCW
+							vec3(max.x,min.y,max.z), vec3(max.x,min.y,min.z),min,vec3(min.x,min.y,max.z) };	// bottom
+		push_square(corners[0], corners[1], corners[2], corners[3], color);// top
+		push_square(corners[4], corners[5], corners[6], corners[7], color);// bottom
+		push_square(corners[0], corners[1], corners[5], corners[4], color);//+X
+		push_square(corners[3], corners[2], corners[6], corners[7], color);//-X
+		push_square(corners[3], corners[0], corners[4], corners[7], color);//+Z
+		push_square(corners[2], corners[1], corners[5], corners[6], color);//+Z
+
+	}
+	void add_line_box(vec3 min, vec3 max, vec3 color)
+	{
+		using VP = VertexP;
+		vec3 corners[8] = { max, vec3(max.x,max.y,min.z),vec3(min.x,max.y,min.z),vec3(min.x,max.y,max.z),	// top CCW
+							vec3(max.x,min.y,max.z), vec3(max.x,min.y,min.z),min,vec3(min.x,min.y,max.z) };	// bottom
+		for (int i = 0; i < 4; i++) {
+			push_2(VP(corners[i], color), VP(corners[(i + 1) % 4], color));
+			push_2(VP(corners[4 + i], color), VP(corners[4 + ((i + 1) % 4)], color));
+		}
+
+		// connecting
+		for (int i = 0; i < 4; i++) {
+			push_2(VP(corners[i], color), VP(corners[i + 4], color));
+		}
+
 	}
 
 	void upload_data();

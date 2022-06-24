@@ -176,7 +176,7 @@ void Renderer::render_scene(SceneData& scene)
 
 	glActiveTexture(GL_TEXTURE0 + 2);
 	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
-	//scene_pass(scene, directional_shadows);
+	scene_pass(scene, directional_shadows);
 
 	// Point lights pass
 	upload_point_lights(scene);
@@ -186,11 +186,11 @@ void Renderer::render_scene(SceneData& scene)
 	glDepthMask(GL_FALSE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE);
-	//scene_pass(scene, point_lights);
+	scene_pass(scene, point_lights);
 	glDisable(GL_BLEND);
 	glDepthMask(GL_TRUE);
 	
-	lightmap_geo();
+	//lightmap_geo();
 
 skip_light:
 

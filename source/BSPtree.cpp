@@ -86,7 +86,7 @@ void BSPtree::subdivide(int cut, int node_idx, int depth)
 
 	while (1) {
 		//	work_buffer.push_back(face_extended.at(l->face_index).min[cut]);
-		work_buffer.push_back(face_extended.at(l->face_index).min[cut_axis]);
+		work_buffer.push_back(face_extended.at(l->face_index).max[cut_axis]);
 		if (l->next == -1) {
 			break;
 		}
@@ -107,23 +107,67 @@ void BSPtree::subdivide(int cut, int node_idx, int depth)
 	child[0].parent = node_idx;
 	child[1].parent = node_idx;
 
-	// Classify all points
 	int current_idx = node.first_child;
+	l = &leaves.at(current_idx);
+
+	int split_leaves = 0;
+	int all_leaves = 0;
+	int front = 0;
+	int back = 0;
+
+	while (1) {
+		const face_ex_t& fx = face_extended.at(l->face_index);
+		float first = p.dist(fx.max);
+		float second = p.dist(fx.min);
+		all_leaves++;
+		int next = l->next;
+		// face in front
+		if (first > -0.01 && second > -0.01) {
+			front++;
+		}
+		// face behind
+		else if (first < 0.01 && second < 0.01) {
+			back++;
+		}
+		// face spans dividing plane
+		else {
+			//total_split++;
+			split_leaves++;
+		}
+
+		// next is the linked list for the current subdividing node
+		if (next == -1) {
+			break;
+		}
+		current_idx = next;
+		l = &leaves.at(current_idx);
+	}
+	float ratio = front / (float)all_leaves;
+	if (ratio > 0.9 || ratio < 0.1) {
+		return;
+	}
+	if (split_leaves / (float)all_leaves >= 0.5) {
+		// If 50% of the leaves just end up getting split, don't subdivide
+		return;
+	}
+
+	// Classify all points
+	current_idx = node.first_child;
 	l = &leaves.at(current_idx);
 	while (1) {
 		const face_ex_t& fx = face_extended.at(l->face_index);
 		float first = p.dist(fx.max);
 		float second = p.dist(fx.min);
-
+		all_leaves++;
 		int next = l->next;
 		// face in front
-		if (first > -0.005 && second > -0.005) {
+		if (first > -0.01 && second > -0.01) {
 			l->next = child[0].first_child;
 			child[0].first_child = current_idx;
 			child[0].num_faces++;
 		}
 		// face behind
-		else if (first < 0.005 && second < 0.005) {
+		else if (first < 0.01 && second < 0.01) {
 			l->next = child[1].first_child;
 			child[1].first_child = current_idx;
 			child[1].num_faces++;
@@ -131,6 +175,7 @@ void BSPtree::subdivide(int cut, int node_idx, int depth)
 		// face spans dividing plane
 		else {
 			total_split++;
+			split_leaves++;
 			winding_t front;
 			face_ex_t back_face;
 
@@ -163,6 +208,7 @@ void BSPtree::subdivide(int cut, int node_idx, int depth)
 		current_idx = next;
 		l = &leaves.at(current_idx);
 	}
+
 
 	// Finish up
 	node.num_faces = -1;
@@ -260,7 +306,10 @@ void BSPtree::create_va()
 	va = new VertexArray;
 	va->set_primitive(VertexArray::Primitive::lines);
 
+
 	create_va_internal(0, vec3(-50), vec3(50));
+	box_array = new VertexArray;
+	box_array->set_primitive(VertexArray::Primitive::triangle);
 }
 int BSPtree::find_leaf(vec3 point) const
 {
@@ -387,4 +436,19 @@ void BSPtree::test_ray_internal(bool uptree, int caller_node, int node_idx, cons
 			}
 		}
 	}
+}
+#include "glad/glad.h"
+void BSPtree::draw()
+{
+	va->draw_array();
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_CULL_FACE);
+	box_array->draw_array();
+	glEnable(GL_CULL_FACE);
+	glDisable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
+
+
 }

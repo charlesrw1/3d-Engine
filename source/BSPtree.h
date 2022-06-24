@@ -9,11 +9,13 @@ class BSPtree
 {
 public:
 	BSPtree() {}
+	~BSPtree() {
+		delete va;
+		delete box_array;
+	}
 	void init(const worldmodel_t* model);
 	void create_va();
-	void draw() {
-		va->draw_array();
-	}
+	void draw();
 	void print();
 
 	void print_trace_stats();
@@ -27,6 +29,8 @@ public:
 
 	// faster version
 	trace_t test_ray(vec3 start, vec3 end);
+	// same as above but with debug output
+	trace_t test_ray_debug(vec3 start, vec3 end);
 private:
 	enum { CUT_X, CUT_Y, CUT_Z };
 	struct node_t {
@@ -71,6 +75,10 @@ private:
 	std::vector<float> work_buffer;
 
 	VertexArray* va = nullptr;
+
+
+	VertexArray* box_array = nullptr;
+
 };
 
 #endif // !BSPTREE_H
