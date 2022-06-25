@@ -4,17 +4,6 @@
 #include "glm/glm.hpp"
 using namespace glm;
 
-struct View
-{
-	int x = 0, y = 0;
-	int width = 256, height = 256;
-
-	bool orthographic=false;
-	float fov_y;
-
-	float znear, zfar;
-};
-
 struct Camera;
 struct Frustum
 {
@@ -64,6 +53,7 @@ struct Camera
 
 	void update_vectors();
 	inline void update_view_matrix();
+
 };
 
 

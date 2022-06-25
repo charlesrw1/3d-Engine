@@ -2,7 +2,6 @@
 #include "renderer.h"
 #include "types.h"
 #include <SDL2/SDL.h>
-#include "loader.h"
 #include "glad/glad.h"
 #include "glm/gtc/matrix_transform.hpp"
 
@@ -33,7 +32,8 @@ void App::init()
 	editor = new Editor;
 
 	create_scene();
-	update_projection_matrix();
+	r->set_fov(45);
+	r->resize(width, height);
 }
 
 void sdldie(const char* msg)
@@ -54,12 +54,24 @@ vec3 make_color(uint8_t r, uint8_t b, uint8_t g) {
 	return vec3(r / 255.f, b / 255.f, g / 255.f);
 }
 
+const entity_t* find_entity_with_classname(const worldmodel_t* wm, const char* classname) {
+	for (const auto& e : wm->entities) {
+		auto classname_prop = e.properties.find("classname");
+		if (classname_prop == e.properties.end())
+			continue;
+		if (classname_prop->second == classname) {
+			return &e;
+		}
+	}
+	return nullptr;
+}
+
 void App::create_scene()
 {
 	
 	MapParser mp;
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/start.map");
+	mp.start_file("resources/maps/e1m2.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
 	mp.add_to_worldmodel(&world);
@@ -67,7 +79,7 @@ void App::create_scene()
 	global_world.load_map(&world);
 	create_light_map(&world);
 
-	r->lightmap_tex = global_textures.find_or_load("lightmap.bmp",NEAREST);
+	r->lightmap_tex = global_textures.find_or_load("lightmap.bmp");
 
 	global_world.create_mesh();
 
@@ -76,8 +88,18 @@ void App::create_scene()
 	printf("Loaded map in: %i ms\n", map_end - map_start);
 	//exit(1);
 	//return;
+	auto player_start = find_entity_with_classname(&world, "info_player_start");
+	auto org = player_start->properties.find("origin");
+	vec3 start = vec3(0);
+	if (org != player_start->properties.end()) {
+		sscanf_s(org->second.c_str(), "%f %f %f", &start.x, &start.y, &start.z);
+		start = vec3(-start.x, start.z, start.y)/32.f;
+	}
+	scene->cams[0].position = start;
+	
 
-	u32 start = SDL_GetTicks();
+
+	u32 start_load = SDL_GetTicks();
 
 	
 	// yes memory leaks galore
@@ -145,11 +167,11 @@ void App::create_scene()
 	scene->sun.direction = normalize(-vec3(cos(azimuth) * sin(altidude), cos(altidude),sin(azimuth) * sin(altidude)));
 
 
-	//Model* soldier = global_models.find_or_load("soldier/soldier.dae");
+	Model* soldier = global_models.find_or_load("soldier/soldier.dae");
 	////load_model_assimp(soldier, "soldier/soldier.dae", false);
-	//scene->objects.push_back(new GameObject(soldier));
-	//scene->objects.back()->scale = vec3(0.03);
-	//scene->objects.back()->position = vec3(1, 0, 0);
+	scene->objects.push_back(new GameObject(soldier));
+	scene->objects.back()->scale = vec3(0.03);
+	scene->objects.back()->position = vec3(1, 0, 0);
 
 //	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
 	//Model* sponza = global_models.find_or_load("sponza/sponza.obj");
@@ -189,7 +211,7 @@ void App::create_scene()
 	u32 end = SDL_GetTicks();
 
 	global_textures.update();
-	printf("\n\n\n     TIME: %u\n\n\n", end - start);
+	printf("\n\n\n     TIME: %u\n\n\n", end - start_load);
 
 	//global_models.print_info();
 	//global_textures.print_info();
@@ -260,9 +282,7 @@ void App::handle_event(SDL_Event& event)
 			glViewport(0, 0, event.window.data1, event.window.data2);
 			width = event.window.data1;
 			height = event.window.data2;
-			update_projection_matrix();
-
-			r->on_resize();
+			r->resize(width, height);
 			break;
 		}
 		break;
@@ -318,8 +338,4 @@ void App::on_render()
 {
 	r->render_scene(*scene);
 	editor->on_render();
-}
-void App::update_projection_matrix()
-{
-	projection_matrix = glm::perspective(glm::radians(scene->active_camera()->fov), (float)width / (float)height, 0.1f, 100.0f);
 }

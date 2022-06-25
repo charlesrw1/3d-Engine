@@ -3,77 +3,10 @@
 #include "glm/glm.hpp"
 #include <unordered_map>
 #include <vector>
+#include "Geometry.h"
 
 using namespace glm;
 class Texture;
-enum side_t { FRONT, BACK, ON_PLANE, SPLIT };
-struct plane_t
-{
-	vec3 normal;
-	float d;
-
-	plane_t() {}
-	plane_t(const vec3& v1, const vec3& v2, const vec3& v3) {
-		init(v1, v2, v3);
-	}
-
-	bool operator!=(const plane_t& other);
-	void init(const vec3& v1, const vec3& v2, const vec3& v3) {
-		normal = cross(v3 - v2, v1 - v2);
-		normal = normalize(normal);
-		d = -dot(normal, v1);
-	}
-	float distance(const vec3& v) const {
-		return dot(normal, v) + d;
-	}
-	// true= in front or on the plane, false= behind
-	bool classify(const vec3& p) const {
-		return dist(p) > -0.01;
-	}
-	float dist(const vec3& p) const {
-		return dot(normal, p) + d;
-	}
-	side_t classify_full(const vec3& p) const {
-		float d = dist(p);
-		if (d < -0.01f) {
-			return BACK;
-		}
-		else if (d > 0.01f) {
-			return FRONT;
-		}
-		else {
-			return ON_PLANE;
-		}
-	}
-	bool get_intersection(const vec3& start, const vec3& end, vec3& result, float& percentage) const
-	{
-		vec3 dir = end - start;
-		dir = normalize(dir);
-
-		float denom = dot(normal, dir);
-		if (fabs(denom) < 0.01) {
-			return false;
-		}
-		float dis = distance(start);
-		float t = -dis / denom;
-		result = start + dir * t;
-
-		percentage = t / length(end - start);
-
-		return true;
-	}
-};
-#define MAX_VERTS 24
-struct winding_t
-{
-	int num_verts=0;
-	vec3 v[MAX_VERTS];
-
-	void add_vert(vec3 vert) {
-		assert(num_verts < MAX_VERTS);
-		v[num_verts++] = vert;
-	}
-};
 // Parsed from .map file
 
 struct texture_info_t
@@ -131,7 +64,9 @@ struct face_t
 	short lightmap_size[2];
 	float exact_min[2];
 	float exact_span[2];
-};
+
+	bool dont_draw = false;
+}; 
 // collection of all faces for an entity/collision hull
 struct brush_model_t
 {
@@ -165,7 +100,6 @@ struct worldmodel_t
 
 	std::vector<entity_t> entities;
 };
-
 
 
 #endif // !MAP_DEF_H

@@ -61,6 +61,7 @@ void Editor::on_render()
 		global_app.r->draw_world = !global_app.r->draw_world;
 	}
 
+	ImGui::DragFloat3("camera_pos: ", (float*)&global_app.scene->active_camera()->position, 0.1);
 
 	ImGui::DragFloat("Gamma: ", &global_app.r->gamma, 0.1, 0.5, 4);
 	ImGui::DragFloat("Exposure: ", &global_app.r->exposure, 0.1, 0, 10);
@@ -227,7 +228,6 @@ void Editor::handle_event(SDL_Event& event)
 		case SDL_MOUSEWHEEL:
 			if (game_focused) {
 				global_app.scene->active_camera()->scroll_wheel_update(event.wheel.y);
-				global_app.update_projection_matrix();
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
@@ -262,7 +262,7 @@ void Editor::shoot_ray()
 	
 	auto start2 = std::chrono::steady_clock::now();
 	for (int i = 0; i < 0; i++) {
-		result = global_world.test_ray(ray);
+		result = global_world.brute_force_raycast(ray);
 	}
 	auto end2 = std::chrono::steady_clock::now();
 	auto elapsed2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);

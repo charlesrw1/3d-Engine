@@ -5,9 +5,19 @@
 
 struct rendersettings_t
 {
-
+	
 };
 
+struct View
+{
+	int x = 0, y = 0;
+	int width = 1600, height = 900;
+
+	bool orthographic = false;
+	float fov_y = 45;
+
+	float znear=0.1f, zfar=100.f;
+};
 
 class Texture;
 class App;
@@ -21,24 +31,15 @@ public:
 	Shader untextured_unshaded;
 	Shader textured_mesh;
 	Shader point_lights;
-
 	Shader debug_depth;
-
 	Shader depth_render;
-
 	Shader gamma_tm;
-
 	Shader bright_pass_filter;
-
 	Shader guassian_blur;
 	Shader upsample_shade;
-
 	Shader no_transform;
-
 	Shader gamma_tm_bloom;
-
 	Shader directional_shadows;
-
 	Shader transformed_primitives;
 	Shader leaf;
 	Shader model_primitives;
@@ -46,30 +47,31 @@ public:
 	Shader overdraw;
 	Shader lightmap;
 
-	// Skybox temp stuff
-	//Mesh cube;
-	Texture* sky_gradient;
-	Shader sky_shader;
-	void draw_gradient_skybox(SceneData& scene);
-	//---------
 	Texture* white_tex;
 
-	Texture* temp;
 	VertexArray quad;
 
 	Framebuffer HDRbuffer;
-
 	Framebuffer new_b;
-
 	Framebuffer intermediate;
-
 	Framebuffer depth_map;
 
 	void render_scene(SceneData& scene);
 
-	void on_resize();
+	void resize(int x, int y) {
+		view.x = x;
+		view.y = y;
+		HDRbuffer.resize(x, y);
+		intermediate.resize(x, y);
+	}
+	void increment_fov(int amt) {
+		view.fov_y += amt;
+	}
+	void set_fov(int new_fov) {
+		view.fov_y = new_fov;
+	}
 
-	// BLOOM STUFF
+	// BLOOM
 	uint32_t bright_pass;
 	uint32_t downsample[2][6];
 	uint32_t upsample[6];
@@ -83,6 +85,8 @@ public:
 	float exposure = 1;
 	float gamma = 2.2;
 
+	View view;
+
 	bool draw_world = true;
 
 	struct ShadowMapProjection
@@ -95,7 +99,7 @@ public:
 	// Matricies for the current frame
 	mat4 projection_matrix, view_matrix;
 
-	// Temporary Debug Stuff
+	// Must be called every frame, or they get cleared
 	void debug_line(vec3 start, vec3 end, vec3 color);
 	void debug_point(vec3 pos, vec3 color);
 	void debug_box(vec3 min, vec3 max, vec3 color);
@@ -108,7 +112,6 @@ public:
 	bool render_lightmap = true;
 
 	bool bloom_debug = false;
-	// TEMP
 	bool show_bright_pass = false;
 	int sample_num=0;
 	bool down_sample=true;
@@ -140,6 +143,8 @@ private:
 
 	void bounding_sphere_pass(SceneData& scene);
 
-	void debug_multi_viewport_bloom();
+	void load_shaders();
+
+	mat4 get_projection_matrix();
 };
 #endif

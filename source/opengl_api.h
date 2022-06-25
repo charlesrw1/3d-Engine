@@ -7,38 +7,17 @@
 #include <vector>
 using namespace glm;
 
-struct Vertex
-{
-	Vertex() {}
-	Vertex(vec3 position, vec3 normal, vec2 uv) : position(position), normal(normal), uv(uv) {}
-	vec3 position = vec3(0); 
-	vec3 normal = vec3(0);
-	vec2 uv = vec2(0);
-};
-enum class Uniforms
-{
-	u_viewpos,
-	u_viewdir,
-	
-	u_view_matrix,
-	u_projection_matrix,
-	u_model_matrix,
-	u_inverse_model_matrix,
-	u_specular_exp,
-
-	u_time,
-
-
-};
-
 struct Shader
 {
 	uint32_t ID=0;
 
-	Shader(const char* vertex_path, const char* fragment_path, const char* geo_path = NULL);
+	Shader(const char* vertex_path, const char* fragment_path, const char* geo_path = NULL) {
+		load_from_file(vertex_path, fragment_path, geo_path);
+	}
 	Shader(){}
 
 	void use();
+	void load_from_file(const char* vertex_path, const char* fragment_path, const char* geo_path = NULL);
 	Shader& set_bool(const char* name, bool value);
 	Shader& set_int(const char* name, int value);
 	Shader& set_float(const char* name, float value);
@@ -46,10 +25,9 @@ struct Shader
 	Shader& set_vec3(const char* name, vec3 value);
 private:
 	std::string read_file(const char* filepath);
-	unsigned int load_shader(const char* vertex_path, const char* fragment_path, const char* geo_path = NULL);
 };
 
-// Vertex primitive, for drawing things like lines, triangles, quads, etc.
+// Vertex primitive, for drawing things like lines, points, quads
 struct VertexP
 {
 	VertexP(vec3 pos, vec3 color) {
@@ -72,19 +50,19 @@ struct VertexP
 };
 
 // A dynamic array suited for additons/deletions on a smaller scale
-// Good for 2d elements like sprites or UI
 struct VertexArray
 {
-	VertexArray();
+	VertexArray() {}
 	~VertexArray();
 
 	enum Primitive
 	{
-		triangle,
-		lines,
-		line_strip,
-		points,
+		TRIANGLES,
+		LINES,
+		LINE_STRIP,
+		POINTS,
 	};
+	void init(Primitive type);
 
 	void draw_array();
 	void append(VertexP p) {
@@ -158,20 +136,21 @@ private:
 	std::vector<VertexP> verts;
 	uint32_t VBO=0;
 	uint32_t VAO=0;
-	Primitive type = triangle;
+	Primitive type = TRIANGLES;
 	uint32_t allocated_size = 0;
 };
+typedef VertexArray::Primitive VAPrim;
 
 enum class FBAttachments
 {
-	a_none,
+	NONE,
 
-	a_depth,
+	DEPTH,
 
-	a_rgba,
-	a_rgb,
-	a_float16,
-	a_float32,
+	RGBA,
+	RGB,
+	FLOAT16,
+	FLOAT32,
 };
 struct FramebufferSpec
 {
@@ -182,7 +161,7 @@ struct FramebufferSpec
 	int width=0, height=0;
 	int samples = 1;
 
-	FBAttachments attach = FBAttachments::a_none;
+	FBAttachments attach = FBAttachments::NONE;
 	bool has_depth_stencil = false;
 };
 
@@ -197,7 +176,7 @@ struct Framebuffer
 	uint32_t depth_id = 0;
 
 	uint32_t get_color() {
-		assert(spec.attach != FBAttachments::a_none);
+		assert(spec.attach != FBAttachments::NONE);
 		return color_id;
 	}
 
@@ -205,14 +184,11 @@ struct Framebuffer
 
 	void invalidate();
 
-	void update_window_size(int n_width, int n_height);
+	void resize(int n_width, int n_height);
 
 	void bind();
 	void destroy();
 };
 
-void clear_screen(bool color = true, bool depth = true);
-void set_clear_color(uint8_t r, uint8_t g, uint8_t b);
-void set_sampler2d(uint32_t binding, uint32_t id);
 
 #endif // OPENGL_API_H

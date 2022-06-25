@@ -3,31 +3,20 @@
 #include "glm/geometric.hpp"
 #include "glm/ext.hpp"
 
-
-// For vertex array class
 #include "opengl_api.h"
 
 #include <iostream>
 
 constexpr float EPSILON = 0.1;
 
-#define EQUALS_0(val) abs(val) < EPSILON
-
-#define NOT_EQUALS(v1,v2) abs(v1-v2) >= EPSILON
-
-
 bool equals(vec3& v1, vec3& v2) {
 	return abs(v1.x - v2.x) < EPSILON && abs(v1.y - v2.y) < EPSILON && abs(v1.z - v2.z) < EPSILON;
-}
-
-bool plane_t::operator!=(const plane_t& other) {
-	return NOT_EQUALS(d, other.d) && NOT_EQUALS(normal.x, other.normal.x) && NOT_EQUALS(normal.y, other.normal.y) && NOT_EQUALS(normal.z, other.normal.z);
 }
 
 static bool intersect_3_planes(const plane_t& p1, const plane_t& p2, const plane_t& p3, vec3& res)
 {
 	float denom = dot(p1.normal, cross(p2.normal, p3.normal));
-	if (EQUALS_0(denom)) {
+	if (fabs(denom)<EPSILON) {
 		return false;
 	}
 
@@ -46,7 +35,6 @@ void MapParser::start_file(std::string file)
 	
 	parse_file();
 	uint64 surf_area = get_surface_area();
-
 	std::cout << "Finished parse. Entities: " << entities.size() << "; Brushes: " << brushes.size() << "; Faces: " << faces.size() << "; Surface area: " << surf_area << '\n';
 	printf("Performing CSG union...\n");
 	CSG_union();
@@ -65,12 +53,10 @@ void MapParser::compute_intersections(mapbrush_t* brush)
 	//std::cout << "new brush: " << (int)brush->num_i << " faces\n";
 	for (int i = 0; i < brush->num_faces; i++) {
 		const int face_index = brush->face_start + i;
-		//faces.at(face_index).v_start = verts.size();
 		mapface_t* f = &faces.at(brush->face_start + i);
 		//std::cout << "	new face: " << faces.at(face_and_poly_index).plane.normal.x << ' ' 
 			//<< faces.at(face_and_poly_index).plane.normal.y << ' ' <<  faces.at(face_and_poly_index).plane.normal.z << '\n';
 		int added_verts = 0;
-		//int v_start = faces.at(face_index).v_start;
 		for (int j = 0; j < brush->num_faces; j++) {
 			for (int k = 0; k < brush->num_faces; k++) {
 				if (i != j && i != k && j != k) {
@@ -98,7 +84,6 @@ void MapParser::compute_intersections(mapbrush_t* brush)
 						}
 					}
 					f->wind.add_vert(res);
-					//verts.push_back(res);
 					added_verts++;
 
 				}
@@ -108,15 +93,11 @@ void MapParser::compute_intersections(mapbrush_t* brush)
 			}
 		}
 		
-		//faces.at(face_index).v_end = verts.size();
-		
 		//std::cout << "	verts on face: " << polys.at(face_and_poly_index).v_end - polys.at(face_and_poly_index).v_start << '\n';
 	}
 }
 void MapParser::sort_verticies(mapface_t* face)
 {
-	//int v_count = face->v_end - face->v_start;
-	//assert(v_count >= 3);
 	if (face->wind.num_verts < 3) {
 		printf("Not enough verts!\n");
 		return;
@@ -129,7 +110,7 @@ void MapParser::sort_verticies(mapface_t* face)
 	//}
 
 	vec3 center = vec3(0);
-	vec3 p_norm = face->plane.normal;//normalize(cross(verts.at(poly->v_start+2) - verts.at(poly->v_start + 1), verts.at(poly->v_start) - verts.at(poly->v_start + 1)));
+	vec3 p_norm = face->plane.normal;
 	for (int s = 0; s < face->wind.num_verts; s++) {
 		center += face->wind.v[s];
 	}
@@ -158,7 +139,6 @@ void MapParser::sort_verticies(mapface_t* face)
 			}
 		}
 		assert(smallest != -1);
-
 		vec3 temp = face->wind.v[n + 1];
 		face->wind.v[n + 1] = face->wind.v[smallest];
 		face->wind.v[smallest] = temp;
@@ -167,9 +147,6 @@ void MapParser::sort_verticies(mapface_t* face)
 
 	// Get normal of resulting verts
 	vec3 new_normal = normalize(cross(face->wind.v[2] - face->wind.v[1], face->wind.v[0] - face->wind.v[1]));
-
-	//vec3 new_normal = normalize(cross(verts.at(face->v_start + 2) - verts.at(face->v_start + 1), verts.at(face->v_start) - verts.at(face->v_start + 1)));
-
 	if (dot(new_normal, face->plane.normal) < 0) {
 		//printf("*reversed winding*\n");
 
@@ -231,10 +208,6 @@ void MapParser::parse_file()
 			return;
 		}
 	}
-
-	// TEMPORARY: moves verts along normal in direction
-	//make_clipping_hull();
-
 	// Finds verticies that belong to each face
 	for (int i = 0; i < brushes.size(); i++) {
 		compute_intersections(&brushes.at(i));
@@ -249,6 +222,10 @@ void MapParser::parse_file()
 			//printf("		Face num:%d\n", m);
 			sort_verticies(&faces.at(brushes.at(i).face_start+m));
 		}
+	}
+	// Computes the AABB for the brush
+	for (int i = 0; i < brushes.size(); i++) {
+		compute_bounds(&brushes.at(i));
 	}
 }
 void MapParser::parse_fail(const char* msg)
@@ -492,6 +469,7 @@ MapParser::Result MapParser::parse_face_quake()
 	t_info.uv_scale[1] = std::stof(parse_buffer);
 	vec3 uaxis, vaxis;
 	get_texture_axis(f->plane, uaxis, vaxis);
+	// This needs fixing
 	/*
 	if (abs(rotation) > 0.01) {
 
@@ -576,7 +554,6 @@ MapParser::Result MapParser::read_token()
 			}
 			break;
 		default:
-		//	std::cout << "Token read, " << c << ", line=" << line << '\n';
 			parse_char = c;
 			file_ptr++;
 			return R_GOOD;
@@ -603,7 +580,6 @@ MapParser::Result MapParser::read_str(bool in_quotes)
 		case '\t':
 			if (started && !in_quotes) {
 				parse_buffer.assign(file_buffer.begin() + start, file_buffer.begin() + file_ptr);
-			//	std::cout << "String read, " << parse_buffer << ", line=" << line << '\n';
 				file_ptr++;
 				return R_GOOD;
 			}
@@ -617,7 +593,6 @@ MapParser::Result MapParser::read_str(bool in_quotes)
 				break;
 
 			parse_buffer.assign(file_buffer.begin() + start, file_buffer.begin() + file_ptr);
-		//	std::cout << "String read, " << parse_buffer << ", line=" << line << '\n';
 			file_ptr++;
 			return R_GOOD;
 		default:
@@ -652,37 +627,23 @@ void MapParser::post_process_pass()
 		f.plane.normal *= -1.f;
 		f.plane.d = -dot(f.plane.normal, vertex_list.at(f.v_start));
 	}
-
-	//new_face.plane.init(world_verts.at(face.v_start), world_verts.at(face.v_start + 1), world_verts.at(face.v_start + 2));
-	//new_face.plane.normal = new_face.plane.normal * -1.f;
-	//new_face.plane.d = -dot(new_face.plane.normal, world_verts.at(face.v_start));
-
 }
 void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)
 {
-	va.set_primitive(VertexArray::Primitive::triangle);
-	edges.set_primitive(VertexArray::Primitive::lines);
+	va.init(VertexArray::Primitive::TRIANGLES);
+	edges.init(VertexArray::Primitive::LINES);
 
 	// Scale verts to something reasonable
 	// Also change from xyz to xzy
 	auto verts = vertex_list;
 
-	//for (int i = 0; i < verts.size(); i++) {
-	//	verts.at(i) /= 32.f;
-	//	verts.at(i) = vec3(-verts.at(i).x, verts.at(i).z, verts.at(i).y);
-	//}
-
+	
 
 	for (int i = 0; i < face_list.size(); i++) {
-		//const poly_t& p = polys.at(i);
 		face_t& f = face_list.at(i);	// faces have same index
-		//texture_info_t& ti = t_info.at(f.t_info_idx);
-		//f.u_axis = vec3(-f.u_axis.x, f.u_axis.z, f.u_axis.y);
-		//f.v_axis = vec3(-f.v_axis.x, f.v_axis.z, f.v_axis.y);
+		
 
-		//f.plane.normal = vec3(-f.plane.normal.x, f.plane.normal.z, f.plane.normal.y);
-
-		int v_count = f.v_count;// v_end - f.v_start;
+		int v_count = f.v_count;
 
 		// Construct V-2 triangles (ie tri is 1, quad is 2, pent is 3)
 		for (int j = 0; j < v_count - 2; j++) {
@@ -697,19 +658,20 @@ void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)
 
 
 }
+void MapParser::compute_bounds(mapbrush_t* mb)
+{
+	mb->min = vec3(4000);
+	mb->max = vec3(-4000);
+	for (int i = 0; i < mb->num_faces; i++) {
+		const mapface_t* mf = &faces.at(mb->face_start + i);
+		for (int j = 0; j < mf->wind.num_verts; j++) {
+			mb->min = glm::min(mb->min, mf->wind.v[j]);
+			mb->max = glm::max(mb->max, mf->wind.v[j]);
+		}
+	}
+}
 uint64 MapParser::get_surface_area()
 {
 	return 0;
-	/*
-	uint64 area = 0;
-	for (int i = 0; i < faces.size(); i++) {
-		int v_count = faces.at(i).v_end - faces.at(i).v_start;
-		int start = faces.at(i).v_start;
-		for (int j = 0; j < v_count; j++) {
-			area += abs(length(cross(verts.at(start + j), verts.at(start + (j + 1) % v_count))))/2.f;
-		}
-	}
-	return area;
-	*/
 }
 

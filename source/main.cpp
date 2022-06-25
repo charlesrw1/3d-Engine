@@ -4,24 +4,12 @@
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "camera.h"
-#include "loader.h"
 
 #include "opengl_api.h"
 
 #include "types.h"
 #include "app.h"
 #include "renderer.h"
-
-
-using namespace std;
-
-
-/* Virtual Interface for Game Logic */
-class IGamee
-{
-	IGamee();
-	virtual ~IGamee() = 0;
-};
 
 int main(int argc, char* argv[])
 {

@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "MapParser.h"
+#include "Geometry.h"
 struct ray_t;
 struct trace_t;
 
@@ -29,23 +30,16 @@ class BSPtree
 {
 public:
 	BSPtree() {}
-	~BSPtree() {
-		delete va;
-		delete box_array;
-	}
+	~BSPtree() {}
 	void init(const worldmodel_t* model);
 	void create_va();
 	void draw();
 	void print();
 
-	void print_trace_stats();
 	// Binary searches to find the leaf enclosing the point
 	int find_leaf(vec3 point) const;
 	// finds leaf and includes the box that surrounds the leaf
 	int find_leaf(vec3 point, vec3& min_box, vec3& max_box) const;
-
-	// bad version
-	trace_t test_ray(const ray_t& r);
 
 	// faster version
 	trace_t test_ray(vec3 start, vec3 end);
@@ -70,11 +64,10 @@ private:
 		u16 parent = -1;
 	};
 	// called recursively
-	void subdivide(int cut_dir, int node_idx, int depth);
+	void subdivide(int node_idx, int depth);
 
 	void create_va_internal(int node_idx, vec3 min, vec3 max);
 
-	void test_ray_internal(bool upstack, int caller_node, int node_idx, const ray_t& r, trace_t& t);
 	inline void check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t);
 	//inline void check_ray_leaf_node(const node_t& node, vec3& start, vec3& end, trace_t& t);
 	inline void check_ray_bsp_node(const BSPNode& leaf, const ray_t& r, trace_t& t);
@@ -102,11 +95,8 @@ private:
 
 	std::vector<float> work_buffer;
 
-	VertexArray* va = nullptr;
-
-
-	VertexArray* box_array = nullptr;
-
+	VertexArray va;
+	VertexArray box_array;
 };
 
 #endif // !BSPTREE_H

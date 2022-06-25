@@ -1,5 +1,4 @@
 #include "renderer.h"
-#include "loader.h"
 #include "app.h"
 #include "types.h"
 #include "camera.h"
@@ -14,74 +13,31 @@
 
 const int SHADOW_WIDTH = 2048;
 
-void Renderer::on_resize()
-{
-	HDRbuffer.update_window_size(global_app.width, global_app.height);
-	intermediate.update_window_size(global_app.width, global_app.height);
-}
 Renderer::Renderer()
 {
-	debug_depth = Shader("no_transform_v.txt", "depth_map_debug_f.txt");
+	load_shaders();
+	debug_lines.init(VAPrim::LINES);
+	debug_points.init(VAPrim::POINTS);
 
-	depth_render = Shader("depth_render_v.txt", "depth_render_f.txt");
-
-	untextured = Shader("basic_lighting_vr.txt", "basic_lighting_fr.txt");
-	untextured_unshaded = Shader("light_cube_vr.txt", "light_cube_fr.txt");
-	textured_mesh = Shader("directional.vert", "directional.frag");
-
-	point_lights = Shader("point_light_v.txt", "point_light_f.txt");
-
-	//cube = load_qobj_mesh("cube.qobj");
-	sky_gradient = global_textures.find_or_load("sky_gradient2.png");
-
-	sky_shader = Shader("gradient.vert", "gradient.frag");
-
-	gamma_tm = Shader("no_transform_v.txt", "gamma_f.txt");
-	gamma_tm_bloom = Shader("no_transform_v.txt", "gamma_bloom_f.txt");
-
-
-	bright_pass_filter = Shader("no_transform_v.txt", "bright_pass_filter_f.txt");
-
-	guassian_blur = Shader("no_transform_v.txt", "guassian_blur_f.txt");
-	upsample_shade = Shader("no_transform_v.txt", "upsample_f.txt");
-
-	no_transform = Shader("no_transform_v.txt", "no_transform_f.txt");
-
-	directional_shadows = Shader("directional_shadows_v.txt", "directional_shadows_f.txt");
-
-	transformed_primitives = Shader("transform_p_v.txt", "transform_p_f.txt");
-	model_primitives = Shader("transform_pmodel_v.txt", "transform_pmodel_f.txt");
-
-	leaf = Shader("leaf_shader_v.txt", "directional.frag");
-
-	fresnel = Shader("point_light_v.txt", "fresnel_f.txt");
-	overdraw = Shader("point_light_v.txt", "overdraw_f.txt");
-
-	lightmap = Shader("lightmap_generic_v.txt", "lightmap_generic_f.txt");
-
-	debug_lines.set_primitive(VertexArray::Primitive::lines);
-	debug_points.set_primitive(VertexArray::Primitive::points);
-
-
+	quad.init(VAPrim::TRIANGLES);
 
 	quad.add_quad(vec2(-1, 1), vec2(2, 2));
-	temp = global_textures.find_or_load("engineer_red.png");
 
 	white_tex = global_textures.find_or_load("white.png");
 
-	intermediate.create(FramebufferSpec(global_app.width, global_app.height, 1, FBAttachments::a_float16, true));
+	intermediate.create(FramebufferSpec(global_app.width, global_app.height, 1, FBAttachments::FLOAT16, true));
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		std::cout << "Framebuffer not complete!" << std::endl;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	new_b.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::a_rgb, true));
+	new_b.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::RGB, true));
 
 
-	HDRbuffer.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::a_float16, true));
+	HDRbuffer.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::FLOAT16, true));
 
-	depth_map.create(FramebufferSpec(SHADOW_WIDTH, SHADOW_WIDTH, 1, FBAttachments::a_depth, false));
+	depth_map.create(FramebufferSpec(SHADOW_WIDTH, SHADOW_WIDTH, 1, FBAttachments::DEPTH, false));
 	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -93,8 +49,6 @@ Renderer::Renderer()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
 	init_bloom();
 
 	init_basic_sphere();
@@ -104,67 +58,20 @@ Renderer::Renderer()
 
 void Renderer::render_scene(SceneData& scene)
 {
-	// BIND FRAMEBUFFER
-
-	//depth_map.bind();
-	// Clears default buffer
 	glClearColor(0, 0, 0, 1);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	mat4 light_space_matrix = render_shadow_map(scene);
 
-	//halt_and_render_to_screen(temp->get_ID());
-	//return;
 	glViewport(0, 0, global_app.width, global_app.height);
-	/*
-	debug_depth.use();
-	glDisable(GL_CULL_FACE);
-	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
-	quad.draw_array();
-	glEnable(GL_CULL_FACE);*/
 
 	glEnable(GL_CULL_FACE);
-	//return;
 	HDRbuffer.bind();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-	//draw_gradient_skybox(scene);
-
-	projection_matrix = global_app.projection_matrix, view_matrix = scene.active_camera()->view_matrix;
+	projection_matrix = get_projection_matrix(), view_matrix = scene.active_camera()->view_matrix;
 	
-
-	untextured_unshaded.use();
-	untextured_unshaded.set_mat4("projection", projection_matrix).set_mat4("view", view_matrix);
-
-	// Unshaded untextured
-	/*
-	for (auto obj : scene.objects) {
-		if (!obj->has_shading && !obj->model->meshes.at(0).mat.diffuse) {
-
-			// this is going to go
-			if (obj->matrix_needs_update) {
-				obj->update_matrix();
-				obj->matrix_needs_update = false;
-			}
-
-			untextured_unshaded.set_mat4("model", obj->model_matrix);
-			Model::SubMesh& sm = obj->model->meshes.at(0);
-
-			obj->model->meshes.at(0).mesh.bind();
-
-			obj->model->meshes.at(0).mesh.draw_indexed_primitive();
-		}
-	}
-	*/
-
-	// Temporary fresnel pass
-	//fresnel.use();
-	//fresnel.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix).set_vec3("view_pos", scene.active_camera()->position)
-	//	.set_float("opacity", 0.1f).set_vec3("rim_color", vec3(1.0, 0.2, 0.5)).set_vec3("interior_color", vec3(0, 0, 0));
-	//scene_pass(scene, fresnel);
-	
-	//goto skip_light;
 
 	if (!render_lightmap) {
 		// Directional light pass + ambient
@@ -193,8 +100,6 @@ void Renderer::render_scene(SceneData& scene)
 	else {
 		lightmap_geo();
 	}
-
-skip_light:
 
 	//glDisable(GL_CULL_FACE);
 	glFrontFace(GL_CW);
@@ -236,7 +141,6 @@ skip_light:
 	}
 
 	glDisable(GL_CULL_FACE);
-	// Draw to the screen
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, global_app.width, global_app.height);
 	glActiveTexture(GL_TEXTURE0);
@@ -250,30 +154,6 @@ skip_light:
 	gamma_tm_bloom.set_float("exposure", exposure).set_int("screen_tex", 0).set_int("bloom_tex", 1);
 
 	quad.draw_array();
-/*
-	glDisable(GL_CULL_FACE);
-	primitive_debug_pass();
-	scene.map_geo.draw_array();
-	//bounding_sphere_pass(scene);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	*/
-
-}
-
-void Renderer::draw_gradient_skybox(SceneData& scene)
-{
-	glDepthMask(GL_FALSE);
-	glDisable(GL_CULL_FACE);
-	sky_shader.use();
-	sky_shader.set_vec3("sun_direction", scene.sun.direction);
-	sky_shader.set_mat4("projection", global_app.projection_matrix);
-	sky_shader.set_mat4("view", mat3(scene.active_camera()->view_matrix));	// Removes translation from matrix
-	//sky_gradient.bind(0);
-	//cube.bind();
-	//cube.draw_indexed_primitive();
-	glDepthMask(GL_TRUE);
-	glEnable(GL_CULL_FACE);
 }
 
 void Renderer::upload_point_lights(SceneData& scene)
@@ -497,11 +377,6 @@ void Renderer::bloom_pass()
 		w *= 2;
 		h *= 2;
 	}
-
-//vec3 pivot 
-//	mat4 angle_rotation
-//	glm::rotate()
-
 }
 
 mat4 Renderer::render_shadow_map(SceneData& scene)
@@ -559,7 +434,6 @@ void Renderer::primitive_debug_pass()
 	debug_lines.clear();
 	glLineWidth(1);
 
-	//glEnable(GL_DEPTH_TEST);
 	draw_lightmap_debug();
 	glPointSize(1);
 }
@@ -644,7 +518,7 @@ void Renderer::lightmap_geo()
 }
 void Renderer::init_basic_sphere()
 {
-	// x
+	basic_sphere.init(VAPrim::LINES);
 	const int iterations = 50;
 	const float angle_delta = 3.14159 * 2 / iterations;
 	vec3 points[iterations];
@@ -671,8 +545,6 @@ void Renderer::init_basic_sphere()
 		basic_sphere.push_2(VertexP(points[i], vec3(0, 0, 1)), VertexP(points[i + 1], vec3(0, 0, 1)));
 	}
 	basic_sphere.push_2(VertexP(points[iterations - 1], vec3(0, 0, 1)), VertexP(points[0], vec3(0, 0, 1)));
-
-	basic_sphere.set_primitive(VertexArray::lines);
 }
 void Renderer::visualize_overdraw(SceneData& scene)
 {
@@ -682,4 +554,43 @@ void Renderer::visualize_overdraw(SceneData& scene)
 	glBlendFunc(GL_ONE, GL_ONE);
 	scene_pass(scene, overdraw);
 	glDisable(GL_BLEND);
+}
+void Renderer::load_shaders()
+{
+	debug_depth.load_from_file("no_transform_v.txt", "depth_map_debug_f.txt");
+
+	depth_render.load_from_file("depth_render_v.txt", "depth_render_f.txt");
+
+	untextured.load_from_file("basic_lighting_vr.txt", "basic_lighting_fr.txt");
+	untextured_unshaded = Shader("light_cube_vr.txt", "light_cube_fr.txt");
+	textured_mesh = Shader("directional.vert", "directional.frag");
+
+	point_lights = Shader("point_light_v.txt", "point_light_f.txt");
+
+	gamma_tm = Shader("no_transform_v.txt", "gamma_f.txt");
+	gamma_tm_bloom = Shader("no_transform_v.txt", "gamma_bloom_f.txt");
+
+
+	bright_pass_filter = Shader("no_transform_v.txt", "bright_pass_filter_f.txt");
+
+	guassian_blur = Shader("no_transform_v.txt", "guassian_blur_f.txt");
+	upsample_shade = Shader("no_transform_v.txt", "upsample_f.txt");
+
+	no_transform = Shader("no_transform_v.txt", "no_transform_f.txt");
+
+	directional_shadows = Shader("directional_shadows_v.txt", "directional_shadows_f.txt");
+
+	transformed_primitives = Shader("transform_p_v.txt", "transform_p_f.txt");
+	model_primitives = Shader("transform_pmodel_v.txt", "transform_pmodel_f.txt");
+
+	leaf = Shader("leaf_shader_v.txt", "directional.frag");
+
+	fresnel = Shader("point_light_v.txt", "fresnel_f.txt");
+	overdraw = Shader("point_light_v.txt", "overdraw_f.txt");
+
+	lightmap = Shader("lightmap_generic_v.txt", "lightmap_generic_f.txt");
+}
+mat4 Renderer::get_projection_matrix()
+{
+	return glm::perspective(glm::radians(view.fov_y), (float)view.width / (float)view.height, view.znear, view.zfar);
 }

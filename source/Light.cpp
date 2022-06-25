@@ -18,13 +18,13 @@ std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
 
-int lm_width = 1500;
-int lm_height = 1500;
+int lm_width = 1800;
+int lm_height = 1800;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
 float density_per_unit = 4.f;
 
-VertexArray* va;
+VertexArray va;
 
 vec3 lerp(const vec3& a, const vec3& b, float percentage)
 {
@@ -133,6 +133,7 @@ void light_face(int num)
 	l.surf_num = num;
 
 	img.face_num = num;
+
 	
 	//va->push_2({ verts[l.face->v_start],vec3(1,1,0) }, { verts[l.face->v_start] + l.face->plane.normal,vec3(1,1,0) });
 	
@@ -221,10 +222,21 @@ void light_face(int num)
 			l.face->exact_span[i] = max[i] - min[i];
 		}
 	}
+	
+	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.02f;
+	trace_t test_if_outside_map = global_world.tree.test_ray_fast(face_mid, face_mid + l.face->plane.normal * 100.f);
+	total_rays_cast++;
+	
+	if (!test_if_outside_map.hit) {
+		l.face->dont_draw = true;
+		return;
+	}
+	
+
 	// "Calc points"
 	{
-		int h = l.tex_size[1]*density_per_unit + 2;
-		int w = l.tex_size[0]*density_per_unit + 2;
+		int h = l.tex_size[1]*density_per_unit + 1;
+		int w = l.tex_size[0]*density_per_unit + 1;
 		float start_u = l.exact_min[0];	// added -0.25
 		float start_v = l.exact_min[1];
 		l.numpts = h * w;
@@ -312,7 +324,7 @@ void light_face(int num)
 
 				vec3 final_color = lights[i].color * dif * max(1/(dist*dist+lights[i].brightness)*(lights[i].brightness-dist),0.f);
 				temp_image_buffer[j] += final_color;
-				temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
+				//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
 				//add_color(img.buffer_start, j, final_color);
 			}
 		}
@@ -414,19 +426,26 @@ void add_lights(worldmodel_t* wm)
 		entity_t* ent = &wm->entities.at(i);
 		auto find = ent->properties.find("classname");
 		vec3 color = vec3(1.0);
-		int brightness = 300;
+		int brightness = 200;
 		if (find->second == "light_torch_small_walltorch") {
 			color = vec3(1.0, 0.3, 0.0);
 			brightness = 100;
-			continue;
+			//continue;
 		}
 		else if (find->second == "light_flame_large_yellow") {
 			color = vec3(1.0, 0.5, 0.0);
 			brightness = 400;
+			//continue;
+		}
+		else if (find->second == "light") {
+
+		}
+		else if (find->second == "light_fluoro") {
+			color = vec3(0.8, 0.8, 1.0);
+		}
+		else {
 			continue;
 		}
-		else if (find->second != "light")
-			continue;
 
 		work_str = ent->properties.find("origin")->second;
 		vec3 org;
@@ -449,7 +468,7 @@ void add_lights(worldmodel_t* wm)
 			sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
 		}
 
-		lights.push_back({ org,color,10 });
+		lights.push_back({ org,color,brightness });
 
 	}
 }
@@ -459,8 +478,7 @@ void create_light_map(worldmodel_t* wm)
 {
 	u32 start = SDL_GetTicks();
 	printf("Starting lightmap...\n");
-	va = new VertexArray;
-	va->set_primitive(VertexArray::Primitive::points);
+	va.init(VertexArray::Primitive::LINES);
 
 	faces = wm->faces.data();
 	num_faces = wm->faces.size();
@@ -527,5 +545,5 @@ void create_light_map(worldmodel_t* wm)
 }
 void draw_lightmap_debug()
 {
-	va->draw_array();
+	va.draw_array();
 }

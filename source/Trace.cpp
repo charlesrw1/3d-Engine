@@ -1,4 +1,4 @@
-#include "Trace.h"
+#include "WorldGeometry.h"
 
 struct tracestack_t
 {
@@ -128,8 +128,8 @@ trace_t BSPtree::test_ray_debug(vec3 start, vec3 end)
 	vec3 max_box = vec3(32);
 	vec3 min_box = vec3(-32);
 	vec3 last_cut = vec3(1, 1, 1);
-	box_array->clear();
-	va->clear();
+	box_array.clear();
+	va.clear();
 	int num_poly_checks = 0;
 	while (1)
 	{
@@ -138,12 +138,12 @@ trace_t BSPtree::test_ray_debug(vec3 start, vec3 end)
 			std::cout << "Checking node " << node_n <<  " depth: " << node->depth << " faces: " << node->num_faces << " (parent " << node->parent << ")\n";
 			r.origin = front;
 			r.length = length(back - front)+0.01f;
-			box_array->add_solid_box(min_box, max_box, vec4(last_cut, node->num_faces/80.f));
+			box_array.add_solid_box(min_box, max_box, vec4(last_cut, node->num_faces/80.f));
 			num_poly_checks += node->num_faces;
 			check_ray_leaf_node(*node, r, trace);
 			if (trace.hit) {
 				std::cout << "Num compares: " << num_poly_checks << '\n';
-				va->push_2({ start,vec3(1.f,0.0,0.0) }, { end,vec3(1.f,0.0,0.0) });
+				va.push_2({ start,vec3(1.f,0.0,0.0) }, { end,vec3(1.f,0.0,0.0) });
 				trace.node = node_n;
 				return trace;
 			}
@@ -152,7 +152,7 @@ trace_t BSPtree::test_ray_debug(vec3 start, vec3 end)
 			top--;
 			if (top < stack) {
 				std::cout << "Num compares: " << num_poly_checks << '\n';
-				va->push_2({ start,vec3(0,1.f,0) }, { end,vec3(0,1.f,0) });
+				va.push_2({ start,vec3(0,1.f,0) }, { end,vec3(0,1.f,0) });
 				return trace;
 			}
 
@@ -452,7 +452,7 @@ void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& t
 			vec3 v = point - geo->verts.at(f.v_start + i);
 			vec3 c = cross(geo->verts.at(f.v_start + (i + 1) % v_count) - geo->verts.at(f.v_start + i), v);
 			float angle = dot(-f.plane.normal, c);
-			if (angle < 0) {
+			if (angle < -0.005f) {
 				// point is outside the edges of the polygon
 				hit = false;
 				break;

@@ -51,15 +51,15 @@ public:
 
 	bool init_from_file(const char* filename);
 
-	const std::string& get_name() {
+	const std::string& get_name() const {
 		return name;
 	}
 	void print();
 	void load_model();
 	void purge_model();
 
-	int num_meshes() { return meshes.size(); }
-	const RenderMesh* mesh(int n) { return &meshes.at(n); }
+	int num_meshes() const { return meshes.size(); }
+	const RenderMesh* mesh(int n) const { return &meshes.at(n); }
 	bool is_loaded() const { return loaded; }
 
 	void append_mesh(RenderMesh mesh) { meshes.push_back(mesh); }

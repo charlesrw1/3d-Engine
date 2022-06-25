@@ -19,9 +19,6 @@ using namespace glm;
 class Texture;
 class VertexArray;
 
-// BrushCSG uses this but so does BSPtree for splitting windings
-void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);
-void get_extents(const winding_t& w, vec3& min, vec3& max);
 class MapParser
 {
 public:
@@ -29,8 +26,6 @@ public:
 		parse_buffer.reserve(256);
 	}
 	void start_file(std::string file);
-
-
 
 	void construct_mesh(VertexArray& va, VertexArray& edges);
 
@@ -47,6 +42,7 @@ public:
 	}
 
 
+private:
 	// Final data
 	std::vector<entity_t> entities;
 	std::vector<texture_info_t> t_info;	// holds axis info and index into 'texture' strings
@@ -54,53 +50,38 @@ public:
 	std::vector<face_t> face_list;
 	std::vector<brush_model_t> model_list;
 	std::vector<vec3> vertex_list;
-private:
-	void CSG_union();
 
-	void post_process_pass();
+	// Raw data
+	std::vector<mapbrush_t> brushes;
+	std::vector<mapface_t> faces;
+
 	enum Result { R_GOOD, R_FAIL, R_EOF };
 
 	void parse_file();
 
 	void compute_intersections(mapbrush_t*);
 	void sort_verticies(mapface_t*);
+	void compute_bounds(mapbrush_t*);
 	
-	void clip_to_brush(mapbrush_t& to_clip, const mapbrush_t& b, bool clip_to_plane, std::vector<mapface_t>& final_faces);
+	void CSG_union();
+	void clip_to_brush(const mapbrush_t& b, bool clip_to_plane, std::vector<mapface_t>& final_faces);
 	std::vector<mapface_t> clip_to_list(const mapbrush_t& a, int start_index, const mapface_t& b, bool clip_to_plane);
 	void split_face(const mapface_t& b, const mapface_t& a, mapface_t& front, mapface_t& back);
 
+	void post_process_pass();
+
 	uint64 get_surface_area();
-
-	void make_clipping_hull();
-
 	side_t classify_face(const mapface_t& face, const mapface_t& other) const;
 
 	Result parse_entity();
 	Result parse_brush();
-
-
 	Result parse_face();
 	Result parse_face_quake();
-
 	Result parse_vec3(vec3& v);
-
 	Result read_token();
 	Result read_str(bool in_quotes=true);
-
 	void parse_fail(const char* msg);
-	
 	int get_texture();
-
-
-	std::vector<mapbrush_t> brushes;	// Groups of faces
-	std::vector<mapface_t> faces;	
-	//std::vector<vec3> verts;		// Indexed into by faces
-
-
-	// Used as temporary buffers during CSG stage
-	//std::vector<vec3> clipped_verts;
-	//std::vector<mbrush_t> clipped_brushes;
-	//std::vector<mface_t> clipped_faces;
 
 	std::unordered_map<std::string, int> str_to_tex_index;
 

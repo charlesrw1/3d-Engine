@@ -25,8 +25,6 @@ public:
 
 	bool running = true;
 
-	glm::mat4 projection_matrix;
-
 	void init();
 	void shutdown();
 	void init_window();
@@ -38,8 +36,6 @@ public:
 	void quit();
 
 	void create_scene();
-
-	void update_projection_matrix();
 
 	void Printf();
 	void Warning();

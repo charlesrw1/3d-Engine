@@ -4,6 +4,7 @@
 
 
 #include "app.h";
+#include "renderer.h"
 
 constexpr float PI = 3.1415926536;
 constexpr float HALFPI = 3.1415926536 /2;
@@ -104,6 +105,7 @@ void Camera::scroll_wheel_update(int amt)
 {
 	if (free_cam) {
 		fov -= amt * 2;
+		global_app.r->set_fov(fov);
 	}
 	else {
 		target_distance -= amt;

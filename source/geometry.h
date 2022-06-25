@@ -2,24 +2,96 @@
 #define GEOMETRY_H
 #include "glm/glm.hpp"
 
-const float MAX_RAY_DIST = 2000.f;
 using vec3 = glm::vec3;
 using vec4 = glm::vec4;
 
 using mat4 = glm::mat4;
 
 
-struct Ray
-{
-	vec3 direction = vec3(1,0,0);
-	vec3 origin = vec3(0);
-	float length = MAX_RAY_DIST;
-};
-struct Plane
+#define MAX_WINDING_VERTS 24
+enum side_t { FRONT, BACK, ON_PLANE, SPLIT };
+struct plane_t
 {
 	vec3 normal;
-	float offset;
+	float d;
+
+	plane_t() {}
+	plane_t(const vec3& v1, const vec3& v2, const vec3& v3) {
+		init(v1, v2, v3);
+	}
+
+	//bool operator!=(const plane_t& other);
+	void init(const vec3& v1, const vec3& v2, const vec3& v3) {
+		normal = cross(v3 - v2, v1 - v2);
+		normal = normalize(normal);
+		d = -dot(normal, v1);
+	}
+	float distance(const vec3& v) const {
+		return dot(normal, v) + d;
+	}
+	// true= in front or on the plane, false= behind
+	bool classify(const vec3& p) const {
+		return dist(p) > -0.01;
+	}
+	float dist(const vec3& p) const {
+		return dot(normal, p) + d;
+	}
+	side_t classify_full(const vec3& p) const {
+		float d = dist(p);
+		if (d < -0.01f) {
+			return BACK;
+		}
+		else if (d > 0.01f) {
+			return FRONT;
+		}
+		else {
+			return ON_PLANE;
+		}
+	}
+	bool get_intersection(const vec3& start, const vec3& end, vec3& result, float& percentage) const
+	{
+		vec3 dir = end - start;
+		dir = normalize(dir);
+
+		float denom = dot(normal, dir);
+		if (fabs(denom) < 0.01) {
+			return false;
+		}
+		float dis = distance(start);
+		float t = -dis / denom;
+		result = start + dir * t;
+
+		percentage = t / length(end - start);
+
+		return true;
+	}
 };
+
+struct winding_t
+{
+	int num_verts = 0;
+	vec3 v[MAX_WINDING_VERTS];
+
+	void add_vert(vec3 vert) {
+		assert(num_verts < MAX_WINDING_VERTS);
+		v[num_verts++] = vert;
+	}
+};
+void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);
+void get_extents(const winding_t& w, vec3& min, vec3& max);
+void sort_winding(winding_t& w);
+
+// classify face 1 against the plane
+side_t classify_face(const winding_t& f1, const plane_t& p);
+
+struct ray_t
+{
+	vec3 dir=vec3(1,0,0);
+	vec3 origin=vec3(0);
+
+	float length = 1000.f;
+};
+
 struct AABB
 {
 	vec3 max=vec3(0.f);

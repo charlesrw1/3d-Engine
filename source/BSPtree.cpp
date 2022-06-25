@@ -1,5 +1,6 @@
 #include"WorldGeometry.h"
 #include "BSPtree.h"
+#include "Geometry.h"
 #include <algorithm>
 
 static u32 total_split = 0;
@@ -36,7 +37,7 @@ void BSPtree::init(const worldmodel_t* wm)
 		leaves.push_back(l);
 	}
 	leaves.back().next = -1;
-	subdivide(0, 0, 1);
+	subdivide(0, 1);
 
 	flatten_arrays();
 	make_fast_list();
@@ -49,7 +50,7 @@ void BSPtree::init(const worldmodel_t* wm)
 	printf("	Split planes: %u\n", total_split);
 }
 
-void BSPtree::subdivide(int cut, int node_idx, int depth)
+void BSPtree::subdivide(int node_idx, int depth)
 {
 	node_t& node = nodes.at(node_idx);
 	assert(node.num_faces >= 0);
@@ -221,11 +222,8 @@ void BSPtree::subdivide(int cut, int node_idx, int depth)
 	nodes.push_back(child[1]);
 
 	// Call recurisvely
-
-	//cut = (cut == 0) ? 2 : 0;
-
-	subdivide((cut + 1) % 3, start, depth + 1);
-	subdivide((cut + 1) % 3, start + 1, depth + 1);
+	subdivide(start, depth + 1);
+	subdivide(start + 1, depth + 1);
 }
 void BSPtree::create_va_internal(int node_idx, vec3 min, vec3 max)
 {
@@ -255,7 +253,7 @@ void BSPtree::create_va_internal(int node_idx, vec3 min, vec3 max)
 	corners[3][(dig + 1) % 3] = new_min[(dig + 1) % 3];
 
 	for (int i = 0; i < 4; i++) {
-		va->push_2(VertexP(corners[i], plane.normal * (float)exp(-node.depth / 2.f)), VertexP(corners[(i + 1) % 4], plane.normal * (float)exp(-node.depth / 2.f)));
+		va.push_2(VertexP(corners[i], plane.normal * (float)exp(-node.depth / 2.f)), VertexP(corners[(i + 1) % 4], plane.normal * (float)exp(-node.depth / 2.f)));
 	}
 
 	create_va_internal(node.first_child, new_min, max);	// front
@@ -306,13 +304,9 @@ void BSPtree::flatten_arrays()
 
 void BSPtree::create_va()
 {
-	va = new VertexArray;
-	va->set_primitive(VertexArray::Primitive::lines);
-
-
+	va.init(VertexArray::Primitive::LINES);
 	create_va_internal(0, vec3(-50), vec3(50));
-	box_array = new VertexArray;
-	box_array->set_primitive(VertexArray::Primitive::triangle);
+	box_array.init(VAPrim::TRIANGLES);
 }
 int BSPtree::find_leaf(vec3 point) const
 {
@@ -359,88 +353,7 @@ int BSPtree::find_leaf(vec3 point, vec3& min_box, vec3& max_box) const
 	//return binary_search(0, point, min_box, max_box);
 }
 
-static u32 total_compares = 0;
-static u32 total_func_calls = 0;
-static u32 total_leafs = 0;
-static u32 skipped = 0;
-void BSPtree::print_trace_stats()
-{
-	printf("Compares: %u\n", total_compares);
-	printf("Calls: %u\n", total_func_calls);
-	printf("Leafs: %u\n", total_leafs);
-	printf("Skipped: %u\n", skipped);
-}
 
-trace_t BSPtree::test_ray(const ray_t& ray)
-{
-	total_compares = 0;
-	total_func_calls = 0;
-	total_leafs = 0;
-	skipped = 0;
-	//curr_compare++;
-	int start_node = find_leaf(ray.origin);
-	trace_t t;
-	t.start = ray.origin;
-	t.dir = ray.dir;
-	// first test start node alone
-	check_ray_leaf_node(nodes.at(start_node), ray, t);
-	if (!t.hit) {
-		test_ray_internal(true, start_node, nodes.at(start_node).parent, ray, t);
-	}
-
-	return t;
-}
-void BSPtree::test_ray_internal(bool uptree, int caller_node, int node_idx, const ray_t& ray, trace_t& trace)
-{
-	total_func_calls++;
-	const node_t& node = nodes.at(node_idx);
-	// node has faces attached to it, check them
-	if (node.num_faces != -1) {
-		int face = trace.face;
-		check_ray_leaf_node(node, ray, trace);
-		if (trace.hit && face != trace.face) 
-			trace.node = node_idx;
-	}
-	// node is a parent, determine where to go next
-	else {
-		const plane_t& p = planes.at(node.plane_num);
-		// classify points
-		bool start = p.classify(ray.origin);
-		//float start_d = p.dist(ray.origin);
-		bool end = p.classify(ray.origin + ray.dir * ray.length);
-		//float end_d = p.dist(ray.origin);
-
-		// caller came from below, check other half of tree
-		if (uptree) {
-			if (trace.hit) {
-				return;
-			}
-
-			assert(caller_node == node.first_child || caller_node == node.first_child + 1);
-			// caller node was front face
-			bool caller_front = caller_node == node.first_child;
-
-			if (!caller_front && (start || end)) {
-				test_ray_internal(false, node_idx, node.first_child, ray, trace);
-			}
-			else if (caller_front && (!start || !end)) {
-				test_ray_internal(false, node_idx, node.first_child + 1, ray, trace);
-			}
-			if (node_idx != 0) {
-				test_ray_internal(true, node_idx, node.parent, ray, trace);
-			}
-		}
-		// we are going down the tree, either leaf is a potential canidate
-		else {
-			if (start || end) {
-				test_ray_internal(false, node_idx, node.first_child, ray, trace);
-			}
-			if (!start || !end) {
-				test_ray_internal(false, node_idx, node.first_child + 1, ray, trace);
-			}
-		}
-	}
-}
 #include "glad/glad.h"
 void BSPtree::draw()
 {
@@ -449,7 +362,7 @@ void BSPtree::draw()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
-	box_array->draw_array();
+	box_array.draw_array();
 	glEnable(GL_CULL_FACE);
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);

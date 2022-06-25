@@ -19,19 +19,19 @@ static bool equals(winding_t& a, winding_t& b) {
 	return true;
 }
 
+static bool aabb_intersect(vec3& min1, vec3& max1, vec3& min2, vec3& max2)
+{
+	for (int i = 0; i < 3; i++) {
+		// + 0.5 cause paranoia
+		if (min1[i] > max2[i]+0.5f || min2[i] > max1[i]+0.5f)
+			return false;
+	}
+	return true;
+}
+
 void MapParser::CSG_union()
 {
-	// create a copy, these will be modified in the functions
-	//clipped_faces = faces;
-//	clipped_verts = verts;
-
-	//std::vector<mapface_t> clipped_faces = faces;
-
-	std::vector<mapbrush_t> clipped_brushes = brushes;
 	std::vector<mapface_t> clipped_faces;
-	//clipped_brushes = brushes;
-	//clipped_verts.clear();
-	//clipped_faces.clear();
 
 	bool clip_on_plane;
 	for (int j = 0; j < entities.size(); j++) {
@@ -45,17 +45,18 @@ void MapParser::CSG_union()
 			clip_on_plane = false;
 			std::vector<mapface_t> final_faces;
 			// copy faces
-			clipped_brushes.at(i).face_start = 0;
 			for (int m = 0; m < brushes.at(i).num_faces; m++) {
 				final_faces.push_back(faces.at(brushes.at(i).face_start + m));
-				//clipped_brushes.at(i).indices[m] = m;
 			}
-
-
+			vec3 clip_min = brushes.at(i).min, clip_max = brushes.at(i).max;
 			for (int j = start; j < start+count; j++) {
-
 				if (i != j) {
-					clip_to_brush(clipped_brushes.at(i), brushes.at(j), clip_on_plane, final_faces);
+					vec3 other_min = brushes.at(j).min, other_max = brushes.at(j).max;
+					if (!aabb_intersect(clip_min, clip_max, other_min, other_max)) {
+						continue;
+					}
+
+					clip_to_brush(brushes.at(j), clip_on_plane, final_faces);
 				}
 				else {
 					clip_on_plane = true;
@@ -86,7 +87,7 @@ void MapParser::CSG_union()
 	}
 }
 // a is being clipped to b
-void MapParser::clip_to_brush(mapbrush_t& to_clip, const mapbrush_t& b, bool clip_to_plane, std::vector<mapface_t>& final_faces)
+void MapParser::clip_to_brush(const mapbrush_t& b, bool clip_to_plane, std::vector<mapface_t>& final_faces)
 {
 	//printf("Clipping brush...\n");
 	//std::vector<mface_t> final_faces;
@@ -193,79 +194,6 @@ side_t MapParser::classify_face(const mapface_t& face, const mapface_t& other) c
 	}
 
 	return ON_PLANE;
-}
-void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back)
-{
-	std::vector<side_t> classified(a.num_verts);
-	for (int i = 0; i < a.num_verts; i++) {
-		classified.at(i) = plane.classify_full(a.v[i]);//verts.at(a.v_start + i));
-	}
-	front.num_verts = 0;
-	back.num_verts = 0;
-
-	for (int i = 0; i < a.num_verts; i++) {
-		//int idx = a.v_start + i;
-
-		switch (classified.at(i))
-		{
-		case FRONT:
-			front.add_vert(a.v[i]);//verts.at(idx));
-			break;
-		case BACK:
-			back.add_vert(a.v[i]);
-			break;
-		case ON_PLANE:
-			front.add_vert(a.v[i]);
-			back.add_vert(a.v[i]);
-			break;
-		}
-
-		int next_idx = (i + 1) % a.num_verts;
-		if (next_idx == a.num_verts) next_idx = 0;
-		assert(next_idx != i);
-
-		bool ignore = false;
-
-		if (classified.at(i) == ON_PLANE && classified.at(next_idx) != ON_PLANE) {
-			ignore = true;
-		}
-		if (classified.at(i) != ON_PLANE && classified.at(next_idx) == ON_PLANE) {
-			ignore = true;
-		}
-		if (!ignore && classified.at(i) != classified.at(next_idx)) {
-			vec3 vert = vec3(0);
-			float percentage;
-
-			if (!plane.get_intersection(a.v[i], a.v[next_idx], vert, percentage)) {//verts.at(idx), verts.at(next_idx), vert, percentage)) {
-
-				// should never happen, but it does...
-				vert = a.v[i];//verts.at(idx);
-				//continue;
-				////printf("Split edge not parallel!\n");
-				//exit(1);
-			}
-			front.add_vert(vert);
-			back.add_vert(vert);
-			//front_verts.push_back(vert);
-			//back_verts.push_back(vert);
-			// texture calc here
-
-
-		}
-	}
-	assert(front.num_verts >= 3);
-	assert(back.num_verts >= 3);
-	assert(front.num_verts + back.num_verts >= a.num_verts);
-
-}
-void get_extents(const winding_t& w, vec3& min, vec3& max)
-{
-	min = vec3(5000);
-	max = vec3(-5000);
-	for (int i = 0; i < w.num_verts; i++) {
-		min = glm::min(w.v[i], min);
-		max = glm::max(w.v[i], max);
-	}
 }
 
 // face a being split by plane b

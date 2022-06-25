@@ -31,7 +31,7 @@ void Framebuffer::invalidate()
 
 	static const GLenum to_glenum_if[] = { 0,0,GL_RGBA, GL_RGB,GL_RGBA16F,GL_RGBA32F };
 	// color texture
-	if (spec.attach != FBAttachments::a_none && spec.attach != FBAttachments::a_depth) {
+	if (spec.attach != FBAttachments::NONE && spec.attach != FBAttachments::DEPTH) {
 		const GLenum internal_format = to_glenum_if[static_cast<int>(spec.attach)];
 		const GLenum target = (multisample) ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
 		const GLenum type = (internal_format == GL_RGBA16F || internal_format == GL_RGBA32F) ? GL_FLOAT : GL_UNSIGNED_BYTE;
@@ -49,7 +49,7 @@ void Framebuffer::invalidate()
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, color_id, 0);
 	}
 	// depth texture
-	if (spec.attach == FBAttachments::a_depth) {
+	if (spec.attach == FBAttachments::DEPTH) {
 		assert(spec.samples == 1);
 
 		glGenTextures(1, &depth_id);
@@ -95,7 +95,7 @@ void Framebuffer::invalidate()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
-void Framebuffer::update_window_size(int n_width, int n_height)
+void Framebuffer::resize(int n_width, int n_height)
 {
 	spec.width = n_width;
 	spec.height = n_height;
@@ -121,10 +121,6 @@ void Framebuffer::destroy()
 }
 
 const char* shader_path = "resources/shaders/";
-Shader::Shader(const char* vertex_path, const char* fragment_path, const char* geo_path)
-{
-	ID = load_shader(vertex_path, fragment_path, geo_path);
-}
 void Shader::use()
 {
 	glUseProgram(ID);
@@ -166,7 +162,7 @@ std::string Shader::read_file(const char* filepath)
 	return std::string((std::istreambuf_iterator<char>(infile)),
 		std::istreambuf_iterator<char>());
 }
-unsigned int Shader::load_shader(const char* vertex_path, const char* fragment_path, const char* geo_path)
+void Shader::load_from_file(const char* vertex_path, const char* fragment_path, const char* geo_path)
 {
 	unsigned int vertex;
 	unsigned int fragment;
@@ -230,25 +226,16 @@ unsigned int Shader::load_shader(const char* vertex_path, const char* fragment_p
 	glDeleteShader(fragment);
 	glDeleteShader(geometry);
 
-	return program;
-}
-void clear_screen(bool color, bool depth)
-{
-	glClear(
-		((color) ? GL_COLOR_BUFFER_BIT : 0) | 
-		((depth) ? GL_DEPTH_BUFFER_BIT : 0));
-}
-void set_sampler2d(uint32_t binding, uint32_t id) {
-	glActiveTexture(GL_TEXTURE0 + binding);
-	glBindTexture(GL_TEXTURE_2D, id);
+	ID = program;
 }
 VertexArray::~VertexArray()
 {
 	glDeleteBuffers(1, &VBO);
 	glDeleteVertexArrays(1, &VAO);
 }
-VertexArray::VertexArray()
+void VertexArray::init(Primitive type)
 {
+	this->type = type;
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
 
@@ -258,7 +245,7 @@ VertexArray::VertexArray()
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexP), (void*)0);
 	glEnableVertexAttribArray(0);
 	// UV
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexP), (void*)(3*sizeof(float)));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexP), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
 	// COLOR
 	glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(VertexP), (void*)(5 * sizeof(float)));
@@ -272,13 +259,7 @@ void VertexArray::draw_array()
 	static const GLenum to_glenum[] = { GL_TRIANGLES, GL_LINES, GL_LINE_STRIP, GL_POINTS };
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	if (verts.size() > allocated_size) {
-		//allocated_size = verts.size() * 1.5;
-		glBufferData(GL_ARRAY_BUFFER, verts.size()*sizeof(VertexP), verts.data(), GL_STREAM_DRAW);
-	}
-	else {
-		glBufferSubData(GL_ARRAY_BUFFER, 0, verts.size()*sizeof(VertexP), verts.data());
-	}
+	glBufferData(GL_ARRAY_BUFFER, verts.size()*sizeof(VertexP), verts.data(), GL_STREAM_DRAW);
 	glDrawArrays(to_glenum[type], 0, verts.size());
 }
 void VertexArray::upload_data()

@@ -63,9 +63,6 @@
     <ClCompile Include="source\renderer.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="source\loader.cpp">
-      <Filter>Source Files\Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="source\camera.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
@@ -102,6 +99,9 @@
     <ClCompile Include="source\BSPtree.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source\Geometry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\app.h">
@@ -110,10 +110,7 @@
     <ClInclude Include="source\editor.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\geometry.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\perlinnoise.h">
+    <ClInclude Include="source\Geometry.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="source\types.h">
@@ -158,9 +155,6 @@
     <ClInclude Include="source\renderer.h">
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="source\loader.h">
-      <Filter>Source Files\Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="source\camera.h">
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
@@ -197,16 +191,7 @@
     <ClInclude Include="source\WorldGeometry.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="source\FreeList.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="source\BSPtree.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\Trace.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\MapProcess.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="source\Light.h">
