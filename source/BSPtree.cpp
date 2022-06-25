@@ -358,6 +358,7 @@ int BSPtree::find_leaf(vec3 point, vec3& min_box, vec3& max_box) const
 
 	//return binary_search(0, point, min_box, max_box);
 }
+
 static u32 total_compares = 0;
 static u32 total_func_calls = 0;
 static u32 total_leafs = 0;
@@ -448,7 +449,7 @@ void BSPtree::draw()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
-	//box_array->draw_array();
+	box_array->draw_array();
 	glEnable(GL_CULL_FACE);
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);

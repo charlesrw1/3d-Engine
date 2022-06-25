@@ -22,7 +22,7 @@ int lm_width = 1500;
 int lm_height = 1500;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 2.f;
+float density_per_unit = 4.f;
 
 VertexArray* va;
 
@@ -116,9 +116,12 @@ struct light_t
 {
 	vec3 pos;
 	vec3 color;
+
+	int brightness;
 };
 std::vector<light_t> lights; //= { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } };// , { {-5.f,5.f,8.f},{0.1f,0.3f,1.0f} }, { {0,1,0},{1,1,1} }, { {0.f,10.f,0.f},{2.f,2.0f,2.0f} }, { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} }, { {0.f,5.f,0.f},{1.f,0.0f,0.0f} } };
 static u32 total_pixels = 0;
+static u32 total_rays_cast = 0;
 // Lots of help from Quake's LTFACE.c 
 void light_face(int num)
 {
@@ -222,7 +225,7 @@ void light_face(int num)
 	{
 		int h = l.tex_size[1]*density_per_unit + 2;
 		int w = l.tex_size[0]*density_per_unit + 2;
-		float start_u = l.exact_min[0];
+		float start_u = l.exact_min[0];	// added -0.25
 		float start_v = l.exact_min[1];
 		l.numpts = h * w;
 		total_pixels += l.numpts;
@@ -231,7 +234,7 @@ void light_face(int num)
 		img.width = w;
 
 		float step[2];
-		step[0] = (l.exact_max[0] - l.exact_min[0]) / w;
+		step[0] = (l.exact_max[0] - l.exact_min[0]) / w;	// added + 0.5
 		step[1] = (l.exact_max[1] - l.exact_min[1]) / h;
 
 		
@@ -248,8 +251,14 @@ void light_face(int num)
 
 				vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal*0.01f;
 				
-				// move point towards middle of face
-				vec3 move_mid = normalize(face_mid	 - point);
+				/*
+				auto res = global_world.tree.test_ray_fast(point + l.face->plane.normal * 0.1f , face_mid + l.face->plane.normal * 0.1f);
+				if (res.hit) {
+					point = res.end_pos;
+					//va->append({ point,vec3(0,1,0) });
+				}
+				*/
+
 				//point = point + move_mid * 0.25f;
 				if (top_point >= MAP_PTS) {
 					l.numpts = MAP_PTS - 1;
@@ -278,14 +287,15 @@ void light_face(int num)
 			if (dist < 0) {
 				continue;
 			}
-			dist = length(light_p - points[0]);
-			if (dist > 30) {
-				continue;
-			}
 
 			for (int j = 0; j < l.numpts; j++) {	
 				
-				
+				float sqrd_dist = dot(light_p - points[j], light_p - points[j]);
+				if (sqrd_dist > lights[i].brightness*lights[i].brightness) {
+					continue;
+				}
+
+				total_rays_cast++;
 				trace_t res = global_world.tree.test_ray_fast(points[j], light_p);
 				if (res.hit) {
 					continue;
@@ -300,7 +310,7 @@ void light_face(int num)
 					continue;
 				}
 
-				vec3 final_color = lights[i].color * dif * max(1/(dist*dist+20)*(20-dist),0.f);
+				vec3 final_color = lights[i].color * dif * max(1/(dist*dist+lights[i].brightness)*(lights[i].brightness-dist),0.f);
 				temp_image_buffer[j] += final_color;
 				temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
 				//add_color(img.buffer_start, j, final_color);
@@ -309,7 +319,6 @@ void light_face(int num)
 	}
 	
 	// PCF filtering
-	static const float weights[] = { 0.19, 0.12, 0.07 };
 	for (int y = 0; y < img.height; y++) {
 		for (int x = 0; x < img.width; x++) {
 			vec3 total = vec3(0);
@@ -404,9 +413,21 @@ void add_lights(worldmodel_t* wm)
 	for (int i = 0; i < wm->entities.size(); i++) {
 		entity_t* ent = &wm->entities.at(i);
 		auto find = ent->properties.find("classname");
-		if (!(find->second == "light" || find->second == "light_spot")) {
+		vec3 color = vec3(1.0);
+		int brightness = 300;
+		if (find->second == "light_torch_small_walltorch") {
+			color = vec3(1.0, 0.3, 0.0);
+			brightness = 100;
 			continue;
 		}
+		else if (find->second == "light_flame_large_yellow") {
+			color = vec3(1.0, 0.5, 0.0);
+			brightness = 400;
+			continue;
+		}
+		else if (find->second != "light")
+			continue;
+
 		work_str = ent->properties.find("origin")->second;
 		vec3 org;
 		sscanf_s(work_str.c_str(), "%f %f %f", &org.x, &org.y, &org.z);
@@ -414,11 +435,21 @@ void add_lights(worldmodel_t* wm)
 
 		org = vec3(-org.x, org.z, org.y);
 
-		//work_str = ent->properties.find("color")->second;
-		vec3 color(1.0);
-		//sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
+		auto brightness_str = ent->properties.find("light");
+		if (brightness_str != ent->properties.end()) {
+			work_str = brightness_str->second;
+			brightness = std::stoi(work_str);
+		}
+		brightness /= 32.f;
 
-		lights.push_back({ org,color });
+		// "color" isn't in Quake's light entities, but it is in my own format
+		auto color_str = ent->properties.find("color");
+		if (color_str != ent->properties.end()) {
+			work_str = ent->properties.find("color")->second;
+			sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
+		}
+
+		lights.push_back({ org,color,10 });
 
 	}
 }
@@ -442,13 +473,15 @@ void create_light_map(worldmodel_t* wm)
 
 	add_lights(wm);
 
-
+	u32 start_light_face = SDL_GetTicks();
 	printf("Lighting faces...\n");
 	const brush_model_t* bm = &wm->models[0];	// "worldspawn"
 	for (int i = bm->face_start; i < bm->face_start+bm->face_count; i++) {
 		light_face(i);
 	}
 	printf("Total pixels: %u\n", total_pixels);
+	printf("Total raycasts: %u\n", total_rays_cast);
+	printf("Face lighting time: %u\n",SDL_GetTicks() - start_light_face);
 
 	final_lightmap.resize(lm_width * lm_height * 3,0);
 	for (int i = 0; i < final_lightmap.size(); i += 3) {

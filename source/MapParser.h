@@ -46,8 +46,6 @@ public:
 		wm->t_info = std::move(t_info);
 	}
 
-	// Pass in a lambada to define a filter to use on brushes for the final model
-	// Takes in a mapbrush_t as a param
 
 	// Final data
 	std::vector<entity_t> entities;

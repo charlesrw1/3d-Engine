@@ -269,7 +269,7 @@ void Editor::shoot_ray()
 	
 	result = global_world.tree.test_ray_debug(ray.origin,ray.origin+ray.dir*100.f);
 	auto start3 = std::chrono::steady_clock::now();
-	for (int i = 0; i < 1'000'000; i++) {
+	for (int i = 0; i <0; i++) {
 		result = global_world.tree.test_ray(ray.origin, ray.origin + ray.dir * 100.f);
 	}
 	auto end3 = std::chrono::steady_clock::now();
@@ -279,7 +279,7 @@ void Editor::shoot_ray()
 
 
 	auto start = std::chrono::steady_clock::now();
-	for (int i = 0; i < 1'000'000; i++) {
+	for (int i = 0; i < 0; i++) {
 		result = global_world.tree.test_ray_fast(ray.origin, ray.origin + ray.dir * 100.f);
 	}
 	auto end = std::chrono::steady_clock::now();
