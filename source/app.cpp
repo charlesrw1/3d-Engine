@@ -71,7 +71,7 @@ void App::create_scene()
 	
 	MapParser mp;
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/start.map");
+	mp.start_file("resources/maps/cornell_box.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
 	mp.add_to_worldmodel(&world);
@@ -82,8 +82,6 @@ void App::create_scene()
 	r->lightmap_tex = global_textures.find_or_load("lightmap.bmp");
 
 	global_world.create_mesh();
-
-	global_world.tree.print_leaves_with_face(1295);
 
 	u32 map_end = SDL_GetTicks();
 	printf("Loaded map in: %i ms\n", map_end - map_start);

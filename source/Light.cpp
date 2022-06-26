@@ -22,7 +22,7 @@ int lm_width = 1800;
 int lm_height = 1800;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 1.f;
+float density_per_unit = 8.f;
 
 VertexArray va;
 
@@ -89,8 +89,12 @@ void add_color(int start, int offset, vec3 color)
 }
 
 const int MAP_PTS = 256 * 256;
-std::vector<vec3> points(MAP_PTS);
+//std::vector<vec3> points(MAP_PTS);
+vec3 points[5][MAP_PTS];
 std::vector<vec3> temp_image_buffer(MAP_PTS);
+
+float offsets[5][2] = { {0,0},{-0.5,0},{0.5,0},{0,-0.5},{0,0.5} };
+
 struct LightmapState
 {
 	//std::vector<vec3> points;
@@ -122,6 +126,70 @@ struct light_t
 std::vector<light_t> lights; //= { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } };// , { {-5.f,5.f,8.f},{0.1f,0.3f,1.0f} }, { {0,1,0},{1,1,1} }, { {0.f,10.f,0.f},{2.f,2.0f,2.0f} }, { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} }, { {0.f,5.f,0.f},{1.f,0.0f,0.0f} } };
 static u32 total_pixels = 0;
 static u32 total_rays_cast = 0;
+
+void calc_points(LightmapState& l, Image& img, float u_offset, float v_offset, vec3* points, int face_num)
+{
+	int h = l.tex_size[1] +1;
+	int w = l.tex_size[0] +1;
+	float start_u = l.exact_min[0]-0.2*(w>3);	// added -0.25
+	float start_v = l.exact_min[1]-0.2*(h>3);
+	l.numpts = h * w;
+	total_pixels += l.numpts;
+
+	img.height = h;
+	img.width = w;
+
+	float step[2];
+	step[0] = (l.exact_max[0] - l.exact_min[0]+0.4*(w>3) - (1/(float)density_per_unit)) / w;	// added + 0.5
+	step[1] = (l.exact_max[1] - l.exact_min[1]+0.4*(h>3) - (1 /(float)density_per_unit)) / h;
+
+	int top_point = 0;
+	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.01f;
+	for (int y = 0; y < h; y++) {
+		for (int x = 0; x < w; x++) {
+			float u = start_u + (x+u_offset) * step[0] + step[0]/2.f;
+			float v = start_v + (y+v_offset) * step[1] + step[1]/2.f;
+
+			vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
+
+			total_rays_cast++;
+			trace_t check_behind_wall = global_world.tree.test_ray_fast(point, face_mid );
+			if (check_behind_wall.hit) {
+				if (u <= l.exact_min[0]) {
+					u = l.exact_min[0] + step[0];
+				}
+				else if (u >= l.exact_max[0]) {
+					u = l.exact_max[0] - step[0];
+				}
+				if (v <= l.exact_min[1]) {
+					v = l.exact_min[1] + step[1];
+				}
+				else if (v >= l.exact_max[1]) {
+					v = l.exact_max[1] - step[1];
+				}
+				if (face_num == 27 || face_num == 1926 || face_num == 1918 ||face_num == 313 || face_num == 323) {
+					va.append({ point, vec3(0,0,1) });
+				}
+				point =l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
+			}
+			
+			if (face_num == 27 || face_num == 1926 || face_num == 1918 || face_num == 1261 
+			|| face_num == 773 || face_num == 1033 || face_num ==313 || face_num == 323) {
+				va.append({ point, vec3(0,1,0) });
+			}
+
+			if (top_point >= MAP_PTS) {
+				l.numpts = MAP_PTS - 1;
+				img.height = y - 1;
+				goto face_too_big;
+			}
+			assert(top_point < MAP_PTS);
+			points[top_point++] = point;
+		}
+	}
+face_too_big:;
+}
+
 // Lots of help from Quake's LTFACE.c 
 void light_face(int num)
 {
@@ -208,18 +276,22 @@ void light_face(int num)
 		//	va->push_2({ l.face->texture_axis[i]*min[i],vec3(0,1,1) }, { vec3(0),vec3(0,1,1) });
 		//	va->push_2({ l.face->texture_axis[i] * max[i],vec3(0,0.8,1) }, { vec3(0),vec3(0,1,0.8) });
 
-			l.tex_min[i] = min[i];
-			l.tex_size[i] = ceil(max[i]) - floor(min[i]);
-			if (l.tex_size[i] > 64) {
-				l.tex_size[i] = 64;
-				printf("Texture size too big!\n");
-				//exit(1);
-			}
 			l.exact_min[i] = min[i];
 			l.exact_max[i] = max[i];
 
 			l.face->exact_min[i] = min[i];
 			l.face->exact_span[i] = max[i] - min[i];
+
+			min[i] = floor(min[i] * density_per_unit);
+			max[i] = ceil(max[i] * density_per_unit);
+
+			l.tex_min[i] = min[i];
+			l.tex_size[i] = max[i]-min[i];
+			if (l.tex_size[i] > 256) {
+				l.tex_size[i] = 256;
+				printf("Texture size too big!\n");
+				//exit(1);
+			}
 		}
 	}
 	
@@ -232,56 +304,8 @@ void light_face(int num)
 		return;
 	}
 	
-
-	// "Calc points"
-	{
-		int h = l.tex_size[1]*density_per_unit + 1;
-		int w = l.tex_size[0]*density_per_unit + 1;
-		float start_u = l.exact_min[0];	// added -0.25
-		float start_v = l.exact_min[1];
-		l.numpts = h * w;
-		total_pixels += l.numpts;
-		
-		img.height = h;
-		img.width = w;
-
-		float step[2];
-		step[0] = (l.exact_max[0] - l.exact_min[0]) / w;	// added + 0.5
-		step[1] = (l.exact_max[1] - l.exact_min[1]) / h;
-
-		
-		int top_point = 0;
-
-		float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
-		float mid_v = (l.exact_min[1] + l.exact_max[1]) / 2.f;
-		vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal*0.01f;
-		face_mid = l.face_middle + l.face->plane.normal*0.01f;
-		for (int y = 0; y < h; y++) {
-			for (int x = 0; x < w; x++) {
-				float u = start_u+x*step[0];
-				float v = start_v+y*step[1];
-
-				vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal*0.01f;
-				
-				/*
-				auto res = global_world.tree.test_ray_fast(point + l.face->plane.normal * 0.1f , face_mid + l.face->plane.normal * 0.1f);
-				if (res.hit) {
-					point = res.end_pos;
-					//va->append({ point,vec3(0,1,0) });
-				}
-				*/
-
-				//point = point + move_mid * 0.25f;
-				if (top_point >= MAP_PTS) {
-					l.numpts = MAP_PTS - 1;
-					img.height = y - 1;
-					goto face_too_big;
-				}
-				assert(top_point < MAP_PTS);
-				points[top_point++]=point;
-			}
-		}
-	face_too_big:;
+	for (int i = 0; i < 1; i++) {
+		calc_points(l, img, offsets[i][0], offsets[i][1], points[i], num);
 	}
 	{
 		img.buffer_start = data_buffer.size();
@@ -299,33 +323,37 @@ void light_face(int num)
 			if (dist < 0) {
 				continue;
 			}
-
 			for (int j = 0; j < l.numpts; j++) {	
-				
-				float sqrd_dist = dot(light_p - points[j], light_p - points[j]);
-				if (sqrd_dist > lights[i].brightness*lights[i].brightness) {
-					continue;
-				}
+				vec3 total_color = vec3(0);
+				for (int m = 0; m < 1; m++) {
 
-				total_rays_cast++;
-				trace_t res = global_world.tree.test_ray_fast(points[j], light_p);
-				if (res.hit) {
-					continue;
-				}
-				//va->append({ l.points[j],vec3(0,1,0) });
+					float sqrd_dist = dot(light_p - points[m][j], light_p - points[m][j]);
+					if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
+						continue;
+					}
 
-				vec3 light_dir = light_p - points[j];
-				float dist = length(light_dir);
-				light_dir = normalize(light_dir);
-				float dif = dot(light_dir, l.face->plane.normal);
-				if (dif < 0) {
-					continue;
-				}
+					total_rays_cast++;
+					trace_t res = global_world.tree.test_ray_fast(points[m][j], light_p);
+					if (res.hit) {
+						continue;
+					}
+					//va->append({ l.points[j],vec3(0,1,0) });
 
+					vec3 light_dir = light_p - points[m][j];
+					float dist = length(light_dir);
+					light_dir = normalize(light_dir);
+					float dif = dot(light_dir, l.face->plane.normal);
+					if (dif < 0) {
+						continue;
+					}
 				vec3 final_color = lights[i].color * dif * max(1/(dist*dist+lights[i].brightness)*(lights[i].brightness-dist),0.f);
-				temp_image_buffer[j] += final_color;
+				total_color += final_color;
+				//temp_image_buffer[j] += final_color*0.2f;
 				//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
-				//add_color(img.buffer_start, j, final_color);
+
+				}
+				temp_image_buffer[j] += total_color;
+				//add_color(img.buffer_start, j, total_color);
 			}
 		}
 	}
@@ -333,13 +361,14 @@ void light_face(int num)
 	// PCF filtering
 	for (int y = 0; y < img.height; y++) {
 		for (int x = 0; x < img.width; x++) {
+			//add_color(img.buffer_start, y* img.width + x, temp_image_buffer.at(y* img.width + x));
 			vec3 total = vec3(0);
 			int added = 0;
 			for (int i = -1; i <= 1; i++) {
 				for (int j = -1; j <= 1; j++) {
 					int ycoord = y + i;
 					int xcoord = x + j;
-					if (ycoord<1 || ycoord>img.height-1 || xcoord <1 || xcoord> img.width-1) 
+					if (ycoord<0 || ycoord>=img.height || xcoord <0 || xcoord>=img.width) 
 						continue;
 					total +=  temp_image_buffer.at(ycoord* img.width + xcoord);
 					added++;
@@ -351,6 +380,10 @@ void light_face(int num)
 			add_color(img.buffer_start, offset, total);
 		}
 	}
+	
+	
+	
+	
 	
 	
 	images.push_back(img);
@@ -478,7 +511,7 @@ void create_light_map(worldmodel_t* wm)
 {
 	u32 start = SDL_GetTicks();
 	printf("Starting lightmap...\n");
-	va.init(VertexArray::Primitive::LINES);
+	va.init(VertexArray::Primitive::POINTS);
 
 	faces = wm->faces.data();
 	num_faces = wm->faces.size();
