@@ -4,6 +4,7 @@
 
 #include "MapParser.h"
 #include "Geometry.h"
+#include <iostream>
 struct ray_t;
 struct trace_t;
 
@@ -48,6 +49,23 @@ public:
 
 	// 10% faster than test_ray
 	trace_t test_ray_fast(vec3 start, vec3 end);
+	void print_leaves_with_face(int face)
+	{
+		std::cout << "Printing leaves with face: " << face << '\n';
+		for (int i = 0; i < nodes.size(); i++)
+		{
+			const node_t* node = &nodes.at(i);
+			if (node->num_faces == -1)
+				continue;
+			for (int j = 0; j < node->num_faces; j++) {
+				const leaf_t* leaf = &leaves.at(node->first_child + j);
+				if (leaf->face_index == face) {
+					std::cout << "	Node: " << i << " (parent: " << node->parent << ")\n";
+				}
+			}
+		}
+		std::cout << "End print leaves\n";
+	}
 
 private:
 	std::vector<BSPNode> fast_list;

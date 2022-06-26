@@ -201,18 +201,19 @@ trace_t WorldGeometry::brute_force_raycast(const ray_t& r)
 			res.length = t;
 			res.normal = f.plane.normal;
 			res.d = f.plane.d;
+			res.face = i;
 
 			best = &f;
 		}
 	}
-	/*
+	
 	if (best) {
 		//int count = best->v_end - best->v_start;
 		for (int i = 0; i < best->v_count; i++) {
-			hit_faces->push_2({ wm->verts.at(best->v_start + i), vec3(1.f,0.0,0.0) }, {wm->verts.at(best->v_start + ((i + 1) % best->v_count)), vec3(1.f,0.0,0.0) });
+			hit_faces.push_2({ wm->verts.at(best->v_start + i), vec3(1.f,0.0,0.0) }, {wm->verts.at(best->v_start + ((i + 1) % best->v_count)), vec3(1.f,0.0,0.0) });
 		}
 	}
-	*/
+	
 
 	return res;
 }

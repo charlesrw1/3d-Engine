@@ -43,7 +43,6 @@ void MapParser::start_file(std::string file)
 	surf_area = get_surface_area();
 	std::cout << "Surface area after CSG: " << surf_area << '\n';
 
-
 	infile.close();
 }
 
@@ -626,6 +625,11 @@ void MapParser::post_process_pass()
 		f.plane.init(vertex_list.at(f.v_start), vertex_list.at(f.v_start + 1), vertex_list.at(f.v_start + 2));
 		f.plane.normal *= -1.f;
 		f.plane.d = -dot(f.plane.normal, vertex_list.at(f.v_start));
+		if (std::isnan(f.plane.d)) {
+			printf("Degenerate plane!\n");
+			f.plane.normal = vec3(1, 0, 0);
+			f.plane.d = 0;
+		}
 	}
 }
 void MapParser::construct_mesh(VertexArray& va, VertexArray& edges)

@@ -261,7 +261,7 @@ void Editor::shoot_ray()
 	trace_t result;
 	
 	auto start2 = std::chrono::steady_clock::now();
-	for (int i = 0; i < 0; i++) {
+	for (int i = 0; i <1; i++) {
 		result = global_world.brute_force_raycast(ray);
 	}
 	auto end2 = std::chrono::steady_clock::now();

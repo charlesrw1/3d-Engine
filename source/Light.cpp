@@ -22,7 +22,7 @@ int lm_width = 1800;
 int lm_height = 1800;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 4.f;
+float density_per_unit = 1.f;
 
 VertexArray va;
 

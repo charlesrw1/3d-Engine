@@ -385,7 +385,7 @@ void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t
 		}
 		float t = -(dot(f.plane.normal, r.origin) + f.plane.d) / denom;
 
-		if (t < 0) {
+		if (t < -0.005) {
 			continue;
 		}
 		if (t > r.length) {

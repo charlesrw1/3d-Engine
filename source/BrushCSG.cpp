@@ -69,6 +69,7 @@ void MapParser::CSG_union()
 		bm.face_start = face_list.size();
 		for (int i = 0; i < clipped_faces.size(); i++)
 		{
+			assert(clipped_faces[i].plane.d != NAN || clipped_faces[i].plane.d != -NAN);
 			face_t f;
 			f.plane = clipped_faces[i].plane;
 			f.t_info_idx = clipped_faces[i].t_info_idx;
@@ -141,7 +142,8 @@ std::vector<mapface_t> MapParser::clip_to_list(const mapbrush_t& a, int start_in
 		{
 			mapface_t front, back;
 			split_face(faces.at(a.face_start+i), b, front, back);
-
+			assert(front.plane.d != NAN);
+			assert(back.plane.d !=  NAN);
 			if (i == a.num_faces - 1) {
 				// discard back clipped
 				result.push_back(front);
