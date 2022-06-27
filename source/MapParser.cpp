@@ -306,7 +306,7 @@ MapParser::Result MapParser::parse_brush()
 				return R_FAIL;
 			}
 			
-			Result r =  parse_face();
+			Result r =  parse_face_quake();
 			if (r == R_FAIL) {
 				return R_FAIL;
 			}
