@@ -22,7 +22,7 @@ int lm_width = 1800;
 int lm_height = 1800;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 8.f;
+float density_per_unit = 10.f;
 
 VertexArray va;
 
@@ -140,21 +140,28 @@ void calc_points(LightmapState& l, Image& img, float u_offset, float v_offset, v
 	img.width = w;
 
 	float step[2];
-	step[0] = (l.exact_max[0] - l.exact_min[0]+0.4*(w>3) - (1/(float)density_per_unit)) / w;	// added + 0.5
-	step[1] = (l.exact_max[1] - l.exact_min[1]+0.4*(h>3) - (1 /(float)density_per_unit)) / h;
+	step[0] = (l.exact_max[0] - l.exact_min[0]+0.4*(w>3)) / w;	// added + 0.5
+	step[1] = (l.exact_max[1] - l.exact_min[1]+0.4*(h>3) ) / h;
 
 	int top_point = 0;
 	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.01f;
 	for (int y = 0; y < h; y++) {
 		for (int x = 0; x < w; x++) {
-			float u = start_u + (x+u_offset) * step[0] + step[0]/2.f;
-			float v = start_v + (y+v_offset) * step[1] + step[1]/2.f;
+			float u = start_u + (x + u_offset) * step[0];// + step[0]/4.f;
+				float v = start_v + (y + v_offset) * step[1]; //+ step[1]/4.f;
 
 			vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
 
 			total_rays_cast++;
 			trace_t check_behind_wall = global_world.tree.test_ray_fast(point, face_mid );
 			if (check_behind_wall.hit) {
+				if (0) {
+					va.append({ point, vec3(0,0,1) });
+				}
+				
+			//	float dist = (abs(dot(check_behind_wall.dir, l.tex_to_world[0])) > abs(dot(check_behind_wall.dir, l.tex_to_world[1]))) ? step[0] : step[1];
+				point = check_behind_wall.end_pos + check_behind_wall.normal*min(step[0],step[1]);
+				/*
 				if (u <= l.exact_min[0]) {
 					u = l.exact_min[0] + step[0];
 				}
@@ -171,10 +178,10 @@ void calc_points(LightmapState& l, Image& img, float u_offset, float v_offset, v
 					va.append({ point, vec3(0,0,1) });
 				}
 				point =l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
+			*/
 			}
 			
-			if (face_num == 27 || face_num == 1926 || face_num == 1918 || face_num == 1261 
-			|| face_num == 773 || face_num == 1033 || face_num ==313 || face_num == 323) {
+			if (0) {
 				va.append({ point, vec3(0,1,0) });
 			}
 
