@@ -123,10 +123,150 @@ std::vector<light_t> lights; //= { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } };// , {
 static u32 total_pixels = 0;
 static u32 total_rays_cast = 0;
 // Lots of help from Quake's LTFACE.c 
+
+void calc_extents(LightmapState& l)
+{
+	texture_info_t* ti = &tinfo[l.face->t_info_idx];
+	// Calc face min and max
+	float min[2], max[2];
+	min[0] = min[1] = 50000;
+	max[0] = max[1] = -50000;
+	int vcount = l.face->v_count;
+	l.face_middle = vec3(0);
+	for (int i = 0; i < vcount; i++) {
+
+		l.face_middle += verts[l.face->v_start + i];
+
+
+		for (int j = 0; j < 2; j++) {
+
+			float val = dot(verts[l.face->v_start + i], ti->axis[j]);
+			if (val < min[j]) {
+				min[j] = val;
+			}
+			if (val > max[j]) {
+				max[j] = val;
+			}
+
+		}
+	}
+	l.face_middle /= vcount;
+
+	for (int i = 0; i < 2; i++) {
+
+		//	va->push_2({ l.face->texture_axis[i]*min[i],vec3(0,1,1) }, { vec3(0),vec3(0,1,1) });
+		//	va->push_2({ l.face->texture_axis[i] * max[i],vec3(0,0.8,1) }, { vec3(0),vec3(0,1,0.8) });
+
+		l.tex_min[i] = min[i];
+		l.tex_size[i] = ceil(max[i]) - floor(min[i]);
+		if (l.tex_size[i] > 64) {
+			l.tex_size[i] = 64;
+			printf("Texture size too big!\n");
+			//exit(1);
+		}
+		l.exact_min[i] = min[i];
+		l.exact_max[i] = max[i];
+
+		l.face->exact_min[i] = min[i];
+		l.face->exact_span[i] = max[i] - min[i];
+	}
+}
+
+void calc_points(LightmapState& l, Image& img)
+{
+	int h = l.tex_size[1] * density_per_unit + 1;
+	int w = l.tex_size[0] * density_per_unit + 1;
+	float start_u = l.exact_min[0];	// added -0.25
+	float start_v = l.exact_min[1];
+	l.numpts = h * w;
+	total_pixels += l.numpts;
+
+	img.height = h;
+	img.width = w;
+
+	float step[2];
+	step[0] = (l.exact_max[0] - l.exact_min[0]) / w;	// added + 0.5
+	step[1] = (l.exact_max[1] - l.exact_min[1]) / h;
+
+
+	int top_point = 0;
+
+	float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
+	float mid_v = (l.exact_min[1] + l.exact_max[1]) / 2.f;
+	vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal * 0.01f;
+	face_mid = l.face_middle + l.face->plane.normal * 0.01f;
+	for (int y = 0; y < h; y++) {
+		for (int x = 0; x < w; x++) {
+			float u = start_u + (x) * step[0]+step[0]/2.f;
+			float v = start_v + (y) * step[1] + step[1] / 2.f;
+
+			vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
+
+			/*
+			auto res = global_world.tree.test_ray_fast(point + l.face->plane.normal * 0.1f , face_mid + l.face->plane.normal * 0.1f);
+			if (res.hit) {
+				point = res.end_pos;
+				//va->append({ point,vec3(0,1,0) });
+			}
+			*/
+
+			//point = point + move_mid * 0.25f;
+			if (top_point >= MAP_PTS) {
+				l.numpts = MAP_PTS - 1;
+				img.height = y - 1;
+				goto face_too_big;
+			}
+			assert(top_point < MAP_PTS);
+			points[top_point++] = point;
+		}
+	}
+face_too_big:;
+}
+
+void calc_vectors(LightmapState& l)
+{
+	assert(l.face->t_info_idx >= 0 && l.face->t_info_idx < num_tinfo);
+	texture_info_t* ti = &tinfo[l.face->t_info_idx];
+
+
+	// face vectors
+	l.world_to_tex[0] = ti->axis[0];
+	l.world_to_tex[1] = ti->axis[1];
+
+
+
+	//va->push_2({ l.face->texture_axis[0],vec3(1,0,0) }, { vec3(0),vec3(1,0,0) });
+	//va->push_2({ l.face->texture_axis[1],vec3(0,1,0) }, { vec3(0),vec3(0,1,0) });
+
+
+	l.tex_normal = normalize(cross(ti->axis[1], ti->axis[0]));
+
+	//va->push_2({ l.tex_normal,vec3(0,0,1) }, { vec3(0),vec3(0,0,1) });
+
+
+	float ratio = dot(l.tex_normal, l.face->plane.normal);
+	if (ratio < 0) {
+		ratio = -ratio;
+		l.tex_normal = -l.tex_normal;
+	}
+
+	for (int i = 0; i < 2; i++) {
+		float dist = dot(l.world_to_tex[i], l.face->plane.normal);
+		dist /= ratio;
+		l.tex_to_world[i] = l.world_to_tex[i] + l.tex_normal * -dist;
+	}
+	l.tex_origin = vec3(0.f);
+	float dist = -l.face->plane.d;
+	dist /= ratio;
+	l.tex_origin += l.tex_normal * dist;
+
+	//va->push_2({ l.tex_origin,vec3(0.2,0.5,1) }, { vec3(0),vec3(0.2,0.5,1) });s
+}
+
+float offsets[4][2] = { {0,0},{0.2,0},{0.2,0.2},{0,0.2} };
 void light_face(int num)
 {
 	LightmapState l;
-	//l.points.resize(MAP_PTS);
 	Image img;
 	assert(num < num_faces);
 	l.face = &faces[num];
@@ -134,94 +274,8 @@ void light_face(int num)
 
 	img.face_num = num;
 
-
-	//va->push_2({ verts[l.face->v_start],vec3(1,1,0) }, { verts[l.face->v_start] + l.face->plane.normal,vec3(1,1,0) });
-
-	assert(l.face->t_info_idx >= 0 && l.face->t_info_idx < num_tinfo);
-	texture_info_t* ti = tinfo + l.face->t_info_idx;
-	// "Calc vectors"
-	{
-
-		// face vectors
-		l.world_to_tex[0] = ti->axis[0];
-		l.world_to_tex[1] = ti->axis[1];
-
-
-
-		//va->push_2({ l.face->texture_axis[0],vec3(1,0,0) }, { vec3(0),vec3(1,0,0) });
-		//va->push_2({ l.face->texture_axis[1],vec3(0,1,0) }, { vec3(0),vec3(0,1,0) });
-
-
-		l.tex_normal = normalize(cross(ti->axis[1], ti->axis[0]));
-
-		//va->push_2({ l.tex_normal,vec3(0,0,1) }, { vec3(0),vec3(0,0,1) });
-
-
-		float ratio = dot(l.tex_normal, l.face->plane.normal);
-		if (ratio < 0) {
-			ratio = -ratio;
-			l.tex_normal = -l.tex_normal;
-		}
-
-		for (int i = 0; i < 2; i++) {
-			float dist = dot(l.world_to_tex[i], l.face->plane.normal);
-			dist /= ratio;
-			l.tex_to_world[i] = l.world_to_tex[i] + l.tex_normal * -dist;
-		}
-		l.tex_origin = vec3(0.f);
-		float dist = -l.face->plane.d;
-		dist /= ratio;
-		l.tex_origin += l.tex_normal * dist;
-
-		//va->push_2({ l.tex_origin,vec3(0.2,0.5,1) }, { vec3(0),vec3(0.2,0.5,1) });
-
-	}
-	// "Calc extents"
-	{
-		// Calc face min and max
-		float min[2], max[2];
-		min[0] = min[1] = 50000;
-		max[0] = max[1] = -50000;
-		int vcount = l.face->v_count;
-		l.face_middle = vec3(0);
-		for (int i = 0; i < vcount; i++) {
-
-			l.face_middle += verts[l.face->v_start + i];
-
-
-			for (int j = 0; j < 2; j++) {
-
-				float val = dot(verts[l.face->v_start + i], ti->axis[j]);
-				if (val < min[j]) {
-					min[j] = val;
-				}
-				if (val > max[j]) {
-					max[j] = val;
-				}
-
-			}
-		}
-		l.face_middle /= vcount;
-
-		for (int i = 0; i < 2; i++) {
-
-			//	va->push_2({ l.face->texture_axis[i]*min[i],vec3(0,1,1) }, { vec3(0),vec3(0,1,1) });
-			//	va->push_2({ l.face->texture_axis[i] * max[i],vec3(0,0.8,1) }, { vec3(0),vec3(0,1,0.8) });
-
-			l.tex_min[i] = min[i];
-			l.tex_size[i] = ceil(max[i]) - floor(min[i]);
-			if (l.tex_size[i] > 64) {
-				l.tex_size[i] = 64;
-				printf("Texture size too big!\n");
-				//exit(1);
-			}
-			l.exact_min[i] = min[i];
-			l.exact_max[i] = max[i];
-
-			l.face->exact_min[i] = min[i];
-			l.face->exact_span[i] = max[i] - min[i];
-		}
-	}
+	calc_vectors(l);
+	calc_extents(l);
 
 	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.02f;
 	trace_t test_if_outside_map = global_world.tree.test_ray_fast(face_mid, face_mid + l.face->plane.normal * 100.f);
@@ -231,58 +285,7 @@ void light_face(int num)
 		l.face->dont_draw = true;
 		return;
 	}
-
-
-	// "Calc points"
-	{
-		int h = l.tex_size[1] * density_per_unit + 1;
-		int w = l.tex_size[0] * density_per_unit + 1;
-		float start_u = l.exact_min[0];	// added -0.25
-		float start_v = l.exact_min[1];
-		l.numpts = h * w;
-		total_pixels += l.numpts;
-
-		img.height = h;
-		img.width = w;
-
-		float step[2];
-		step[0] = (l.exact_max[0] - l.exact_min[0]) / w;	// added + 0.5
-		step[1] = (l.exact_max[1] - l.exact_min[1]) / h;
-
-
-		int top_point = 0;
-
-		float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
-		float mid_v = (l.exact_min[1] + l.exact_max[1]) / 2.f;
-		vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal * 0.01f;
-		face_mid = l.face_middle + l.face->plane.normal * 0.01f;
-		for (int y = 0; y < h; y++) {
-			for (int x = 0; x < w; x++) {
-				float u = start_u + x * step[0];
-				float v = start_v + y * step[1];
-
-				vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
-
-				/*
-				auto res = global_world.tree.test_ray_fast(point + l.face->plane.normal * 0.1f , face_mid + l.face->plane.normal * 0.1f);
-				if (res.hit) {
-					point = res.end_pos;
-					//va->append({ point,vec3(0,1,0) });
-				}
-				*/
-
-				//point = point + move_mid * 0.25f;
-				if (top_point >= MAP_PTS) {
-					l.numpts = MAP_PTS - 1;
-					img.height = y - 1;
-					goto face_too_big;
-				}
-				assert(top_point < MAP_PTS);
-				points[top_point++] = point;
-			}
-		}
-	face_too_big:;
-	}
+	calc_points(l, img);
 	{
 		img.buffer_start = data_buffer.size();
 		make_space(img.height * img.width);
@@ -323,35 +326,14 @@ void light_face(int num)
 				}
 
 				vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f);
-				temp_image_buffer[j] += final_color;
+				//temp_image_buffer[j] += final_color;
 				//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
-				//add_color(img.buffer_start, j, final_color);
+				add_color(img.buffer_start, j, final_color);
 			}
 		}
 	}
-
-	// PCF filtering
-	for (int y = 0; y < img.height; y++) {
-		for (int x = 0; x < img.width; x++) {
-			vec3 total = vec3(0);
-			int added = 0;
-			for (int i = -1; i <= 1; i++) {
-				for (int j = -1; j <= 1; j++) {
-					int ycoord = y + i;
-					int xcoord = x + j;
-					if (ycoord<1 || ycoord>img.height - 1 || xcoord <1 || xcoord> img.width - 1)
-						continue;
-					total += temp_image_buffer.at(ycoord * img.width + xcoord);
-					added++;
-				}
-			}
-			total /= added;
-			int offset = y * img.width + x;
-			assert(offset < l.numpts);
-			add_color(img.buffer_start, offset, total);
-		}
-	}
-
+	
+	
 
 	images.push_back(img);
 }

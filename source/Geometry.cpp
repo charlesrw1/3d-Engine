@@ -107,3 +107,23 @@ side_t classify_face(const winding_t& f1, const plane_t& p)
 
 	return ON_PLANE;
 }
+
+float winding_t::get_area() const
+{
+	float area = 0;
+	for (int i = 2; i < num_verts; i++) {
+		vec3 e1 = v[i-1] - v[0];
+		vec3 e2 = v[i] - v[0];
+		area += length(cross(e1, e2))*0.5f;
+	}
+	return area;
+}
+vec3 winding_t::get_center() const
+{
+	vec3 center = vec3(0);
+	for (int i = 0; i < num_verts; i++) {
+		center += v[i];
+	}
+	center /= num_verts;
+	return center;
+}

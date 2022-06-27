@@ -79,7 +79,7 @@ void App::create_scene()
 	global_world.load_map(&world);
 	create_light_map(&world);
 
-	r->lightmap_tex = global_textures.find_or_load("lightmap.bmp", NEAREST);
+	r->lightmap_tex = global_textures.find_or_load("lightmap.bmp");
 
 	global_world.create_mesh();
 

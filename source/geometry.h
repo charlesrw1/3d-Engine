@@ -76,6 +76,8 @@ struct winding_t
 		assert(num_verts < MAX_WINDING_VERTS);
 		v[num_verts++] = vert;
 	}
+	vec3 get_center() const;
+	float get_area() const;
 };
 void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);
 void get_extents(const winding_t& w, vec3& min, vec3& max);
