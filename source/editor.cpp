@@ -19,6 +19,9 @@
 Editor::Editor()
 {
 }
+#define R_BOOLEAN_IMGUI(str, var) 	if (ImGui::RadioButton(str, r->var)) { \
+r->var = !r->var; \
+}
 void Editor::on_render()
 {
 	ImGui_ImplSDL2_NewFrame();
@@ -57,9 +60,17 @@ void Editor::on_render()
 	if (ImGui::RadioButton("Downsample", global_app.r->down_sample)) {
 		global_app.r->down_sample = !global_app.r->down_sample;
 	}
-	if (ImGui::RadioButton("Draw world", global_app.r->draw_world)) {
-		global_app.r->draw_world = !global_app.r->draw_world;
-	}
+
+	Renderer* r = global_app.r;
+	R_BOOLEAN_IMGUI("d_world", d_world);
+	R_BOOLEAN_IMGUI("d_world_face_edges", d_world_face_edges);
+	R_BOOLEAN_IMGUI("d_trace_boxes", d_trace_boxes);
+	R_BOOLEAN_IMGUI("d_tree_nodes", d_tree_nodes);
+	R_BOOLEAN_IMGUI("d_trace_hits", d_trace_hits);
+	R_BOOLEAN_IMGUI("d_lightmap_patches", d_lightmap_patches);
+	R_BOOLEAN_IMGUI("d_lightmap_debug", d_lightmap_debug);
+
+
 
 	ImGui::DragFloat3("camera_pos: ", (float*)&global_app.scene->active_camera()->position, 0.1);
 

@@ -80,14 +80,20 @@ public:
 	uint32_t downsample_fbo[2][6];
 	uint32_t upsample_fbo[6];
 
-	bool enable_bloom;
+	bool enable_bloom=true;
 	float threshold = 2.f;
 	float exposure = 1;
 	float gamma = 2.2;
 
 	View view;
 
-	bool draw_world = true;
+	bool d_world = true;
+	bool d_world_face_edges = false;
+	bool d_lightmap_debug = true;
+	bool d_lightmap_patches = true;
+	bool d_trace_hits = true;
+	bool d_trace_boxes = true;
+	bool d_tree_nodes = true;
 
 	struct ShadowMapProjection
 	{

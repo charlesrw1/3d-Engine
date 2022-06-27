@@ -355,9 +355,14 @@ int BSPtree::find_leaf(vec3 point, vec3& min_box, vec3& max_box) const
 
 
 #include "glad/glad.h"
-void BSPtree::draw()
+void BSPtree::draw_tree_nodes()
 {
-	//va->draw_array();
+	glLineWidth(1);
+	glEnable(GL_DEPTH_TEST);
+	va.draw_array();
+}
+void BSPtree::draw_trace_boxes()
+{
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

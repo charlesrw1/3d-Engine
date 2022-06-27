@@ -5,6 +5,7 @@
 struct worldmodel_t;
 void create_light_map(worldmodel_t* wm);
 void draw_lightmap_debug();
+void draw_lightmap_patches();
 
 
 // Radiosity of i = Emitted of i + Reflectance of i * sum[Form factor of i to j * Radiosity of j]

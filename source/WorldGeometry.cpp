@@ -136,17 +136,21 @@ void WorldGeometry::create_mesh()
 	print_info();
 }
 
-void WorldGeometry::debug_draw() {
-	glLineWidth(1);
-	glEnable(GL_DEPTH_TEST);
-	//line_va->draw_array();
+void WorldGeometry::draw_trace_hits() {
 	glDisable(GL_DEPTH_TEST);
+	glLineWidth(3);
 	hit_faces.draw_array();
 	glPointSize(10);
 	hit_points.draw_array();
 	glLineWidth(1);
 	glEnable(GL_DEPTH_TEST);
-	tree.draw();
+}
+void WorldGeometry::draw_face_edges()
+{
+	glLineWidth(1);
+	glEnable(GL_DEPTH_TEST);
+	line_va.draw_array();
+
 }
 
 void WorldGeometry::print_info() const {

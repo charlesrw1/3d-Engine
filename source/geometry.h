@@ -80,6 +80,10 @@ struct winding_t
 	float get_area() const;
 };
 void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);
+
+bool try_split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);
+
+
 void get_extents(const winding_t& w, vec3& min, vec3& max);
 void sort_winding(winding_t& w);
 

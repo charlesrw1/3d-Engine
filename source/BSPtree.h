@@ -34,7 +34,8 @@ public:
 	~BSPtree() {}
 	void init(const worldmodel_t* model);
 	void create_va();
-	void draw();
+	void draw_tree_nodes();
+	void draw_trace_boxes();
 	void print();
 
 	// Binary searches to find the leaf enclosing the point

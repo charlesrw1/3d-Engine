@@ -107,9 +107,8 @@ void Renderer::render_scene(SceneData& scene)
 	//scene.map_geo.draw_array();
 	//scene.map_geo_edges.draw_array();
 	//bounding_sphere_pass(scene);
-	glLineWidth(3);
 	glDisable(GL_DEPTH_TEST);
-	global_world.debug_draw();
+	global_world.draw_trace_hits();
 	glEnable(GL_DEPTH_TEST);
 	glFrontFace(GL_CCW);
 	
@@ -247,8 +246,8 @@ void Renderer::scene_pass(SceneData& scene, Shader& shader)
 			}
 		}
 	}
-	if (draw_world) {
-		draw_world_geo(shader);
+	if (d_world) {
+		//draw_world_geo(shader);
 	}
 }
 
@@ -433,8 +432,27 @@ void Renderer::primitive_debug_pass()
 	debug_lines.draw_array();
 	debug_lines.clear();
 	glLineWidth(1);
+	glEnable(GL_DEPTH_TEST);
 
-	draw_lightmap_debug();
+	if (d_lightmap_debug) {
+		draw_lightmap_debug();
+	}
+	if (d_lightmap_patches) {
+		draw_lightmap_patches();
+	}
+	if (d_trace_boxes) {
+		global_world.tree.draw_trace_boxes();
+	}
+	if (d_tree_nodes) {
+		global_world.tree.draw_tree_nodes();
+	}
+	if (d_world_face_edges) {
+		global_world.draw_face_edges();
+	}
+	if (d_trace_hits) {
+		global_world.draw_trace_hits();
+	}
+
 	glPointSize(1);
 }
 void Renderer::bounding_sphere_pass(SceneData& scene)

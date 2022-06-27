@@ -3,6 +3,8 @@
 #include "SDL2/SDL_timer.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#include <random>
+const worldmodel_t* world;
 
 face_t* faces;
 int num_faces;
@@ -14,6 +16,11 @@ texture_info_t* tinfo;
 int num_tinfo;
 
 
+patch_t patches[0x1000];
+int num_patches = 0;
+
+patch_t* face_patches[0x1000];
+
 std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
@@ -24,6 +31,8 @@ int lm_height = 1800;
 // 32 quake units = 1 my units
 float density_per_unit = 4.f;
 
+float patch_grid = 0.25f;
+
 VertexArray va;
 
 vec3 lerp(const vec3& a, const vec3& b, float percentage)
@@ -31,6 +40,15 @@ vec3 lerp(const vec3& a, const vec3& b, float percentage)
 	return a + (b - a) * percentage;
 }
 
+
+vec3 random_color()
+{
+	vec3 v;
+	for (int i = 0; i < 3; i++) {
+		v[i] = rand() / (RAND_MAX+1.f);
+	}
+	return v;
+}
 
 struct Rectangle
 {
@@ -85,6 +103,104 @@ void add_color(int start, int offset, vec3 color)
 
 		data_buffer.at(start + (offset * 3) + i) = add;
 
+	}
+}
+
+void patch_for_face(int face_num)
+{
+	const face_t* face = &faces[face_num];
+	if (face->dont_draw) {
+		return;
+	}
+	patch_t* p = &patches[num_patches++];
+	assert(num_patches < 0x1000);
+	p->face = face_num;
+	face_patches[face_num] = p;
+
+	for (int i = 0; i < face->v_count; i++) {
+		p->winding.add_vert(verts[face->v_start + i]);
+	}
+	p->area = p->winding.get_area();
+	p->area = max(p->area, 1.f);
+	p->center = p->winding.get_center();
+
+	p->next = nullptr;
+}
+
+void make_patches()
+{
+	const brush_model_t* bm = &world->models[0];
+	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
+		patch_for_face(i);
+	}
+}
+static int failed_subdivide = 0;
+void subdivide_patch(patch_t* p)
+{
+	vec3 min, max;
+	winding_t front, back;
+	get_extents(p->winding, min, max);
+	int i;
+	for (i = 0; i < 3; i++) {
+		if ((floor(((min[i]+1)*20.f))/20.f / patch_grid) < (ceil(((max[i] - 1)*20.f)/20.f) / patch_grid)+0.01f) {
+			plane_t split;
+			split.normal = vec3(0);
+			split.normal[i] = 1.f;
+			split.d = -(((floor((min[i] + 1) * 20.f) / 20.f) / patch_grid) + 1) * patch_grid;
+			bool res = try_split_winding(p->winding, split, front, back);
+			if (res) {
+				break;
+			}
+			failed_subdivide++;
+		}
+	}
+	if (i == 3) {
+		return;
+	}
+
+	assert(num_patches < 0x1000);
+	patch_t* new_p = &patches[num_patches++];
+
+	new_p->next = p->next;
+	p->next = new_p;
+
+	p->winding = front;
+	new_p->winding = back;
+
+	new_p->face = p->face;
+
+	p->center = p->winding.get_center();
+	new_p->center = new_p->winding.get_center();
+	p->area = p->winding.get_area();
+	new_p->area = new_p->winding.get_area();
+
+	subdivide_patch(p);
+	subdivide_patch(new_p);
+
+}
+void subdivide_patches()
+{
+	int num = num_patches;
+	for (int i = 0; i < num; i++) {
+		subdivide_patch(&patches[i]);
+	}
+	printf("Failed num: %d\n", failed_subdivide);
+}
+
+VertexArray patch_va;
+void create_patch_view()
+{
+	using VP = VertexP;
+	patch_va.init(VAPrim::TRIANGLES);
+	for (int i = 0; i < num_patches; i++) {
+		patch_t* p = &patches[i];
+		winding_t* w = &p->winding;
+		vec3 color = random_color();
+		//color = max(color, vec3(0.15f));
+		for (int i = 0; i < w->num_verts-2; i++) {
+		//	patch_va.push_line(w->v[i], w->v[(i + 1)%w->num_verts], vec3(1.0));
+			patch_va.push_3(VP(w->v[0], color), VP(w->v[i + 1], color), VP(w->v[(i + 2) % w->num_verts],color));
+		}
 	}
 }
 
@@ -481,6 +597,7 @@ void add_lights(worldmodel_t* wm)
 #include <algorithm>
 void create_light_map(worldmodel_t* wm)
 {
+	world = wm;
 	u32 start = SDL_GetTicks();
 	printf("Starting lightmap...\n");
 	va.init(VertexArray::Primitive::LINES);
@@ -495,6 +612,8 @@ void create_light_map(worldmodel_t* wm)
 	num_tinfo = wm->t_info.size();
 
 	add_lights(wm);
+
+
 
 	u32 start_light_face = SDL_GetTicks();
 	printf("Lighting faces...\n");
@@ -546,9 +665,23 @@ void create_light_map(worldmodel_t* wm)
 	delete root;
 
 	stbi_write_bmp("resources/textures/lightmap.bmp", lm_width, lm_height, 3, final_lightmap.data());
-	printf("Lightmap finished in %u ms", SDL_GetTicks() - start);
+	printf("Lightmap finished in %u ms\n", SDL_GetTicks() - start);
+
+
+
+
+	make_patches();
+	subdivide_patches();
+	srand(234508956l);
+	srand(time(NULL));
+	create_patch_view();
 }
 void draw_lightmap_debug()
 {
 	va.draw_array();
+	
+}
+void draw_lightmap_patches()
+{
+	patch_va.draw_array();
 }

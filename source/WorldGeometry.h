@@ -40,7 +40,10 @@ public:
 
 	trace_t brute_force_raycast(const ray_t& r);
 
-	void debug_draw();
+	void draw_trace_hits();
+
+	void draw_face_edges();
+
 	void create_mesh();
 
 	 Model* get_model()  {

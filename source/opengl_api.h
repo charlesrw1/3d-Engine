@@ -54,6 +54,7 @@ struct VertexArray
 {
 	VertexArray() {}
 	~VertexArray();
+	using VP = VertexP;
 
 	enum Primitive
 	{
@@ -90,9 +91,11 @@ struct VertexArray
 		verts.push_back(b);
 	}
 	void push_square(vec3 p1,vec3 p2, vec3 p3, vec3 p4, vec4 color) {
-		using VP = VertexP;
 		push_3(VP(p1, color), VP(p2, color), VP(p3, color));
 		push_3(VP(p1, color), VP(p3, color), VP(p4, color));
+	}
+	void push_line(vec3 v1, vec3 v2, vec3 color) {
+		push_2(VP(v1, color), VP(v2, color));
 	}
 	void clear() {
 		verts.clear();
