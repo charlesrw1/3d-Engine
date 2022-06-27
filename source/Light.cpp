@@ -263,7 +263,6 @@ void calc_vectors(LightmapState& l)
 	//va->push_2({ l.tex_origin,vec3(0.2,0.5,1) }, { vec3(0),vec3(0.2,0.5,1) });s
 }
 
-float offsets[4][2] = { {0,0},{0.2,0},{0.2,0.2},{0,0.2} };
 void light_face(int num)
 {
 	LightmapState l;
@@ -326,12 +325,36 @@ void light_face(int num)
 				}
 
 				vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f);
-				//temp_image_buffer[j] += final_color;
+				temp_image_buffer[j] += final_color;
 				//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
-				add_color(img.buffer_start, j, final_color);
+				//add_color(img.buffer_start, j, final_color);
 			}
 		}
 	}
+	
+	for (int y = 0; y < img.height; y++) {
+		for (int x = 0; x < img.width; x++) {
+			vec3 total = vec3(0);
+			int added = 0;
+			for (int i = -1; i <= 1; i++) {
+				for (int j = -1; j <= 1; j++) {
+					int ycoord = y + i;
+					int xcoord = x + j;
+					if (ycoord<0 || ycoord>img.height - 1 || xcoord <0 || xcoord> img.width - 1)
+						continue;
+					total += temp_image_buffer.at(ycoord * img.width + xcoord);
+					added++;
+
+				}
+
+			}
+			total /= added;
+			int offset = y * img.width + x;
+			assert(offset < l.numpts);
+			add_color(img.buffer_start, offset, total);
+		}
+	}
+	
 	
 	
 
