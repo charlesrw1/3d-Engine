@@ -21,6 +21,17 @@ int num_patches = 0;
 
 patch_t* face_patches[MAX_PATCHES];
 
+std::string* tex_strings;
+int num_tex_strings;
+
+#define MAX_FACES 0x10000
+facelight_t facelights[MAX_FACES];
+
+vec3 radiosity[MAX_PATCHES];
+vec3 illumination[MAX_PATCHES];
+
+neighbor_faces_t neighbors[MAX_FACES];
+
 std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
@@ -31,7 +42,8 @@ int lm_height = 1800;
 // 32 quake units = 1 my units
 float density_per_unit = 4.f;
 
-float patch_grid = 0.25f;
+float patch_grid = 0.01f;
+int num_bounces = 100;
 
 VertexArray va;
 
@@ -40,6 +52,10 @@ vec3 lerp(const vec3& a, const vec3& b, float percentage)
 	return a + (b - a) * percentage;
 }
 
+
+vec3 rgb_to_float(uint8 r, uint g, uint b) {
+	return vec3(r / 255.f, g / 255.f, b / 255.f);
+}
 
 vec3 random_color()
 {
@@ -124,6 +140,18 @@ void patch_for_face(int face_num)
 	p->area = max(p->area, 1.f);
 	p->center = p->winding.get_center();
 
+	texture_info_t* ti = tinfo + face->t_info_idx;
+	std::string* t_string = tex_strings + ti->t_index;
+	if (*t_string == "color/red") {
+		p->reflectance = rgb_to_float(237, 28, 36);
+	}
+	else if (*t_string == "color/green") {
+		p->reflectance = rgb_to_float(34,177,76);
+	}
+	else if (*t_string == "color/blue") {
+		p->reflectance = rgb_to_float(0, 128, 255);
+	}
+
 	p->next = nullptr;
 }
 
@@ -135,6 +163,7 @@ void make_patches()
 	}
 }
 static int failed_subdivide = 0;
+const float some_num = 20.f;
 void subdivide_patch(patch_t* p)
 {
 	vec3 min, max;
@@ -142,11 +171,11 @@ void subdivide_patch(patch_t* p)
 	get_extents(p->winding, min, max);
 	int i;
 	for (i = 0; i < 3; i++) {
-		if ((floor(((min[i]+1)*20.f))/20.f / patch_grid) < (ceil(((max[i] - 1)*20.f)/20.f) / patch_grid)+0.01f) {
+		if ((floor(((min[i]+1)* some_num))/ some_num / patch_grid) < (ceil(((max[i] - 1)* some_num)/ some_num) / patch_grid)+0.01f) {
 			plane_t split;
 			split.normal = vec3(0);
 			split.normal[i] = 1.f;
-			split.d = -(((floor((min[i] + 1) * 20.f) / 20.f) / patch_grid) + 1) * patch_grid;
+			split.d = -(((floor((min[i] + 1) * some_num) / some_num) / patch_grid) + 1) * patch_grid;
 			bool res = try_split_winding(p->winding, split, front, back);
 			if (res) {
 				break;
@@ -174,6 +203,8 @@ void subdivide_patch(patch_t* p)
 	p->area = p->winding.get_area();
 	new_p->area = new_p->winding.get_area();
 
+	new_p->reflectance = p->reflectance;
+
 	subdivide_patch(p);
 	subdivide_patch(new_p);
 
@@ -188,21 +219,158 @@ void subdivide_patches()
 }
 
 VertexArray patch_va;
-void create_patch_view()
+static PatchDebugMode cur_mode;
+
+void create_patch_view(PatchDebugMode mode)
 {
 	using VP = VertexP;
+	using PDM = PatchDebugMode;
 	patch_va.init(VAPrim::TRIANGLES);
 	for (int i = 0; i < num_patches; i++) {
 		patch_t* p = &patches[i];
 		winding_t* w = &p->winding;
-		vec3 color = random_color();
-		//color = max(color, vec3(0.15f));
+		vec3 color;
+		switch (mode)
+		{
+		case PDM::RANDOM:
+			color = random_color();
+			break;
+		case PDM::AREA:
+			color = vec3(p->area / (patch_grid*patch_grid*5.f));
+			break;
+		case PDM::LIGHTCOLOR:
+			color = p->sample_light;
+			break;
+		case PDM::NUMTRANSFERS:
+			color = vec3(p->num_transfers * 2.f / (num_patches));
+			break;
+		case PDM::RADCOLOR:
+			color = p->total_light;
+		}
 		for (int i = 0; i < w->num_verts-2; i++) {
 		//	patch_va.push_line(w->v[i], w->v[(i + 1)%w->num_verts], vec3(1.0));
 			patch_va.push_3(VP(w->v[0], color), VP(w->v[i + 1], color), VP(w->v[(i + 2) % w->num_verts],color));
 		}
 	}
 }
+void set_patch_debug(PatchDebugMode mode)
+{
+	if (cur_mode == mode)
+		return;
+	cur_mode = mode;
+	patch_va.clear();
+	create_patch_view(mode);
+}
+
+// RADIOSITY FUNCTIONS
+std::vector<float> transfers;	// work buffer
+void make_transfers(int patch_num)
+{
+	patch_t* patch = &patches[patch_num];
+	plane_t plane = faces[patch->face].plane;
+	const int i = patch_num;
+	float total = 0;
+	vec3 center_with_offset = patch->center + plane.normal * 0.01f;
+	patch->num_transfers = 0;
+	for (int j = 0; j < num_patches; j++)
+	{
+		transfers[j] = 0;
+
+		if (j == i) {
+			continue;
+		}
+		patch_t* other = &patches[j];
+		vec3 dir = normalize(other->center - patch->center);
+		float angi = dot(dir, plane.normal);
+		if (angi <= 0) {
+			continue;
+		}
+
+		plane_t* planej = &faces[other->face].plane;
+		auto res = global_world.tree.test_ray_fast(center_with_offset, other->center + planej->normal * 0.01f);
+		if (res.hit) {
+			continue;
+		}
+
+		float angj = -dot(dir, planej->normal);
+		float dist_sq = dot(other->center - patch->center, other->center - patch->center);
+		float factor = (angj * angi * other->area) / (dist_sq);
+		if (factor < 0) {
+			factor = 0;
+		}
+
+		if (factor > 0.00005) {
+			transfers[j] = factor;
+			total += factor;
+			patch->num_transfers++;
+		}
+	}
+	float final_total = 0;
+	if (patch->num_transfers > 0) {
+		patch->transfers = new transfer_t[patch->num_transfers];
+
+		int t_index = 0;
+		transfer_t* t = &patch->transfers[t_index++];
+		for (int i = 0; i < num_patches; i++) {
+			if (transfers[i] <= 0.00005) {
+				continue;
+			}
+			t->factor = transfers[i] / total;
+			t->patch_num = i;
+			final_total += t->factor;
+
+			t = &patch->transfers[t_index++];
+			assert(t_index <= patch->num_transfers+1);
+		}
+	}
+}
+void shoot_light(int patch_num)
+{
+	patch_t* p = &patches[patch_num];
+
+	vec3 send = radiosity[patch_num];
+
+	for (int i = 0; i < p->num_transfers; i++) {
+		transfer_t* t = p->transfers + i;
+		illumination[t->patch_num] += send * t->factor;
+	}
+}
+void collect_light()
+{
+	for (int i = 0; i < num_patches; i++) {
+
+		patch_t* p = patches + i;
+		p->total_light += illumination[i] / p->area;
+		radiosity[i] = illumination[i] * p->reflectance;
+		illumination[i] = vec3(0.f);
+	}
+}
+void start_radiosity()
+{
+	for (int i = 0; i < num_patches; i++)
+	{
+		patch_t* p = &patches[i];
+		radiosity[i] = p->sample_light * p->reflectance*p->area;
+	}
+	for (int i = 0; i < num_bounces; i++)
+	{
+		for (int j = 0; j < num_patches; j++) {
+			shoot_light(j);
+		}
+		collect_light();
+	}
+
+}
+
+
+void free_patches()
+{
+	for (int i = 0; i < num_patches; i++) {
+		delete[] patches[i].transfers;
+	}
+}
+
+
 
 const int MAP_PTS = 256 * 256;
 std::vector<vec3> points(MAP_PTS);
@@ -238,6 +406,33 @@ struct light_t
 std::vector<light_t> lights; //= { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } };// , { {-5.f,5.f,8.f},{0.1f,0.3f,1.0f} }, { {0,1,0},{1,1,1} }, { {0.f,10.f,0.f},{2.f,2.0f,2.0f} }, { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} }, { {0.f,5.f,0.f},{1.f,0.0f,0.0f} } };
 static u32 total_pixels = 0;
 static u32 total_rays_cast = 0;
+
+
+void add_sample_to_patch(vec3 point, vec3 color, int face_num)
+{
+	patch_t* patch = face_patches[face_num];
+	vec3 min, max;
+
+	while (patch)
+	{
+		get_extents(patch->winding, min, max);
+
+		for (int i = 0; i < 3; i++) {
+			if (min[i] > point[i] + 0.25) {
+				goto skip_patch;
+			}
+			if (max[i] < point[i] - 0.25) {
+				goto skip_patch;
+			}
+		}
+		patch->sample_light += color;
+		patch->num_samples++;
+
+	skip_patch:;
+		patch = patch->next;
+	}
+}
+
 // Lots of help from Quake's LTFACE.c 
 
 void calc_extents(LightmapState& l)
@@ -402,52 +597,61 @@ void light_face(int num)
 	}
 	*/
 	calc_points(l, img);
-	{
-		img.buffer_start = data_buffer.size();
-		make_space(img.height * img.width);
-		// ambient term
-		for (int i = 0; i < l.numpts; i++) {
-			temp_image_buffer[i] = vec3(0);
-			//add_color(img.buffer_start, i, vec3(0.05, 0.05, 0.05));
-		}
 
+	img.buffer_start = data_buffer.size();
+	make_space(img.height * img.width);
+	// ambient term
+	for (int i = 0; i < l.numpts; i++) {
+		temp_image_buffer[i] = vec3(0);
+		//add_color(img.buffer_start, i, vec3(0.05, 0.05, 0.05));
+	}
+
+	for (int j = 0; j < l.numpts; j++) {
 		for (int i = 0; i < lights.size(); i++) {
 			vec3 light_p = lights[i].pos;
 
-			float dist = l.face->plane.distance(light_p);
-			if (dist < 0) {
+			float plane_dist = l.face->plane.distance(light_p);
+			if (plane_dist < 0) {
 				continue;
 			}
 
-			for (int j = 0; j < l.numpts; j++) {
 
-				float sqrd_dist = dot(light_p - points[j], light_p - points[j]);
-				if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
-					continue;
-				}
-
-				total_rays_cast++;
-				trace_t res = global_world.tree.test_ray_fast(points[j], light_p);
-				if (res.hit) {
-					continue;
-				}
-				//va->append({ l.points[j],vec3(0,1,0) });
-
-				vec3 light_dir = light_p - points[j];
-				float dist = length(light_dir);
-				light_dir = normalize(light_dir);
-				float dif = dot(light_dir, l.face->plane.normal);
-				if (dif < 0) {
-					continue;
-				}
-
-				vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f);
-				temp_image_buffer[j] += final_color;
-				//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
-				//add_color(img.buffer_start, j, final_color);
+			float sqrd_dist = dot(light_p - points[j], light_p - points[j]);
+			if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
+				continue;
 			}
+
+			total_rays_cast++;
+			trace_t res = global_world.tree.test_ray_fast(points[j], light_p);
+			if (res.hit) {
+				continue;
+			}
+			//va->append({ l.points[j],vec3(0,1,0) });
+
+			vec3 light_dir = light_p - points[j];
+			float dist = length(light_dir);
+			light_dir = normalize(light_dir);
+			float dif = dot(light_dir, l.face->plane.normal);
+			if (dif < 0) {
+				continue;
+			}
+
+			vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f);
+			temp_image_buffer[j] += final_color;
+
+			//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
+			//add_color(img.buffer_start, j, final_color);
 		}
+		add_sample_to_patch(points[j], temp_image_buffer[j], num);
 	}
+
+	patch_t* patch = face_patches[num];
+	while (patch)
+	{
+		patch->sample_light /= patch->num_samples;
+		patch = patch->next;
+	}
+
 	
 	for (int y = 0; y < img.height; y++) {
 		for (int x = 0; x < img.width; x++) {
@@ -607,7 +811,8 @@ void mark_bad_faces()
 		middle /= f->v_count;
 		middle += f->plane.normal * 0.02f;
 
-		// A hacky way to check if a face is "outside" the playarea. There are some false positives, but no false negatives so it works alright
+		// A hacky way to check if a face is "outside" the playarea. 
+		// There are some false positives, but no false negatives so it works alright
 		total_rays_cast++;
 		trace_t check_outside_world = global_world.tree.test_ray_fast(middle, middle + f->plane.normal * 200.f);
 		if (!check_outside_world.hit) {
@@ -635,10 +840,19 @@ void create_light_map(worldmodel_t* wm)
 	tinfo = wm->t_info.data();
 	num_tinfo = wm->t_info.size();
 
+	tex_strings = wm->texture_names.data();
+	num_tex_strings = wm->texture_names.size();
+
 	add_lights(wm);
 
-	mark_bad_faces();
+	//mark_bad_faces();
 
+
+
+	make_patches();
+	subdivide_patches();
+	srand(234508956l);
+	srand(time(NULL));
 
 	u32 start_light_face = SDL_GetTicks();
 	printf("Lighting faces...\n");
@@ -649,6 +863,16 @@ void create_light_map(worldmodel_t* wm)
 	printf("Total pixels: %u\n", total_pixels);
 	printf("Total raycasts: %u\n", total_rays_cast);
 	printf("Face lighting time: %u\n", SDL_GetTicks() - start_light_face);
+
+	printf("Making transfers...\n");
+	transfers.resize(MAX_PATCHES);
+	for (int i = 0; i < num_patches; i++) {
+		make_transfers(i);
+	}
+	printf("Finished transfers\n");
+
+
+	start_radiosity();
 
 	final_lightmap.resize(lm_width * lm_height * 3, 0);
 	for (int i = 0; i < final_lightmap.size(); i += 3) {
@@ -691,15 +915,10 @@ void create_light_map(worldmodel_t* wm)
 
 	stbi_write_bmp("resources/textures/lightmap.bmp", lm_width, lm_height, 3, final_lightmap.data());
 	printf("Lightmap finished in %u ms\n", SDL_GetTicks() - start);
+	
+	cur_mode = PatchDebugMode::RADCOLOR;
+	create_patch_view(PatchDebugMode::RADCOLOR);
 
-
-
-
-	make_patches();
-	subdivide_patches();
-	srand(234508956l);
-	srand(time(NULL));
-	create_patch_view();
 }
 void draw_lightmap_debug()
 {

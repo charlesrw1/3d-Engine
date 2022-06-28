@@ -71,7 +71,7 @@ void App::create_scene()
 	
 	MapParser mp;
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/e1m1.map");
+	mp.start_file("resources/maps/gi_test.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
 	mp.add_to_worldmodel(&world);
@@ -170,11 +170,11 @@ void App::create_scene()
 	scene->sun.direction = normalize(-vec3(cos(azimuth) * sin(altidude), cos(altidude),sin(azimuth) * sin(altidude)));
 
 
-	Model* soldier = global_models.find_or_load("soldier/soldier.dae");
+	//Model* soldier = global_models.find_or_load("soldier/soldier.dae");
 	////load_model_assimp(soldier, "soldier/soldier.dae", false);
-	scene->objects.push_back(new GameObject(soldier));
-	scene->objects.back()->scale = vec3(0.03);
-	scene->objects.back()->position = vec3(1, 0, 0);
+	//scene->objects.push_back(new GameObject(soldier));
+	//scene->objects.back()->scale = vec3(0.03);
+	//scene->objects.back()->position = vec3(1, 0, 0);
 
 //	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
 	//Model* sponza = global_models.find_or_load("sponza/sponza.obj");
