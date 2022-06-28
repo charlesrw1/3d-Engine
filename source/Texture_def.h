@@ -43,6 +43,9 @@ public:
 
 	ivec2 get_dimensions() const { return ivec2(width, height); }
 
+	int get_params() const {
+		return params;
+	}
 private:
 	// OpenGL calls, thread unsafe
 	void internal_init(u8* data);
@@ -57,7 +60,6 @@ private:
 
 	// OpenGL specific
 	u32 ID{};
-
 };
 
 #endif // !TEXTUREDEF_H

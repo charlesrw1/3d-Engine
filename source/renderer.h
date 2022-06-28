@@ -13,10 +13,9 @@ struct View
 	int x = 0, y = 0;
 	int width = 1600, height = 900;
 
-	bool orthographic = false;
 	float fov_y = 45;
 
-	float znear=0.1f, zfar=100.f;
+	float znear=0.1f, zfar=200.f;
 };
 
 class Texture;
@@ -90,10 +89,11 @@ public:
 	bool d_world = true;
 	bool d_world_face_edges = false;
 	bool d_lightmap_debug = true;
-	bool d_lightmap_patches = true;
+	bool d_lightmap_patches = false;
 	bool d_trace_hits = true;
 	bool d_trace_boxes = true;
-	bool d_tree_nodes = true;
+	bool d_tree_nodes = false;
+	bool lightmap_nearest = true;
 
 	struct ShadowMapProjection
 	{
@@ -115,16 +115,14 @@ public:
 
 	VertexArray basic_sphere;
 
-	bool render_lightmap = true;
-
 	bool bloom_debug = false;
 	bool show_bright_pass = false;
 	int sample_num=0;
 	bool down_sample=true;
 	bool first_blur_pass=false;
 
-
-	Texture* lightmap_tex;
+	Texture* lightmap_tex_nearest;
+	Texture* lightmap_tex_linear;
 private:
 	
 	void lightmap_geo();

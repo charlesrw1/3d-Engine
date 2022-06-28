@@ -14,12 +14,12 @@ int num_verts;
 
 texture_info_t* tinfo;
 int num_tinfo;
+#define MAX_PATCHES 0x10000
 
-
-patch_t patches[0x1000];
+patch_t patches[MAX_PATCHES];
 int num_patches = 0;
 
-patch_t* face_patches[0x1000];
+patch_t* face_patches[MAX_PATCHES];
 
 std::vector<u8> data_buffer;
 
@@ -158,7 +158,7 @@ void subdivide_patch(patch_t* p)
 		return;
 	}
 
-	assert(num_patches < 0x1000);
+	assert(num_patches < MAX_PATCHES);
 	patch_t* new_p = &patches[num_patches++];
 
 	new_p->next = p->next;
@@ -391,7 +391,7 @@ void light_face(int num)
 
 	calc_vectors(l);
 	calc_extents(l);
-
+	/*
 	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.02f;
 	trace_t test_if_outside_map = global_world.tree.test_ray_fast(face_mid, face_mid + l.face->plane.normal * 100.f);
 	total_rays_cast++;
@@ -400,6 +400,7 @@ void light_face(int num)
 		l.face->dont_draw = true;
 		return;
 	}
+	*/
 	calc_points(l, img);
 	{
 		img.buffer_start = data_buffer.size();
@@ -458,6 +459,7 @@ void light_face(int num)
 					int xcoord = x + j;
 					if (ycoord<0 || ycoord>img.height - 1 || xcoord <0 || xcoord> img.width - 1)
 						continue;
+
 					total += temp_image_buffer.at(ycoord * img.width + xcoord);
 					added++;
 
@@ -593,6 +595,27 @@ void add_lights(worldmodel_t* wm)
 
 	}
 }
+void mark_bad_faces()
+{
+	const brush_model_t* bm = &world->models[0];
+	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
+		face_t* f = &faces[i];
+		vec3 middle = vec3(0.f);
+		for (int v = 0; v < f->v_count; v++) {
+			middle += verts[f->v_start+v];
+		}
+		middle /= f->v_count;
+		middle += f->plane.normal * 0.02f;
+
+		// A hacky way to check if a face is "outside" the playarea. There are some false positives, but no false negatives so it works alright
+		total_rays_cast++;
+		trace_t check_outside_world = global_world.tree.test_ray_fast(middle, middle + f->plane.normal * 200.f);
+		if (!check_outside_world.hit) {
+			f->dont_draw = true;
+		}
+
+	}
+}
 
 #include <algorithm>
 void create_light_map(worldmodel_t* wm)
@@ -601,6 +624,7 @@ void create_light_map(worldmodel_t* wm)
 	u32 start = SDL_GetTicks();
 	printf("Starting lightmap...\n");
 	va.init(VertexArray::Primitive::LINES);
+
 
 	faces = wm->faces.data();
 	num_faces = wm->faces.size();
@@ -613,6 +637,7 @@ void create_light_map(worldmodel_t* wm)
 
 	add_lights(wm);
 
+	mark_bad_faces();
 
 
 	u32 start_light_face = SDL_GetTicks();

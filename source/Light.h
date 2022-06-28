@@ -28,7 +28,16 @@ struct patch_t
 
 	vec3 reflectance;
 
+	vec3 sample_light = vec3(0);
+	int num_samples = 0;
+
 	patch_t* next = nullptr;
+};
+
+struct facelight_t
+{
+	int num_samples = 0;
+	vec3* points = nullptr;
 };
 
 

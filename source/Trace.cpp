@@ -246,7 +246,7 @@ trace_t BSPtree::test_ray_fast(vec3 start, vec3 end)
 
 	while (1)
 	{
-		node = &fast_list.at(node_n);
+		node = &fast_list[node_n];
 		while (ISLEAF(node->data1)) {
 			r.origin = front;
 			r.length = length(back - front) + 0.01f;
@@ -421,24 +421,18 @@ void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& t
 	int count = node.data2;
 	int offset = LEAF_OFFSET(node.data1);
 	assert(count >= 0);
-	//const leaf_t* leaf;
 
 	for (int i = offset; i <offset + count; i++) {
-		//leaf = &leaves.at(i);
-		const face_t& f = geo->faces.at(face_index.at(i));//leaf->face_index);
-
+		const face_t& f = geo->faces.at(face_index.at(i));
 
 		float denom = dot(f.plane.normal, r.dir);
-		// backface
-		//if (denom > -0.1f) {
-		//	continue;
-		//}
+
 		if (abs(denom) < 0.01f) {
 			continue;
 		}
 		float t = -(dot(f.plane.normal, r.origin) + f.plane.d) / denom;
 
-		if (t < 0) {
+		if (t < -0.005) {
 			continue;
 		}
 		if (t > r.length) {
@@ -446,11 +440,11 @@ void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& t
 		}
 		// point on the plane
 		vec3 point = r.origin + r.dir * t;
-		int v_count = f.v_count;// f.v_end - f.v_start;
+		int v_count = f.v_count;
 		bool hit = true;
 		for (int i = 0; i < v_count; i++) {
-			vec3 v = point - geo->verts.at(f.v_start + i);
-			vec3 c = cross(geo->verts.at(f.v_start + (i + 1) % v_count) - geo->verts.at(f.v_start + i), v);
+			vec3 v = point - geo->verts[f.v_start + i];
+			vec3 c = cross(geo->verts[f.v_start + (i + 1) % v_count]- geo->verts[f.v_start + i], v);
 			float angle = dot(-f.plane.normal, c);
 			if (angle < -0.005f) {
 				// point is outside the edges of the polygon

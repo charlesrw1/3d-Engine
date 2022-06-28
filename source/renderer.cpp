@@ -73,7 +73,7 @@ void Renderer::render_scene(SceneData& scene)
 	projection_matrix = get_projection_matrix(), view_matrix = scene.active_camera()->view_matrix;
 	
 
-	if (!render_lightmap) {
+	if (!d_world) {
 		// Directional light pass + ambient
 		directional_shadows.use();
 		directional_shadows.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix).set_vec3("light.direction", scene.sun.direction)
@@ -104,12 +104,6 @@ void Renderer::render_scene(SceneData& scene)
 	//glDisable(GL_CULL_FACE);
 	glFrontFace(GL_CW);
 	primitive_debug_pass();
-	//scene.map_geo.draw_array();
-	//scene.map_geo_edges.draw_array();
-	//bounding_sphere_pass(scene);
-	glDisable(GL_DEPTH_TEST);
-	global_world.draw_trace_hits();
-	glEnable(GL_DEPTH_TEST);
 	glFrontFace(GL_CCW);
 	
 	//glEnable(GL_CULL_FACE);
@@ -508,8 +502,12 @@ void Renderer::lightmap_geo()
 	lightmap.use();
 	lightmap.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix)
 		.set_int("baseTex", 0).set_int("lightmap", 1).set_mat4("u_model",mat4(1));
-
-	lightmap_tex->bind(1);
+	if (lightmap_nearest) {
+	lightmap_tex_nearest->bind(1);
+	}
+	else {
+	lightmap_tex_linear->bind(1);
+	}
 	 Model* m = global_world.get_model();
 	for (int i = 0; i < m->num_meshes(); i++) {
 

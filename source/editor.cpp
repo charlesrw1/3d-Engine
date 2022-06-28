@@ -22,6 +22,7 @@ Editor::Editor()
 #define R_BOOLEAN_IMGUI(str, var) 	if (ImGui::RadioButton(str, r->var)) { \
 r->var = !r->var; \
 }
+
 void Editor::on_render()
 {
 	ImGui_ImplSDL2_NewFrame();
@@ -30,10 +31,7 @@ void Editor::on_render()
 	ImGui::ShowDemoWindow();
 
 
-	ImGui::Begin("ENVIORNMENT");
-	
-	ImGui::ColorEdit3("Sun Diffuse Light: ", &global_app.scene->sun.diffuse.x);
-
+	ImGui::Begin("Editor");
 
 	ImGui::BeginChild("RENDERER");
 	if (ImGui::Button("Reload Gamma/Tonemap shader")) {
@@ -43,9 +41,6 @@ void Editor::on_render()
 	if (ImGui::Button("Reload Directional shader")) {
 		// Temporary, should delete shader
 		global_app.r->directional_shadows = Shader("directional_shadows_v.txt", "directional_shadows_f.txt");
-	}
-	if (ImGui::RadioButton("Render lightmap", global_app.r->render_lightmap)) {
-		global_app.r->render_lightmap = !global_app.r->render_lightmap;
 	}
 	if (ImGui::RadioButton("Bloom debug", global_app.r->bloom_debug)) {
 		global_app.r->bloom_debug = !global_app.r->bloom_debug;
@@ -69,7 +64,7 @@ void Editor::on_render()
 	R_BOOLEAN_IMGUI("d_trace_hits", d_trace_hits);
 	R_BOOLEAN_IMGUI("d_lightmap_patches", d_lightmap_patches);
 	R_BOOLEAN_IMGUI("d_lightmap_debug", d_lightmap_debug);
-
+	R_BOOLEAN_IMGUI("lightmap_nearest", lightmap_nearest);
 
 
 	ImGui::DragFloat3("camera_pos: ", (float*)&global_app.scene->active_camera()->position, 0.1);
@@ -262,6 +257,18 @@ void Editor::on_update()
 	//shoot_ray();
 }
 #include <chrono>
+void print_out_area(int face_num)
+{
+	const worldmodel_t* world = global_world.wm;
+	assert(face_num < world->faces.size());
+	const face_t* face = &world->faces[face_num];
+	winding_t winding;
+	for (int i = 0; i < face->v_count; i++) {
+		winding.add_vert(world->verts[face->v_start + i]);
+	}
+	std::cout << "Face area: " << winding.get_area() << '\n';
+}
+
 void Editor::shoot_ray()
 {
 	ray_t ray;
@@ -307,6 +314,10 @@ void Editor::shoot_ray()
 			<< "	Pos: " << result.end_pos.x << ' ' << result.end_pos.y << ' ' << result.end_pos.z << '\n'
 			<< "	Length: " << result.length << '\n'
 			<< "	Origin: " << result.start.x << ' ' << result.start.y << ' ' << result.start.z << '\n';
+		if (result.hit) {
+			print_out_area(result.face);
+		}
+		
 		//world_hits.push_back(result);
 	}
 }
