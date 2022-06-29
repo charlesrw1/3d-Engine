@@ -86,10 +86,10 @@ public:
 
 	View view;
 
-	bool d_world = false;
+	bool d_world = true;
 	bool d_world_face_edges = false;
-	bool d_lightmap_debug = true;
-	bool d_lightmap_patches = true;
+	bool d_lightmap_debug = false;
+	bool d_lightmap_patches = false;
 	bool d_trace_hits = true;
 	bool d_trace_boxes = true;
 	bool d_tree_nodes = false;

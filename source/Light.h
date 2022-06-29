@@ -35,7 +35,7 @@ struct patch_t
 	int face;
 	float area = 0;
 
-	vec3 reflectance=vec3(0.8);
+	vec3 reflectance=vec3(0.7);
 
 	vec3 sample_light = vec3(0);
 	int num_samples = 0;
@@ -44,19 +44,6 @@ struct patch_t
 
 	patch_t* next = nullptr;
 };
-
-struct facelight_t
-{
-	int num_points = 0;
-	int point_offset = 0;
-};
-#define MAX_NEIGHBORS 8
-struct neighbor_faces_t
-{
-	int neighbors[MAX_NEIGHBORS];
-	int num_neighbors;
-};
-
 
 
 int light_main(int argc, char** argv);

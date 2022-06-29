@@ -24,28 +24,40 @@ patch_t* face_patches[MAX_PATCHES];
 std::string* tex_strings;
 int num_tex_strings;
 
-#define MAX_FACES 0x10000
-facelight_t facelights[MAX_FACES];
+#include <map>
+
+struct facelight_t
+{
+	int num_points = 0;
+	vec3* sample_points = nullptr;
+
+	int num_pixels = 0;
+	vec3* pixel_colors = nullptr;
+
+	int width=0, height = 0;
+};
+
+facelight_t facelights[0x10000];
 
 vec3 radiosity[MAX_PATCHES];
 vec3 illumination[MAX_PATCHES];
 
-neighbor_faces_t neighbors[MAX_FACES];
 
 std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
 
-int lm_width = 1500;
-int lm_height = 1500;
+int lm_width = 1024;
+int lm_height = 1024;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
 float density_per_unit = 4.f;
 
-float patch_grid = 1.f;
-int num_bounces = 50;
+float patch_grid = 1.0f;
+int num_bounces = 100;
 
 VertexArray va;
+VertexArray point_array;
 
 vec3 lerp(const vec3& a, const vec3& b, float percentage)
 {
@@ -114,7 +126,7 @@ struct triangle_t
 {
 	triedge_t* edges[3] = { nullptr,nullptr,nullptr };
 };
-#define MAX_TRI_POINTS 500
+#define MAX_TRI_POINTS 2048
 #define MAX_TRI_EDGES (MAX_TRI_POINTS*6)
 #define MAX_TRI_TRIS (MAX_TRI_POINTS*2)
 // shamelessly stolen from Quake 2...
@@ -123,6 +135,8 @@ struct triangulation_t
 	triangulation_t() {
 		memset(patch_points, 0, sizeof(patch_points));
 		memset(edge_matrix, 0, sizeof(edge_matrix));
+		memset(used_points, 0, sizeof(used_points));
+
 	}
 	int num_points = 0;
 	int num_edges = 0;
@@ -130,6 +144,7 @@ struct triangulation_t
 
 	const face_t* face = nullptr;
 	patch_t* patch_points[MAX_TRI_POINTS];
+	bool used_points[MAX_TRI_POINTS];
 	triedge_t edges[MAX_TRI_EDGES];
 	triangle_t tries[MAX_TRI_TRIS];
 
@@ -155,6 +170,9 @@ struct triangulation_t
 				best = ang;
 				best_point = i;
 			}
+		}
+		if (best > 0.9) {
+			return;
 		}
 		if (best_point == -1) {
 			return;
@@ -241,6 +259,8 @@ struct triangulation_t
 		edge_matrix[p1][p0] = be;
 
 		va.push_line(patch_points[p0]->center, patch_points[p1]->center, color);
+		used_points[p0] = true;
+		used_points[p1] = true;
 
 		return e;
 	}
@@ -629,10 +649,9 @@ void free_patches()
 }
 
 
-
 const int MAP_PTS = 256 * 256;
-std::vector<vec3> points(MAP_PTS);
-std::vector<vec3> temp_image_buffer(MAP_PTS);
+//std::vector<vec3> points(MAP_PTS);
+//std::vector<vec3> temp_image_buffer(MAP_PTS);
 struct LightmapState
 {
 	//std::vector<vec3> points;
@@ -651,6 +670,8 @@ struct LightmapState
 	float exact_min[2];
 	float exact_max[2];
 
+	facelight_t* fl;
+
 	int surf_num = 0;
 	face_t* face = nullptr;
 };
@@ -664,6 +685,57 @@ struct light_t
 std::vector<light_t> lights; //= { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } };// , { {-5.f,5.f,8.f},{0.1f,0.3f,1.0f} }, { {0,1,0},{1,1,1} }, { {0.f,10.f,0.f},{2.f,2.0f,2.0f} }, { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} }, { {0.f,5.f,0.f},{1.f,0.0f,0.0f} } };
 static u32 total_pixels = 0;
 static u32 total_rays_cast = 0;
+
+struct planeneighbor_t
+{
+	planeneighbor_t* next=nullptr;
+	int face=0;
+};
+static int num_planes = 0;
+planeneighbor_t planes[MAX_PATCHES];
+int index_to_plane_list[MAX_PATCHES];
+static int num_unique_planes = 0;
+bool plane_equals(plane_t& p1, plane_t& p2)
+{
+	return (fabs(p1.d - p2.d) < 0.001f) 
+		&& (fabs(p1.normal.x - p2.normal.x) < 0.001f) 
+		&& (fabs(p1.normal.y - p2.normal.y) < 0.001f) 
+		&& (fabs(p1.normal.z - p2.normal.z) < 0.001f);
+}
+void find_coplanar_faces()
+{
+	printf("Finding coplanar faces...\n");
+	memset(index_to_plane_list, -1, sizeof(index_to_plane_list));
+	for (int i = 0; i < num_faces; i++) {
+		if (index_to_plane_list[i] != -1)
+			continue;
+		face_t* f = &faces[i];
+		planeneighbor_t* p = &planes[num_planes];
+		planeneighbor_t* last_p = p;
+		p->face = i;
+		int plane_index = num_planes;
+		index_to_plane_list[i] = plane_index;
+		num_planes++;
+		num_unique_planes++;
+		for (int j = i+1; j < num_faces; j++) {
+			if (index_to_plane_list[j] != -1)
+				continue;
+			face_t* of = &faces[j];
+
+			if (!plane_equals(f->plane, of->plane))
+				continue;
+			
+			planeneighbor_t* opn = &planes[num_planes++];
+
+			last_p->next = opn;
+			last_p = opn;
+			opn->face = j;
+
+			index_to_plane_list[j] = plane_index;
+		}
+	}
+	printf("Num unique planes: %d\n", num_unique_planes);
+}
 
 
 void add_sample_to_patch(vec3 point, vec3 color, int face_num)
@@ -748,7 +820,19 @@ void calc_points(LightmapState& l, Image& img)
 	float start_u = l.exact_min[0];	// added -0.25
 	float start_v = l.exact_min[1];
 	l.numpts = h * w;
+	if (l.numpts > MAP_PTS) {
+		l.numpts = MAP_PTS;
+	}
 	total_pixels += l.numpts;
+
+	l.fl->height = h;
+	l.fl->width = w;
+
+	l.fl->pixel_colors = new vec3[l.numpts];
+	l.fl->sample_points = new vec3[l.numpts];
+
+	l.fl->num_pixels = l.numpts;
+	l.fl->num_points = l.numpts;
 
 	img.height = h;
 	img.width = w;
@@ -783,10 +867,11 @@ void calc_points(LightmapState& l, Image& img)
 			if (top_point >= MAP_PTS) {
 				l.numpts = MAP_PTS - 1;
 				img.height = y - 1;
+				l.fl->height = y - 1;
 				goto face_too_big;
 			}
 			assert(top_point < MAP_PTS);
-			points[top_point++] = point;
+			l.fl->sample_points[top_point++] = point;
 		}
 	}
 face_too_big:;
@@ -839,7 +924,7 @@ void light_face(int num)
 	assert(num < num_faces);
 	l.face = &faces[num];
 	l.surf_num = num;
-
+	l.fl = &facelights[num];
 	img.face_num = num;
 
 	calc_vectors(l);
@@ -856,11 +941,12 @@ void light_face(int num)
 	*/
 	calc_points(l, img);
 
-	img.buffer_start = data_buffer.size();
-	make_space(img.height * img.width);
+	//img.buffer_start = data_buffer.size();
+	//make_space(img.height * img.width);
 	// ambient term
+
 	for (int i = 0; i < l.numpts; i++) {
-		temp_image_buffer[i] = vec3(0);
+		l.fl->pixel_colors[i] = vec3(0);
 		//add_color(img.buffer_start, i, vec3(0.05, 0.05, 0.05));
 	}
 
@@ -874,19 +960,19 @@ void light_face(int num)
 			}
 
 
-			float sqrd_dist = dot(light_p - points[j], light_p - points[j]);
+			float sqrd_dist = dot(light_p - l.fl->sample_points[j], light_p - l.fl->sample_points[j]);
 			if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
 				continue;
 			}
 
 			total_rays_cast++;
-			trace_t res = global_world.tree.test_ray_fast(points[j], light_p);
+			trace_t res = global_world.tree.test_ray_fast(l.fl->sample_points[j], light_p);
 			if (res.hit) {
 				continue;
 			}
 			//va->append({ l.points[j],vec3(0,1,0) });
 
-			vec3 light_dir = light_p - points[j];
+			vec3 light_dir = light_p - l.fl->sample_points[j];
 			float dist = length(light_dir);
 			light_dir = normalize(light_dir);
 			float dif = dot(light_dir, l.face->plane.normal);
@@ -895,12 +981,12 @@ void light_face(int num)
 			}
 
 			vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f);
-			temp_image_buffer[j] += final_color;
+			l.fl->pixel_colors[j] += final_color;
 
 			//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
 			//add_color(img.buffer_start, j, final_color);
 		}
-		add_sample_to_patch(points[j], temp_image_buffer[j], num);
+		add_sample_to_patch(l.fl->sample_points[j], l.fl->pixel_colors[j], num);
 	}
 
 	patch_t* patch = face_patches[num];
@@ -910,7 +996,7 @@ void light_face(int num)
 		patch = patch->next;
 	}
 
-	
+	/*
 	for (int y = 0; y < img.height; y++) {
 		for (int x = 0; x < img.width; x++) {
 			vec3 total = vec3(0);
@@ -934,12 +1020,78 @@ void light_face(int num)
 			add_color(img.buffer_start, offset, total);
 		}
 	}
-	
+	*/
 	
 	
 
-	images.push_back(img);
+	//images.push_back(img);
 }
+
+void final_light_face(int face_num)
+{
+	face_t* face = &faces[face_num];
+	facelight_t* fl = &facelights[face_num];
+	Image img;
+	img.face_num = face_num;
+	img.height = fl->height;
+	img.width = fl->width;
+	img.buffer_start = data_buffer.size();
+	make_space(img.height * img.width);
+
+	triangulation_t* t = new triangulation_t;
+	t->color = random_color();
+	t->face =face;
+	patch_t* p = face_patches[face_num];
+	while (p)
+	{
+		t->add_point(p);
+		p = p->next;
+	}
+
+	t->triangulate_points();
+
+	for (int i = 0; i < fl->num_points; i++) {
+
+		vec3 sample_point = fl->sample_points[i];
+		vec3 gi_color;
+		t->sample(sample_point, gi_color);
+
+		fl->pixel_colors[i] += gi_color;
+	}
+
+	for (int y = 0; y < img.height; y++) {
+		for (int x = 0; x < img.width; x++) {
+			vec3 total = vec3(0);
+			int added = 0;
+			for (int i = -1; i <= 1; i++) {
+				for (int j = -1; j <= 1; j++) {
+					int ycoord = y + i;
+					int xcoord = x + j;
+					if (ycoord<0 || ycoord>img.height - 1 || xcoord <0 || xcoord> img.width - 1)
+						continue;
+
+					total += fl->pixel_colors[ycoord * img.width + xcoord];
+					added++;
+				}
+			}
+			total /= added;
+			int offset = y * img.width + x;
+			//assert(offset < l.numpts);
+			add_color(img.buffer_start, offset, total);
+		}
+	}
+
+
+
+	images.push_back(img);
+
+
+
+	delete[] fl->pixel_colors;
+	delete[] fl->sample_points;
+	delete t;
+}
+
 
 PackNode* insert_imgage(PackNode* pn, const Image* img)
 {
@@ -1095,9 +1247,17 @@ void temp_check_triangulation()
 
 		t->triangulate_points();
 
+		for (int j = 0; j < t->num_points; j++) {
+			if (!t->used_points[j]) {
+				point_array.append(VertexP(t->patch_points[j]->center, t->color));
+			}
+		}
+
 		delete t;
 	}
 }
+
+
 
 #include <algorithm>
 void create_light_map(worldmodel_t* wm)
@@ -1106,6 +1266,7 @@ void create_light_map(worldmodel_t* wm)
 	u32 start = SDL_GetTicks();
 	printf("Starting lightmap...\n");
 	va.init(VertexArray::Primitive::LINES);
+	point_array.init(VertexArray::Primitive::POINTS);
 
 
 	faces = wm->faces.data();
@@ -1124,7 +1285,7 @@ void create_light_map(worldmodel_t* wm)
 
 	mark_bad_faces();
 
-
+	//find_coplanar_faces();
 
 	make_patches();
 	subdivide_patches();
@@ -1152,6 +1313,11 @@ void create_light_map(worldmodel_t* wm)
 
 
 	start_radiosity();
+
+	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
+		final_light_face(i);
+	}
+
 
 	final_lightmap.resize(lm_width * lm_height * 3, 0);
 	for (int i = 0; i < final_lightmap.size(); i += 3) {
@@ -1198,13 +1364,16 @@ void create_light_map(worldmodel_t* wm)
 	cur_mode = PatchDebugMode::RADCOLOR;
 	create_patch_view(PatchDebugMode::RADCOLOR);
 
-	temp_check_triangulation();
+	//temp_check_triangulation();
 
 	free_patches();
 }
+#include "glad/glad.h"
 void draw_lightmap_debug()
 {
 	va.draw_array();
+	glPointSize(4);
+	point_array.draw_array();
 	
 }
 void draw_lightmap_patches()
