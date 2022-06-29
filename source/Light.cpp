@@ -114,7 +114,7 @@ struct triangle_t
 {
 	triedge_t* edges[3] = { nullptr,nullptr,nullptr };
 };
-#define MAX_TRI_POINTS 100
+#define MAX_TRI_POINTS 500
 #define MAX_TRI_EDGES (MAX_TRI_POINTS*6)
 #define MAX_TRI_TRIS (MAX_TRI_POINTS*2)
 // shamelessly stolen from Quake 2...
@@ -135,7 +135,8 @@ struct triangulation_t
 
 	triedge_t* edge_matrix[MAX_TRI_POINTS][MAX_TRI_POINTS];
 
-	triedge_t* find_edge(int p0, int p1);
+	vec3 color;
+
 	void triedge_r(triedge_t* e) {
 		if (e->tri)
 			return;
@@ -239,7 +240,86 @@ struct triangulation_t
 		be->plane.d = -dist;
 		edge_matrix[p1][p0] = be;
 
+		va.push_line(patch_points[p0]->center, patch_points[p1]->center, color);
+
 		return e;
+	}
+	void triangulate_points()
+	{
+		if (num_points <= 1)
+			return;
+		float best_dist = 1000;
+		int b1, b2;
+		for (int i = 0; i < num_points; i++) {
+			vec3 point1 = patch_points[i]->center;
+			for (int j = i + 1; j < num_points; j++) {
+				vec3 point2 = patch_points[j]->center;
+				float dist = length(point2 - point1);
+				if (dist < best_dist) {
+					b1 = i;
+					b2 = j;
+					best_dist = dist;
+				}
+			}
+		}
+		triedge_t* e = find_edge(b1, b2);
+		triedge_t* e2 = find_edge(b2, b1);
+		triedge_r(e);
+		triedge_r(e2);
+	}
+	void sample(vec3 point, vec3& color)
+	{
+		if (num_points == 0) {
+			color = vec3(0);
+			return;
+		}
+		if (num_points == 1) {
+			color = patch_points[0]->total_light;
+			return;
+		}
+		for (int i = 0; i < num_tris; i++) {
+			triangle_t* tri = &tries[i];
+			if (!point_in_tri(point, tri))
+				continue;
+			lerp_tri(tri, point, color);
+		}
+		for (int i = 0; i < num_edges; i++) {
+			triedge_t* te = &edges[i];
+			if (te->tri)
+				continue;
+			if (te->plane.dist(point) < 0)
+				continue;
+			vec3 p0 = patch_points[te->p0]->center;
+			vec3 p1 = patch_points[te->p1]->center;
+
+			vec3 v1 = normalize(p1 - p0);
+			vec3 v2 = point - p0;
+			float d = dot(v2, v1);
+			if (d < 0)
+				continue;
+			if (d > 1)
+				continue;
+			patch_t* pp0 = patch_points[te->p0];
+			patch_t* pp1 = patch_points[te->p1];
+			color = pp0->total_light + d * (pp1->total_light - pp0->total_light);
+
+		}
+		float best_d = 10000;
+		patch_t* best_p = nullptr;
+		for (int i = 0; i < num_points; i++) {
+			vec3 p0 = patch_points[i]->center;
+			float dist = length(point - p0);
+			if (dist < best_d)
+			{
+				best_d = dist;
+				best_p = patch_points[i];
+			}
+		}
+		if (!best_p) {
+			printf("Triangulation with no points\n");
+			exit(1);
+		}
+		color = best_p->total_light;
 	}
 
 };
@@ -999,6 +1079,25 @@ void mark_bad_faces()
 
 	}
 }
+void temp_check_triangulation()
+{
+	for (int i = 0; i < num_faces; i++)
+	{
+		triangulation_t* t = new triangulation_t;
+		t->color = random_color();
+		t->face = &faces[i];
+		patch_t* p = face_patches[i];
+		while (p)
+		{
+			t->add_point(p);
+			p = p->next;
+		}
+
+		t->triangulate_points();
+
+		delete t;
+	}
+}
 
 #include <algorithm>
 void create_light_map(worldmodel_t* wm)
@@ -1098,6 +1197,8 @@ void create_light_map(worldmodel_t* wm)
 	
 	cur_mode = PatchDebugMode::RADCOLOR;
 	create_patch_view(PatchDebugMode::RADCOLOR);
+
+	temp_check_triangulation();
 
 	free_patches();
 }
