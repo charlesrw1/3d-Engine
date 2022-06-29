@@ -11,6 +11,8 @@
 #include "app.h"
 #include "renderer.h"
 
+
+
 int main(int argc, char* argv[])
 {
 	App& app = global_app;

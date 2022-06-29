@@ -192,3 +192,34 @@ vec3 winding_t::get_center() const
 	center /= num_verts;
 	return center;
 }
+bool to_barycentric(vec3 p1, vec3 p2, vec3 p3, vec3 point, float& u, float& v, float& w)
+{
+	vec3 e1 = p2 - p1;
+	vec3 e2 = p3 - p1;
+	vec3 N = cross(e1, e2);
+	float area = length(N) / 2.f;
+
+	e1 = p2 - p1;
+	e2 = point - p1;
+	vec3 c = cross(e1, e2);
+	if (dot(c, N) < 0)
+		return false;
+
+	e1 = p3 - p2;
+	e2 = point - p2;
+	c = cross(e1, e2);
+	if (dot(c, N) < 0)
+		return false;
+	u = (length(c) / 2.f) / area;
+
+	e1 = p1 - p3;
+	e2 = point - p3;
+	c = cross(e1, e2);
+	if (dot(c, N) < 0)
+		return false;
+	v = (length(cross(e1, e2)) / 2.f) / area;
+
+	w = 1 - u - v;
+
+	return true;
+}

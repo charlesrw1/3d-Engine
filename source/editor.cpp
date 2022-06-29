@@ -201,8 +201,6 @@ void Editor::on_render()
 	//global_world.tree.find_leaf(global_app.scene->active_camera()->position, min, max);
 	//global_app.r->debug_box(min, max, vec3(0, 0, 1));
 
-
-
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
@@ -223,6 +221,9 @@ void Editor::handle_event(SDL_Event& event)
 				break;
 			case SDLK_SPACE:
 				shoot_ray();
+				break;
+			case SDLK_q:
+				global_app.scene->active_camera()->toggle_scroll_state();
 				break;
 			}
 			break;

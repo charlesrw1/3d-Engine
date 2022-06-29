@@ -19,7 +19,7 @@ Camera::Camera()
 	znear = 0.1;
 	zfar = 100;
 	target_distance = 1;
-	move_speed = rot_speed = 1;
+	move_speed = rot_speed = 0.1f;
 	free_cam = true;
 	target_lock = false;
 
@@ -34,7 +34,7 @@ Camera::Camera()
 }
 void Camera::keyboard_update(const uint8_t* keys)
 {
-	float camera_speed = 0.1;
+	float camera_speed = move_speed;
 	if (free_cam) {
 		if (keys[SDL_SCANCODE_W])
 			position += camera_speed * front;
@@ -104,8 +104,13 @@ void Camera::update_vectors()
 void Camera::scroll_wheel_update(int amt)
 {
 	if (free_cam) {
-		fov -= amt * 2;
-		global_app.r->set_fov(fov);
+		if (scroll_for_fov) {
+			fov -= amt * 2;
+			global_app.r->set_fov(fov);
+		}
+		else {
+			move_speed += amt/10.f;
+		}
 	}
 	else {
 		target_distance -= amt;

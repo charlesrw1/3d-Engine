@@ -204,7 +204,7 @@ void MapParser::parse_file()
 		}
 		else if (r == R_FAIL) {
 			std::cout << "Aborting!\n";
-			return;
+			exit(1);
 		}
 	}
 	// Finds verticies that belong to each face
@@ -608,6 +608,14 @@ MapParser::Result MapParser::read_str(bool in_quotes)
 }
 void MapParser::post_process_pass()
 {
+	int skip_idx = -1;
+	for (int i = 0; i < textures.size(); i++) {
+		if (textures[i] == "tools/skip") {
+			skip_idx = i;
+			break;
+		}
+	}
+	
 	for (int i = 0; i < vertex_list.size(); i++) {
 		auto& v = vertex_list.at(i);
 		v /= 32.f;
@@ -619,12 +627,18 @@ void MapParser::post_process_pass()
 			ti.axis[j] = vec3(-ti.axis[j].x, ti.axis[j].z, ti.axis[j].y);
 		}
 	}
+
+	texture_info_t* ti;
 	for (int i = 0; i < face_list.size(); i++) {
 		auto& f = face_list.at(i);
-		f.plane.normal = vec3(-f.plane.normal.x, f.plane.normal.z, f.plane.normal.y);
-		f.plane.init(vertex_list.at(f.v_start), vertex_list.at(f.v_start + 1), vertex_list.at(f.v_start + 2));
-		f.plane.normal *= -1.f;
-		f.plane.d = -dot(f.plane.normal, vertex_list.at(f.v_start));
+		ti = &t_info.at(f.t_info_idx);
+		if (ti->t_index == skip_idx) {
+			f.dont_draw = true;
+		}
+		//f.plane.normal = vec3(-f.plane.normal.x, f.plane.normal.z, f.plane.normal.y);
+		f.plane.init(vertex_list.at(f.v_start+1), vertex_list.at(f.v_start), vertex_list.at(f.v_start + 2));
+		//f.plane.normal *= -1.f;
+		//f.plane.d = -dot(f.plane.normal, vertex_list.at(f.v_start));
 		if (std::isnan(f.plane.d)) {
 			printf("Degenerate plane!\n");
 			f.plane.normal = vec3(1, 0, 0);

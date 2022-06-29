@@ -37,11 +37,14 @@ struct Camera
 
 	bool free_cam;
 	bool target_lock;
+	bool scroll_for_fov = false;
 
 	Frustum frust;
 
 	Camera();
-
+	void toggle_scroll_state() {
+		scroll_for_fov = !scroll_for_fov;
+	}
 	mat4 get_view_matrix() {
 		return view_matrix;
 	}
