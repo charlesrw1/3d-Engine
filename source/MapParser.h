@@ -22,7 +22,7 @@ class VertexArray;
 class MapParser
 {
 public:
-	MapParser() {
+	MapParser(bool quake_format) : quake_format(quake_format) {
 		parse_buffer.reserve(256);
 	}
 	void start_file(std::string file);
@@ -43,6 +43,8 @@ public:
 
 
 private:
+	bool quake_format;
+
 	// Final data
 	std::vector<entity_t> entities;
 	std::vector<texture_info_t> t_info;	// holds axis info and index into 'texture' strings

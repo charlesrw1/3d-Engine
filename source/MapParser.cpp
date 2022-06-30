@@ -305,8 +305,15 @@ MapParser::Result MapParser::parse_brush()
 				parse_fail("Too many faces!");
 				return R_FAIL;
 			}
+			Result r;
+			if (quake_format) {
+				r = parse_face_quake();
+			}
+			else {
+				r = parse_face();
+			}
+
 			
-			Result r =  parse_face();
 			if (r == R_FAIL) {
 				return R_FAIL;
 			}

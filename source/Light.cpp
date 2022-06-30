@@ -47,13 +47,13 @@ std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
 
-int lm_width = 1024;
-int lm_height = 1024;
+int lm_width = 1500;
+int lm_height = 1500;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 4.f;
+float density_per_unit = 8.f;
 
-float patch_grid = 1.0f;
+float patch_grid = 0.5f;
 int num_bounces = 100;
 
 VertexArray va;
@@ -302,6 +302,7 @@ struct triangulation_t
 			if (!point_in_tri(point, tri))
 				continue;
 			lerp_tri(tri, point, color);
+			return;
 		}
 		for (int i = 0; i < num_edges; i++) {
 			triedge_t* te = &edges[i];
@@ -322,6 +323,7 @@ struct triangulation_t
 			patch_t* pp0 = patch_points[te->p0];
 			patch_t* pp1 = patch_points[te->p1];
 			color = pp0->total_light + d * (pp1->total_light - pp0->total_light);
+			return;
 
 		}
 		float best_d = 10000;
@@ -377,7 +379,7 @@ void patch_for_face(int face_num)
 		p->winding.add_vert(verts[face->v_start + i]);
 	}
 	p->area = p->winding.get_area();
-	p->area = max(p->area, 1.f);
+	p->area = max(p->area, 0.1f);
 	p->center = p->winding.get_center();
 
 	texture_info_t* ti = tinfo + face->t_info_idx;
@@ -1311,9 +1313,10 @@ void create_light_map(worldmodel_t* wm)
 	}
 	printf("Finished transfers\n");
 
-
+	printf("Bouncing light...\n");
 	start_radiosity();
 
+	printf("Final light pass...\n");
 	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
 		final_light_face(i);
 	}

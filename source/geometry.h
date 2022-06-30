@@ -80,13 +80,11 @@ struct winding_t
 	float get_area() const;
 };
 void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);
-
+// same as above but returns false if it cant split it into 2
 bool try_split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);
 
 
 void get_extents(const winding_t& w, vec3& min, vec3& max);
-void sort_winding(winding_t& w);
-void sort_triangle(vec3& p0, vec3& p1, vec3& p2, bool clockwise);
 // returns false if point is outside the triangle
 bool to_barycentric(vec3 p1, vec3 p2, vec3 p3, vec3 point, float& u, float& v, float& w);
 
