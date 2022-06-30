@@ -21,7 +21,7 @@ struct tracestack_debug_t
 	int depth;
 };
 
-trace_t BSPtree::test_ray(vec3 start, vec3 end)
+trace_t BSPtree::test_ray(vec3 start, vec3 end, float epsilon)
 {
 	trace_t trace;
 	trace.dir = normalize(end - start);
@@ -48,7 +48,7 @@ trace_t BSPtree::test_ray(vec3 start, vec3 end)
 		while (node->num_faces != -1) {
 			r.origin = front;
 			r.length = length(back - front)+0.01f;
-			check_ray_leaf_node(*node, r, trace);
+			check_ray_leaf_node(*node, r, trace, epsilon);
 			if (trace.hit) {
 //va->push_2({ start,vec3(1.f,0.0,0.0) }, { end,vec3(1.f,0.0,0.0) });
 				trace.node = node_n;
@@ -140,7 +140,7 @@ trace_t BSPtree::test_ray_debug(vec3 start, vec3 end)
 			r.length = length(back - front)+0.01f;
 			box_array.add_solid_box(min_box, max_box, vec4(last_cut, node->num_faces/80.f));
 			num_poly_checks += node->num_faces;
-			check_ray_leaf_node(*node, r, trace);
+			check_ray_leaf_node(*node, r, trace, -0.005f);
 			if (trace.hit) {
 				std::cout << "Num compares: " << num_poly_checks << '\n';
 				va.push_2({ start,vec3(1.f,0.0,0.0) }, { end,vec3(1.f,0.0,0.0) });
@@ -224,7 +224,7 @@ trace_t BSPtree::test_ray_debug(vec3 start, vec3 end)
 #define LEAF_OFFSET(a) (a&0x7FFFFFFF)
 
 
-trace_t BSPtree::test_ray_fast(vec3 start, vec3 end)
+trace_t BSPtree::test_ray_fast(vec3 start, vec3 end, float epsilon, bool dif_first_epsilon, float first_epsilon)
 {
 	trace_t trace;
 	trace.dir = normalize(end - start);
@@ -243,6 +243,7 @@ trace_t BSPtree::test_ray_fast(vec3 start, vec3 end)
 	top = stack;
 	front = start;
 	back = end;
+	bool seen_first = false;
 
 	while (1)
 	{
@@ -250,7 +251,8 @@ trace_t BSPtree::test_ray_fast(vec3 start, vec3 end)
 		while (ISLEAF(node->data1)) {
 			r.origin = front;
 			r.length = length(back - front) + 0.01f;
-			check_ray_bsp_node(*node, r, trace);
+			check_ray_bsp_node(*node, r, trace, (!seen_first)?first_epsilon:epsilon);
+			seen_first = true;
 			if (trace.hit) {
 				//va->push_2({ start,vec3(1.f,0.0,0.0) }, { end,vec3(1.f,0.0,0.0) });
 				trace.node = node_n;
@@ -364,7 +366,7 @@ inline void BSPtree::check_ray_leaf_node(const node_t& node, vec3& start, vec3& 
 }
 */
 
-void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& trace)
+void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& trace, float epsilon)
 {
 	assert(node.num_faces > -1);
 	const leaf_t* leaf;
@@ -385,7 +387,7 @@ void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t
 		}
 		float t = -(dot(f.plane.normal, r.origin) + f.plane.d) / denom;
 
-		if (t < -0.005) {
+		if (t < epsilon) {
 			continue;
 		}
 		if (t > r.length) {
@@ -399,7 +401,7 @@ void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t
 			vec3 v = point - geo->verts.at(f.v_start + i);
 			vec3 c = cross(geo->verts.at(f.v_start + (i + 1) % v_count) - geo->verts.at(f.v_start + i), v);
 			float angle = dot(-f.plane.normal, c);
-			if (angle < 0) {
+			if (angle < -0.005f) {
 				// point is outside the edges of the polygon
 				hit = false;
 				break;
@@ -416,7 +418,7 @@ void BSPtree::check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t
 		}
 	}
 }
-void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& trace)
+void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& trace, float epsilon)
 {
 	int count = node.data2;
 	int offset = LEAF_OFFSET(node.data1);
@@ -432,7 +434,7 @@ void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& t
 		}
 		float t = -(dot(f.plane.normal, r.origin) + f.plane.d) / denom;
 
-		if (t < -0.005) {
+		if (t < epsilon) {
 			continue;
 		}
 		if (t > r.length) {

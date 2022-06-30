@@ -287,6 +287,8 @@ void Editor::shoot_ray()
 	auto elapsed2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
 	
 	result = global_world.tree.test_ray_debug(ray.origin,ray.origin+ray.dir*100.f);
+	result = global_world.tree.test_ray(ray.origin, ray.origin + ray.dir * 100.f, 0.005f);
+	result = global_world.tree.test_ray_fast(ray.origin, ray.origin + ray.dir * 100.f, -0.005f, true,0.005f);
 	auto start3 = std::chrono::steady_clock::now();
 	for (int i = 0; i <0; i++) {
 		result = global_world.tree.test_ray(ray.origin, ray.origin + ray.dir * 100.f);

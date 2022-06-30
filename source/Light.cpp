@@ -51,10 +51,12 @@ int lm_width = 1500;
 int lm_height = 1500;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 8.f;
+float density_per_unit = 4.f;
 
 float patch_grid = 0.5f;
 int num_bounces = 100;
+
+bool no_radiosity = false;
 
 VertexArray va;
 VertexArray point_array;
@@ -840,8 +842,8 @@ void calc_points(LightmapState& l, Image& img)
 	img.width = w;
 
 	float step[2];
-	step[0] = (l.exact_max[0] - l.exact_min[0]) / w;	// added + 0.5
-	step[1] = (l.exact_max[1] - l.exact_min[1]) / h;
+	step[0] = (l.exact_max[0] - l.exact_min[0]) / (w-1);	// added + 0.5
+	step[1] = (l.exact_max[1] - l.exact_min[1]) / (h-1);
 
 
 	int top_point = 0;
@@ -852,8 +854,8 @@ void calc_points(LightmapState& l, Image& img)
 	face_mid = l.face_middle + l.face->plane.normal * 0.01f;
 	for (int y = 0; y < h; y++) {
 		for (int x = 0; x < w; x++) {
-			float u = start_u + (x) * step[0]+step[0]/2.f;
-			float v = start_v + (y) * step[1] + step[1] / 2.f;
+			float u = start_u + (x)*step[0];//+step[0]/2.f;
+			float v = start_v + (y)*step[1];// +step[1] / 2.f;
 
 			vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
 
@@ -968,11 +970,10 @@ void light_face(int num)
 			}
 
 			total_rays_cast++;
-			trace_t res = global_world.tree.test_ray_fast(l.fl->sample_points[j], light_p);
+			trace_t res = global_world.tree.test_ray_fast(l.fl->sample_points[j], light_p,-0.005f,true,0.005f);
 			if (res.hit) {
 				continue;
 			}
-			//va->append({ l.points[j],vec3(0,1,0) });
 
 			vec3 light_dir = light_p - l.fl->sample_points[j];
 			float dist = length(light_dir);
@@ -988,14 +989,17 @@ void light_face(int num)
 			//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
 			//add_color(img.buffer_start, j, final_color);
 		}
-		add_sample_to_patch(l.fl->sample_points[j], l.fl->pixel_colors[j], num);
+		if (!no_radiosity) {
+			add_sample_to_patch(l.fl->sample_points[j], l.fl->pixel_colors[j], num);
+		}
 	}
-
-	patch_t* patch = face_patches[num];
-	while (patch)
-	{
-		patch->sample_light /= patch->num_samples;
-		patch = patch->next;
+	if (!no_radiosity) {
+		patch_t* patch = face_patches[num];
+		while (patch)
+		{
+			patch->sample_light /= patch->num_samples;
+			patch = patch->next;
+		}
 	}
 
 	/*
@@ -1039,32 +1043,40 @@ void final_light_face(int face_num)
 	img.width = fl->width;
 	img.buffer_start = data_buffer.size();
 	make_space(img.height * img.width);
+	triangulation_t* t=nullptr;
+	if (!no_radiosity) {
+		t = new triangulation_t;
+		t->color = random_color();
+		t->face = face;
+		patch_t* p = face_patches[face_num];
+		while (p)
+		{
+			t->add_point(p);
+			p = p->next;
+		}
 
-	triangulation_t* t = new triangulation_t;
-	t->color = random_color();
-	t->face =face;
-	patch_t* p = face_patches[face_num];
-	while (p)
-	{
-		t->add_point(p);
-		p = p->next;
+		t->triangulate_points();
+
+		for (int i = 0; i < fl->num_points; i++) {
+
+			vec3 sample_point = fl->sample_points[i];
+			vec3 gi_color;
+			t->sample(sample_point, gi_color);
+
+			fl->pixel_colors[i] += gi_color;
+		}
 	}
-
-	t->triangulate_points();
-
-	for (int i = 0; i < fl->num_points; i++) {
-
-		vec3 sample_point = fl->sample_points[i];
-		vec3 gi_color;
-		t->sample(sample_point, gi_color);
-
-		fl->pixel_colors[i] += gi_color;
-	}
-
+	
 	for (int y = 0; y < img.height; y++) {
 		for (int x = 0; x < img.width; x++) {
 			vec3 total = vec3(0);
 			int added = 0;
+			int offset = y * img.width + x;
+			total = fl->pixel_colors[y * img.width + x];
+			add_color(img.buffer_start, offset, total);
+
+			continue;
+
 			for (int i = -1; i <= 1; i++) {
 				for (int j = -1; j <= 1; j++) {
 					int ycoord = y + i;
@@ -1077,9 +1089,7 @@ void final_light_face(int face_num)
 				}
 			}
 			total /= added;
-			int offset = y * img.width + x;
 			//assert(offset < l.numpts);
-			add_color(img.buffer_start, offset, total);
 		}
 	}
 
@@ -1288,9 +1298,10 @@ void create_light_map(worldmodel_t* wm)
 	mark_bad_faces();
 
 	//find_coplanar_faces();
-
-	make_patches();
-	subdivide_patches();
+	if (!no_radiosity) {
+		make_patches();
+		subdivide_patches();
+	}
 	srand(234508956l);
 	srand(time(NULL));
 
@@ -1306,15 +1317,17 @@ void create_light_map(worldmodel_t* wm)
 	printf("Total raycasts: %u\n", total_rays_cast);
 	printf("Face lighting time: %u\n", SDL_GetTicks() - start_light_face);
 
-	printf("Making transfers...\n");
-	transfers.resize(MAX_PATCHES);
-	for (int i = 0; i < num_patches; i++) {
-		make_transfers(i);
-	}
-	printf("Finished transfers\n");
+	if (!no_radiosity) {
+		printf("Making transfers...\n");
+		transfers.resize(MAX_PATCHES);
+		for (int i = 0; i < num_patches; i++) {
+			make_transfers(i);
+		}
+		printf("Finished transfers\n");
 
-	printf("Bouncing light...\n");
-	start_radiosity();
+		printf("Bouncing light...\n");
+		start_radiosity();
+	}
 
 	printf("Final light pass...\n");
 	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {

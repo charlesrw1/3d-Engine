@@ -8,6 +8,7 @@
 struct ray_t;
 struct trace_t;
 
+
 struct BSPNode
 {
 	u32 data1=0;
@@ -44,12 +45,13 @@ public:
 	int find_leaf(vec3 point, vec3& min_box, vec3& max_box) const;
 
 	// faster version
-	trace_t test_ray(vec3 start, vec3 end);
+	trace_t test_ray(vec3 start, vec3 end, float epsilon = -0.005f);
 	// same as above but with debug output
 	trace_t test_ray_debug(vec3 start, vec3 end);
 
 	// 10% faster than test_ray
-	trace_t test_ray_fast(vec3 start, vec3 end);
+	// kinda gross arguments, but it lets a ray not end up hitting the plane it starts from which is annoying
+	trace_t test_ray_fast(vec3 start, vec3 end, float epsilon = -0.005f,bool dif_first_epsilon = false, float first_epsilon = -0.005f);
 	void print_leaves_with_face(int face)
 	{
 		std::cout << "Printing leaves with face: " << face << '\n';
@@ -87,9 +89,9 @@ private:
 
 	void create_va_internal(int node_idx, vec3 min, vec3 max);
 
-	inline void check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t);
+	inline void check_ray_leaf_node(const node_t& node, const ray_t& r, trace_t& t, float epsilon);
 	//inline void check_ray_leaf_node(const node_t& node, vec3& start, vec3& end, trace_t& t);
-	inline void check_ray_bsp_node(const BSPNode& leaf, const ray_t& r, trace_t& t);
+	inline void check_ray_bsp_node(const BSPNode& leaf, const ray_t& r, trace_t& t, float epsilon);
 
 	void flatten_arrays();
 	void make_fast_list();
