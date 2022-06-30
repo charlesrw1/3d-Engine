@@ -56,7 +56,8 @@ float density_per_unit = 4.f;
 float patch_grid = 0.5f;
 int num_bounces = 100;
 
-bool no_radiosity = false;
+bool enable_radiosity = true;
+bool inside_map = true;
 
 VertexArray va;
 VertexArray point_array;
@@ -989,11 +990,11 @@ void light_face(int num)
 			//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
 			//add_color(img.buffer_start, j, final_color);
 		}
-		if (!no_radiosity) {
+		if (enable_radiosity) {
 			add_sample_to_patch(l.fl->sample_points[j], l.fl->pixel_colors[j], num);
 		}
 	}
-	if (!no_radiosity) {
+	if (enable_radiosity) {
 		patch_t* patch = face_patches[num];
 		while (patch)
 		{
@@ -1002,35 +1003,6 @@ void light_face(int num)
 		}
 	}
 
-	/*
-	for (int y = 0; y < img.height; y++) {
-		for (int x = 0; x < img.width; x++) {
-			vec3 total = vec3(0);
-			int added = 0;
-			for (int i = -1; i <= 1; i++) {
-				for (int j = -1; j <= 1; j++) {
-					int ycoord = y + i;
-					int xcoord = x + j;
-					if (ycoord<0 || ycoord>img.height - 1 || xcoord <0 || xcoord> img.width - 1)
-						continue;
-
-					total += temp_image_buffer.at(ycoord * img.width + xcoord);
-					added++;
-
-				}
-
-			}
-			total /= added;
-			int offset = y * img.width + x;
-			assert(offset < l.numpts);
-			add_color(img.buffer_start, offset, total);
-		}
-	}
-	*/
-	
-	
-
-	//images.push_back(img);
 }
 
 void final_light_face(int face_num)
@@ -1044,7 +1016,7 @@ void final_light_face(int face_num)
 	img.buffer_start = data_buffer.size();
 	make_space(img.height * img.width);
 	triangulation_t* t=nullptr;
-	if (!no_radiosity) {
+	if (enable_radiosity) {
 		t = new triangulation_t;
 		t->color = random_color();
 		t->face = face;
@@ -1090,6 +1062,10 @@ void final_light_face(int face_num)
 			}
 			total /= added;
 			//assert(offset < l.numpts);
+
+
+			//add_color(img.buffer_start, offset, total);
+
 		}
 	}
 
@@ -1294,15 +1270,17 @@ void create_light_map(worldmodel_t* wm)
 	num_tex_strings = wm->texture_names.size();
 
 	add_lights(wm);
-
-	mark_bad_faces();
+	
+	if (inside_map) {
+		mark_bad_faces();
+	}
 
 	//find_coplanar_faces();
-	if (!no_radiosity) {
+	if (enable_radiosity) {
 		make_patches();
 		subdivide_patches();
 	}
-	srand(234508956l);
+	// Used for random debug colors
 	srand(time(NULL));
 
 	printf("Total patches: %u\n", num_patches);
@@ -1317,7 +1295,7 @@ void create_light_map(worldmodel_t* wm)
 	printf("Total raycasts: %u\n", total_rays_cast);
 	printf("Face lighting time: %u\n", SDL_GetTicks() - start_light_face);
 
-	if (!no_radiosity) {
+	if (enable_radiosity) {
 		printf("Making transfers...\n");
 		transfers.resize(MAX_PATCHES);
 		for (int i = 0; i < num_patches; i++) {
