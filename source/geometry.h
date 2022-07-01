@@ -79,6 +79,7 @@ struct winding_t
 	vec3 get_center() const;
 	float get_area() const;
 	vec3 closest_point_on_winding(const vec3& point) const;
+	bool point_inside(const vec3& point) const;
 };
 vec3 closest_point_on_line(const vec3& A, const vec3& B, const vec3& point);
 void split_winding(const winding_t& a, const plane_t& plane, winding_t& front, winding_t& back);

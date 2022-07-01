@@ -4,6 +4,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include <random>
+#include <unordered_map>
 const worldmodel_t* world;
 
 face_t* faces;
@@ -51,9 +52,9 @@ int lm_width = 1500;
 int lm_height = 1500;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 4.f;
+float density_per_unit = 2.f;
 
-float patch_grid = 0.5f;
+float patch_grid = 2.f;
 int num_bounces = 100;
 
 bool enable_radiosity = false;
@@ -149,6 +150,10 @@ struct triangulation_t
 	patch_t* patch_points[MAX_TRI_POINTS];
 	bool used_points[MAX_TRI_POINTS];
 	triedge_t edges[MAX_TRI_EDGES];
+	
+	//std::unordered_map<int, std::unordered_map<int, int>> edgematrix;
+
+
 	triangle_t tries[MAX_TRI_TRIS];
 
 	triedge_t* edge_matrix[MAX_TRI_POINTS][MAX_TRI_POINTS];
@@ -675,7 +680,10 @@ struct LightmapState
 	float exact_min[2];
 	float exact_max[2];
 
-	facelight_t* fl;
+	facelight_t* fl=nullptr;
+
+	std::vector<vec3> sample_points[4];
+	int num_samples = 4;
 
 	int surf_num = 0;
 	face_t* face = nullptr;
@@ -818,6 +826,8 @@ void calc_extents(LightmapState& l)
 	}
 }
 
+const float sample_ofs[4][2] = { {0.1,0.1},{0.1,-0.1},{-0.1,-0.1},{-0.1,0.1} };
+
 void calc_points(LightmapState& l, Image& img)
 {
 	int h = l.tex_size[1] * density_per_unit + 1;
@@ -833,11 +843,12 @@ void calc_points(LightmapState& l, Image& img)
 	l.fl->height = h;
 	l.fl->width = w;
 
-	l.fl->pixel_colors = new vec3[l.numpts];
-	l.fl->sample_points = new vec3[l.numpts];
-
 	l.fl->num_pixels = l.numpts;
 	l.fl->num_points = l.numpts;
+
+	for (int i = 0; i < l.num_samples; i++) {
+		l.sample_points[i].resize(l.numpts);
+	}
 
 	img.height = h;
 	img.width = w;
@@ -846,40 +857,60 @@ void calc_points(LightmapState& l, Image& img)
 	step[0] = (l.exact_max[0] - l.exact_min[0]) / (w-1);	// added + 0.5
 	step[1] = (l.exact_max[1] - l.exact_min[1]) / (h-1);
 
-
-	int top_point = 0;
-
-	float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
-	float mid_v = (l.exact_min[1] + l.exact_max[1]) / 2.f;
-	vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal * 0.01f;
-	face_mid = l.face_middle + l.face->plane.normal * 0.01f;
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			float u = start_u + (x)*step[0];//+step[0]/2.f;
-			float v = start_v + (y)*step[1];// +step[1] / 2.f;
-
-			vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
-
-			/*
-			auto res = global_world.tree.test_ray_fast(point + l.face->plane.normal * 0.1f , face_mid + l.face->plane.normal * 0.1f);
-			if (res.hit) {
-				point = res.end_pos;
-				//va->append({ point,vec3(0,1,0) });
-			}
-			*/
-
-			//point = point + move_mid * 0.25f;
-			if (top_point >= MAP_PTS) {
-				l.numpts = MAP_PTS - 1;
-				img.height = y - 1;
-				l.fl->height = y - 1;
-				goto face_too_big;
-			}
-			assert(top_point < MAP_PTS);
-			l.fl->sample_points[top_point++] = point;
-		}
+	const face_t* f = l.face;
+	winding_t wind;
+	for (int i = 0; i < f->v_count; i++) {
+		wind.add_vert(verts[f->v_start + i]);
 	}
-face_too_big:;
+
+	l.fl->pixel_colors = new vec3[l.numpts];
+	l.fl->sample_points = new vec3[l.numpts];
+
+
+
+	//float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
+	//float mid_v = (l.exact_min[1] + l.exact_max[1]) / 2.f;
+	//vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal * 0.01f;
+	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.01f;
+	for (int s = 0; s < l.num_samples; s++) {
+		int top_point = 0;
+		for (int y = 0; y < h; y++) {
+			for (int x = 0; x < w; x++) {
+				float ofs[2];
+				ofs[0] = (l.num_samples == 1) ? 0 : sample_ofs[s][0];
+				ofs[1] = (l.num_samples == 1) ? 0 : sample_ofs[s][1];
+
+				float u = start_u + (x)*step[0] + ofs[0];//+step[0]/2.f;
+				float v = start_v + (y)*step[1] + ofs[1];// +step[1] / 2.f;
+
+				vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
+
+
+				// is the point outside the bounds?
+				//		cast ray towards middle
+				//		did it hit?
+				//			no, point is good
+				//			yes, find closest point on face winding, move sample to that position
+
+				if (!wind.point_inside(point)) {
+					auto trace_res = global_world.tree.test_ray_fast(point, face_mid);
+					if (trace_res.hit) {
+						point = wind.closest_point_on_winding(point);
+					}
+				}
+
+				if (top_point >= MAP_PTS) {
+					l.numpts = MAP_PTS - 1;
+					img.height = y - 1;
+					l.fl->height = y - 1;
+					goto face_too_big;
+				}
+				assert(top_point < MAP_PTS);
+				l.sample_points[s][top_point++] = point;
+			}
+		}
+	face_too_big:;
+	}
 }
 
 void calc_vectors(LightmapState& l)
@@ -950,45 +981,67 @@ void light_face(int num)
 	//make_space(img.height * img.width);
 	// ambient term
 
+
 	for (int i = 0; i < l.numpts; i++) {
 		l.fl->pixel_colors[i] = vec3(0);
 		//add_color(img.buffer_start, i, vec3(0.05, 0.05, 0.05));
 	}
+	// calc middle points
+	for (int i = 0; i < l.numpts; i++) {
+		vec3 total = vec3(0.f);
+		for (int s = 0; s < l.num_samples; s++) {
+			total += l.sample_points[s][i];
+		}
+		l.fl->sample_points[i] = total / (float)l.num_samples;
+	}
 
+	float sample_scale = 1 / (float)l.num_samples;
 	for (int j = 0; j < l.numpts; j++) {
 		for (int i = 0; i < lights.size(); i++) {
-			vec3 light_p = lights[i].pos;
+			for (int s = 0; s < l.num_samples; s++) {
+				if (num == 1 || num == 3 || num == 30 || num == 21 || num == 11) {
+					vec3 color = vec3(0);
+					if (s > 0) {
+						color[s - 1] = 1.f;
+					}
+					point_array.append({ l.sample_points[s][j],color });
+					point_array.append({ l.fl->sample_points[j],vec3(1.0) });
 
-			float plane_dist = l.face->plane.distance(light_p);
-			if (plane_dist < 0) {
-				continue;
+				}
+				vec3 light_p = lights[i].pos;
+				vec3 sample_pos = l.sample_points[s][j];
+
+				float plane_dist = l.face->plane.distance(light_p);
+				if (plane_dist < 0) {
+					continue;
+				}
+
+
+				float sqrd_dist = dot(light_p - sample_pos, light_p - sample_pos);
+				if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
+					continue;
+				}
+
+				total_rays_cast++;
+				trace_t res = global_world.tree.test_ray_fast(sample_pos, light_p, -0.005f, true, 0.005f);
+				if (res.hit) {
+					continue;
+				}
+
+				vec3 light_dir = light_p - sample_pos;
+				float dist = length(light_dir);
+				light_dir = normalize(light_dir);
+				float dif = dot(light_dir, l.face->plane.normal);
+				if (dif < 0) {
+					continue;
+				}
+
+				vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f);
+				l.fl->pixel_colors[j] += final_color*sample_scale;
+
+				//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
+				//add_color(img.buffer_start, j, final_color);
 			}
-
-
-			float sqrd_dist = dot(light_p - l.fl->sample_points[j], light_p - l.fl->sample_points[j]);
-			if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
-				continue;
-			}
-
-			total_rays_cast++;
-			trace_t res = global_world.tree.test_ray_fast(l.fl->sample_points[j], light_p,-0.005f,true,0.005f);
-			if (res.hit) {
-				continue;
-			}
-
-			vec3 light_dir = light_p - l.fl->sample_points[j];
-			float dist = length(light_dir);
-			light_dir = normalize(light_dir);
-			float dif = dot(light_dir, l.face->plane.normal);
-			if (dif < 0) {
-				continue;
-			}
-
-			vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f);
-			l.fl->pixel_colors[j] += final_color;
-
-			//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
-			//add_color(img.buffer_start, j, final_color);
 		}
 		if (enable_radiosity) {
 			add_sample_to_patch(l.fl->sample_points[j], l.fl->pixel_colors[j], num);

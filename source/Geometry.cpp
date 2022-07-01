@@ -261,3 +261,18 @@ vec3 winding_t::closest_point_on_winding(const vec3& point) const
 	}
 	return (outside)?best_point:projected_point;
 }
+
+bool winding_t::point_inside(const vec3& point) const
+{
+	plane_t p;
+	p.init(v[1], v[0], v[2]);
+	for (int i = 0; i < num_verts; i++) {
+		vec3 vec = point - v[i];
+		vec3 c = cross(v[(i + 1) % num_verts] - v[i], vec);
+		float angle = dot(p.normal, c);
+		if (angle < -0.005f) {
+			return false;
+		}
+	}
+	return true;
+}
