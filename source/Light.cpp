@@ -56,7 +56,7 @@ float density_per_unit = 4.f;
 float patch_grid = 0.5f;
 int num_bounces = 100;
 
-bool enable_radiosity = true;
+bool enable_radiosity = false;
 bool inside_map = true;
 
 VertexArray va;
@@ -129,7 +129,7 @@ struct triangle_t
 {
 	triedge_t* edges[3] = { nullptr,nullptr,nullptr };
 };
-#define MAX_TRI_POINTS 2048
+#define MAX_TRI_POINTS 512
 #define MAX_TRI_EDGES (MAX_TRI_POINTS*6)
 #define MAX_TRI_TRIS (MAX_TRI_POINTS*2)
 // shamelessly stolen from Quake 2...
@@ -315,7 +315,7 @@ struct triangulation_t
 				continue;
 			vec3 p0 = patch_points[te->p0]->center;
 			vec3 p1 = patch_points[te->p1]->center;
-
+			// This is bugged and wrong
 			vec3 v1 = normalize(p1 - p0);
 			vec3 v2 = point - p0;
 			float d = dot(v2, v1);
@@ -1004,7 +1004,6 @@ void light_face(int num)
 	}
 
 }
-
 void final_light_face(int face_num)
 {
 	face_t* face = &faces[face_num];

@@ -82,7 +82,7 @@ void Editor::on_render()
 
 	ImGui::Image(reinterpret_cast<ImTextureID>(global_app.r->bright_pass), ImVec2(256, 256));
 	static int downsample_selection = 0;
-	ImGui::SliderInt("Downsample #:", &downsample_selection,0,5);
+	ImGui::SliderInt("Downsample #:", &downsample_selection, 0, 5);
 	ImGui::Image(reinterpret_cast<ImTextureID>(global_app.r->downsample[1][downsample_selection]), ImVec2(256, 256));
 
 
@@ -137,17 +137,17 @@ void Editor::on_render()
 	//global_app.r->debug_line(vec3(0), vec3(0, 0, 2), vec3(0, 0, 1));
 
 
-	
+
 
 	vec3 light_origin = global_app.r->shadow_map.distance * -global_app.scene->sun.direction;
 	vec3 shadow_map_start = light_origin + global_app.scene->sun.direction * global_app.r->shadow_map.near;
 	vec3 shadow_map_end = light_origin + global_app.scene->sun.direction * global_app.r->shadow_map.far;
 
 	vec3 side_vec = normalize(cross(global_app.scene->sun.direction, vec3(0, 1, 0)));
-	vec3 up_vec = normalize(cross(side_vec,global_app.scene->sun.direction));
+	vec3 up_vec = normalize(cross(side_vec, global_app.scene->sun.direction));
 
 	vec3 corners[8];
-	
+
 	// Draws shadow map projection matrix
 	// Front quad
 	if (show_shadow_map) {
@@ -171,11 +171,11 @@ void Editor::on_render()
 	if (show_light_lines) {
 
 		for (int i = 0; i < global_app.scene->num_lights; i++) {
-		//	global_app.r->debug_line(vec3(0), global_app.scene->lights[i].position, global_app.scene->lights[i].color);
-		//	global_app.r->debug_point(global_app.scene->lights[i].position, global_app.scene->lights[i].color);
+			//	global_app.r->debug_line(vec3(0), global_app.scene->lights[i].position, global_app.scene->lights[i].color);
+			//	global_app.r->debug_point(global_app.scene->lights[i].position, global_app.scene->lights[i].color);
 		}
 	}
-	
+
 	Camera* c = &global_app.scene->cams[0];
 	c->frust.update(*c);
 	for (int i = 0; i < 5; i++) {
@@ -185,7 +185,7 @@ void Editor::on_render()
 	//global_app.r->debug_line(vec3(0), 10.f*-global_app.scene->sun.direction, vec3(1, 0, 0));
 
 	for (const auto& hit : world_hits) {
-	//	global_app.r->debug_line(hit.start, hit.end_pos, vec3(1.0, 0.0, 0.0));
+		//	global_app.r->debug_line(hit.start, hit.end_pos, vec3(1.0, 0.0, 0.0));
 		global_app.r->debug_point(hit.end_pos, vec3(1.f));
 		global_app.r->debug_line(hit.end_pos, hit.end_pos + hit.normal, vec3(0.5, 1.0, 0.0));
 
@@ -200,6 +200,20 @@ void Editor::on_render()
 	vec3 min, max;
 	//global_world.tree.find_leaf(global_app.scene->active_camera()->position, min, max);
 	//global_app.r->debug_box(min, max, vec3(0, 0, 1));
+
+	winding_t w;
+	w.add_vert({ 0,5,0 });
+	w.add_vert({ -3,5,2 });
+	w.add_vert({ 0, 5, -3 });
+	for (int i = 0; i < 3; i++) {
+		vec3 color = vec3(0);
+		color[i] = 1.f;
+		r->debug_line(w.v[i], w.v[(i + 1) % 3], color);
+	}
+	auto point = w.closest_point_on_winding(global_app.scene->active_camera()->position);
+	r->debug_point(point, vec3(1, 0, 1));
+
+
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -223,3 +223,41 @@ bool to_barycentric(vec3 p1, vec3 p2, vec3 p3, vec3 point, float& u, float& v, f
 
 	return true;
 }
+vec3 closest_point_on_line(const vec3& A, const vec3& B, const vec3& point)
+{
+	vec3 AB = B - A;
+	float t = dot(point - A, AB) / dot(AB, AB);
+	return A + glm::min(glm::max(t, 0.f), 1.f)*AB;
+
+
+	//vec3 v1 = normalize(B - A);
+	//vec3 v2 = point - A;
+	//float d = dot(v2, v1);
+	//return A+ glm::min(glm::max(d, 0.f), 1.f) * v1;
+
+}
+vec3 winding_t::closest_point_on_winding(const vec3& point) const
+{
+	assert(num_verts >= 3);
+	plane_t p;
+	p.init(v[1], v[0], v[2]);
+	vec3 projected_point = point - p.normal * p.dist(point);	// point on plane
+	vec3 best_point=vec3(0);
+	float best_dist = 10000.f;
+	bool outside = false;
+	for (int i = 0; i < num_verts; i++) {
+		vec3 vec = point - v[i];
+		vec3 c = cross(v[(i + 1) % num_verts] - v[i], vec);
+		float angle = dot(-p.normal, c);
+		if (angle < -0.005f) {
+			vec3 point_on_w= closest_point_on_line(v[i], v[(i + 1) % num_verts], point);
+			float dist = dot(point - point_on_w, point - point_on_w);
+			if (dist < best_dist || !outside) {
+				outside = true;
+				best_dist = dist;
+				best_point = point_on_w;
+			}
+		}
+	}
+	return (outside)?best_point:projected_point;
+}
