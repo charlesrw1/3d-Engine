@@ -52,13 +52,18 @@ int lm_width = 1500;
 int lm_height = 1500;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
+// this is how many actual pixels are in the lightmap, each pixel gets supersampled with 4 additional samples 
 float density_per_unit = 4.f;
-
-float patch_grid = 4.f;
+// Determines biggest side length of a patch, more patches dramatically slow lighting time
+float patch_grid = 4.0f;
+// Number of bounce iterations, you already pay the price computing form factors so might as well set it high
 int num_bounces = 64;
-
+// Obvious
 bool enable_radiosity = true;
+// determine if "outward facing" faces are culled and not computed, helps performance and file space for Quake and indoor maps
 bool inside_map = true;
+// Cast a ray from the patch to the center of a face to prevent light bleeds, breaks on some maps
+bool test_patch_visibility = false;
 
 VertexArray va;
 VertexArray point_array;
@@ -128,242 +133,8 @@ struct Image
 };
 
 std::vector<Image> images;
-struct triangle_t;
-struct triedge_t
-{
-	plane_t plane;	// extends perpendicular to triangle normal
-	triangle_t* tri = nullptr;
-	int p0=0, p1=0;
-};
-struct triangle_t
-{
-	triedge_t* edges[3] = { nullptr,nullptr,nullptr };
-};
-#define MAX_TRI_POINTS 1024
-#define MAX_TRI_EDGES (MAX_TRI_POINTS*6)
-#define MAX_TRI_TRIS (MAX_TRI_POINTS*2)
-// shamelessly stolen from Quake 2...
-struct triangulation_t
-{
-	triangulation_t() {
-		memset(patch_points, 0, sizeof(patch_points));
-		memset(edge_matrix, 0, sizeof(edge_matrix));
-		memset(used_points, 0, sizeof(used_points));
 
-	}
-	int num_points = 0;
-	int num_edges = 0;
-	int num_tris = 0;
-
-	const face_t* face = nullptr;
-	patch_t* patch_points[MAX_TRI_POINTS];
-	bool used_points[MAX_TRI_POINTS];
-	triedge_t edges[MAX_TRI_EDGES];
-	
-	//std::unordered_map<int, std::unordered_map<int, int>> edgematrix;
-
-
-	triangle_t tries[MAX_TRI_TRIS];
-
-	triedge_t* edge_matrix[MAX_TRI_POINTS][MAX_TRI_POINTS];
-
-	vec3 color;
-
-	void triedge_r(triedge_t* e) {
-		if (e->tri)
-			return;
-		vec3 p0 = patch_points[e->p0]->center;
-		vec3 p1 = patch_points[e->p1]->center;
-		float best = 1.1;
-		int best_point = -1;
-		for (int i = 0; i < num_points; i++) {
-			vec3 point = patch_points[i]->center;
-			if (e->plane.dist(point) < 0)
-				continue;
-			vec3 v1 = normalize(p0 - point);
-			vec3 v2 = normalize(p1 - point);
-			float ang = dot(v1, v2);
-			if (ang < best) {
-				best = ang;
-				best_point = i;
-			}
-		}
-		if (best > 0.9) {
-			return;
-		}
-		if (best_point == -1) {
-			return;
-		}
-		triangle_t* tri = add_triangle();
-		tri->edges[0] = e;
-		tri->edges[1] = find_edge(e->p1, best_point);
-		tri->edges[2] = find_edge(best_point, e->p0);
-		for (int i = 0; i < 3; i++) {
-			tri->edges[i]->tri = tri;
-		}
-		triedge_r(find_edge(best_point, e->p1));
-		triedge_r(find_edge(e->p0, best_point));
-	}
-	void lerp_tri(triangle_t* t, vec3 point, vec3& color)
-	{
-		patch_t* p[3];
-		for (int i = 0; i < 3; i++) {
-			p[i] = patch_points[t->edges[i]->p0];
-		}
-		vec3 base = p[0]->total_light;
-		vec3 d1 = p[1]->total_light - base;
-		vec3 d2 = p[2]->total_light - base;
-
-		float x = dot(point, t->edges[0]->plane.normal) + t->edges[0]->plane.d;
-		float y = dot(point, t->edges[2]->plane.normal) + t->edges[2]->plane.d;
-
-		float y1 = dot(p[1]->center, t->edges[2]->plane.normal) + t->edges[2]->plane.d;
-		float x2 = dot(p[2]->center, t->edges[0]->plane.normal) + t->edges[0]->plane.d;
-		if (fabs(y1) < 0.01f || fabs(x2) < 0.01f) {
-			color = base;
-		}
-		color = base + (x / x2) * d2 + (y / y1) * d1;
-	}
-	bool point_in_tri(vec3 point, triangle_t* t)
-	{
-		for (int i = 0; i < 3; i++) {
-			triedge_t* e = t->edges[i];
-			if (dot(e->plane.normal, point) + e->plane.d < 0) {
-				return false;
-			}
-		}
-		return true;
-	}
-	void add_point(patch_t* p) {
-		if (num_points >= MAX_TRI_POINTS) {
-			printf("Too many points!\n");
-			exit(1);
-		}
-		this->patch_points[num_points++] = p;
-	}
-	triangle_t* add_triangle() {
-		if (num_tris >= MAX_TRI_TRIS) {
-			printf("Too many tris\n");
-			exit(1);
-		}
-		return &this->tries[num_tris++];
-	}
-	triedge_t* find_edge(int p0, int p1) {
-		if (edge_matrix[p0][p1]) {
-			return edge_matrix[p0][p1];
-		}
-		if (num_edges+2 > MAX_TRI_EDGES) {
-			printf("Too many tri edges\n");
-			exit(1);
-		}
-		vec3 edge = normalize(patch_points[p1]->center - patch_points[p0]->center);
-		vec3 normal = cross(edge, face->plane.normal);
-		float dist = -dot(normal, patch_points[p0]->center);
-
-		triedge_t* e = &edges[num_edges++];
-		e->p0 = p0;
-		e->p1 = p1;
-		e->plane.normal = normal;
-		e->plane.d = dist;
-		edge_matrix[p0][p1] = e;
-
-
-		triedge_t* be = &edges[num_edges++];
-		be->p0 = p1;
-		be->p1 = p0;
-		be->plane.normal = -normal;
-		be->plane.d = -dist;
-		edge_matrix[p1][p0] = be;
-
-		va.push_line(patch_points[p0]->center, patch_points[p1]->center, color);
-		used_points[p0] = true;
-		used_points[p1] = true;
-
-		return e;
-	}
-	void triangulate_points()
-	{
-		if (num_points <= 1)
-			return;
-		float best_dist = 1000;
-		int b1, b2;
-		for (int i = 0; i < num_points; i++) {
-			vec3 point1 = patch_points[i]->center;
-			for (int j = i + 1; j < num_points; j++) {
-				vec3 point2 = patch_points[j]->center;
-				float dist = length(point2 - point1);
-				if (dist < best_dist) {
-					b1 = i;
-					b2 = j;
-					best_dist = dist;
-				}
-			}
-		}
-		triedge_t* e = find_edge(b1, b2);
-		triedge_t* e2 = find_edge(b2, b1);
-		triedge_r(e);
-		triedge_r(e2);
-	}
-	void sample(vec3 point, vec3& color)
-	{
-		if (num_points == 0) {
-			color = vec3(0);
-			return;
-		}
-		if (num_points == 1) {
-			color = patch_points[0]->total_light;
-			return;
-		}
-		for (int i = 0; i < num_tris; i++) {
-			triangle_t* tri = &tries[i];
-			if (!point_in_tri(point, tri))
-				continue;
-			lerp_tri(tri, point, color);
-			//return;
-		}
-		for (int i = 0; i < num_edges; i++) {
-			triedge_t* te = &edges[i];
-			if (te->tri)
-				continue;
-			if (te->plane.dist(point) < 0)
-				continue;
-			vec3 p0 = patch_points[te->p0]->center;
-			vec3 p1 = patch_points[te->p1]->center;
-			// This is bugged and wrong
-			vec3 v1 = normalize(p1 - p0);
-			vec3 v2 = point - p0;
-			float d = dot(v2, v1);
-			if (d < 0)
-				continue;
-			if (d > 1)
-				continue;
-			patch_t* pp0 = patch_points[te->p0];
-			patch_t* pp1 = patch_points[te->p1];
-			color = pp0->total_light + d * (pp1->total_light - pp0->total_light);
-			//return;
-
-		}
-		float best_d = 10000;
-		patch_t* best_p = nullptr;
-		for (int i = 0; i < num_points; i++) {
-			vec3 p0 = patch_points[i]->center;
-			float dist = length(point - p0);
-			if (dist < best_d)
-			{
-				best_d = dist;
-				best_p = patch_points[i];
-			}
-		}
-		if (!best_p) {
-			printf("Triangulation with no points\n");
-			exit(1);
-		}
-		color = best_p->total_light;
-	}
-
-};
-
-const float RADIAL = 8.f;
+const float RADIAL = patch_grid*4.f;
 const float RADIALSQRT = sqrt(RADIAL);
 
 // This is similar to what Valve uses in VRAD, Quake 2's triangulation method was garbage frankly
@@ -425,8 +196,12 @@ public:
 						break;
 				}
 				if (i == 3) {
-					auto check_wall_collison = global_world.tree.test_ray_fast(p->center, face_middle);
-					if (!check_wall_collison.hit) {
+					// prevents some light bleeding, some make it through though
+					trace_t check_wall_collison;
+					if (test_patch_visibility) {
+						check_wall_collison = global_world.tree.test_ray_fast(p->center, face_middle);
+					}
+					if (!test_patch_visibility || !check_wall_collison.hit) {
 						add_ambient_sample(p, patch_min, patch_max);
 
 					}
@@ -452,7 +227,7 @@ public:
 				if (point[j]<ext_min[j]-0.1f || point[j]>ext_max[j]+0.1f)
 					break;
 			}
-			// point is outside the bounds of patchs "influence"
+			// point is outside the bounds of patches "influence"
 			if (j != 3)
 				continue;
 
@@ -551,9 +326,8 @@ void subdivide_patch(patch_t* p)
 	int i;
 	for (i = 0; i < 3; i++) {
 		// Quake 2 had the patch grid as an actual grid thats not relative to a specific patch
-		// However (at least in my radiosity), the edges get bright (assuming cause the bounces are more intense there)
-		// and is very noticable when the patches are small
-		// solution is to have the patch grid start at the face, and also not let a face become 0.25f in width which solves it
+		// However this leads to some really small patches, more matches no matter the size tank performance (n^2)
+		// Instead make it relative to the face
 		if (min[i]+patch_grid+0.25f <= max[i]) {
 			plane_t split;
 			split.normal = vec3(0);
@@ -777,6 +551,7 @@ struct LightmapState
 
 	facelight_t* fl=nullptr;
 
+	// For supersampling, final facelight_t points are the center of the 4 (they might get shifted around)
 	std::vector<vec3> sample_points[4];
 	int num_samples = 4;
 
@@ -790,7 +565,7 @@ struct light_t
 
 	int brightness;
 };
-std::vector<light_t> lights; //= { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } };// , { {-5.f,5.f,8.f},{0.1f,0.3f,1.0f} }, { {0,1,0},{1,1,1} }, { {0.f,10.f,0.f},{2.f,2.0f,2.0f} }, { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} }, { {0.f,5.f,0.f},{1.f,0.0f,0.0f} } };
+std::vector<light_t> lights;
 static u32 total_pixels = 0;
 static u32 total_rays_cast = 0;
 
@@ -1050,6 +825,9 @@ void light_face(int num)
 	l.fl = &facelights[num];
 	img.face_num = num;
 
+	if (l.face->dont_draw)
+		return;
+
 	calc_vectors(l);
 	calc_extents(l);
 	/*
@@ -1086,15 +864,6 @@ void light_face(int num)
 	for (int j = 0; j < l.numpts; j++) {
 		for (int i = 0; i < lights.size(); i++) {
 			for (int s = 0; s < l.num_samples; s++) {
-				if (num == 1 || num == 3 || num == 30 || num == 21 || num == 11) {
-					vec3 color = vec3(0);
-					if (s > 0) {
-						color[s - 1] = 1.f;
-					}
-					point_array.append({ l.sample_points[s][j],color });
-					point_array.append({ l.fl->sample_points[j],vec3(1.0) });
-
-				}
 				vec3 light_p = lights[i].pos;
 				vec3 sample_pos = l.sample_points[s][j];
 
@@ -1148,6 +917,8 @@ void final_light_face(int face_num)
 {
 	face_t* face = &faces[face_num];
 	facelight_t* fl = &facelights[face_num];
+	if (face->dont_draw)
+		return;
 	Image img;
 	img.face_num = face_num;
 	img.height = fl->height;
@@ -1155,6 +926,7 @@ void final_light_face(int face_num)
 	img.buffer_start = data_buffer.size();
 	make_space(img.height * img.width);
 	
+
 	//triangulation_t* t=nullptr;
 	if (enable_radiosity) {
 		//t = new triangulation_t;
@@ -1362,32 +1134,6 @@ void mark_bad_faces()
 
 	}
 }
-void temp_check_triangulation()
-{
-	for (int i = 0; i < num_faces; i++)
-	{
-		triangulation_t* t = new triangulation_t;
-		t->color = random_color();
-		t->face = &faces[i];
-		patch_t* p = face_patches[i];
-		while (p)
-		{
-			t->add_point(p);
-			p = p->next;
-		}
-
-		t->triangulate_points();
-
-		for (int j = 0; j < t->num_points; j++) {
-			if (!t->used_points[j]) {
-				point_array.append(VertexP(t->patch_points[j]->center, t->color));
-			}
-		}
-
-		delete t;
-	}
-}
-
 
 
 #include <algorithm>
@@ -1500,8 +1246,6 @@ void create_light_map(worldmodel_t* wm)
 	
 	cur_mode = PatchDebugMode::RADCOLOR;
 	create_patch_view(PatchDebugMode::RADCOLOR);
-
-	//temp_check_triangulation();
 
 	free_patches();
 }

@@ -35,7 +35,7 @@ struct patch_t
 	int face;
 	float area = 0;
 
-	vec3 reflectance=vec3(0.4);
+	vec3 reflectance=vec3(0.3);
 
 	vec3 sample_light = vec3(0);
 	int num_samples = 0;
