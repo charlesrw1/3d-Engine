@@ -65,6 +65,8 @@ private:
 	void sort_verticies(mapface_t*);
 	void compute_bounds(mapbrush_t*);
 
+	void set_surface_flags();
+
 	void CSG_union();
 	void clip_to_brush(const mapbrush_t& b, bool clip_to_plane, std::vector<mapface_t>& final_faces);
 	std::vector<mapface_t> clip_to_list(const mapbrush_t& a, int start_index, const mapface_t& b, bool clip_to_plane);

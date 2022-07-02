@@ -4,7 +4,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include <random>
-#include <unordered_map>
+
 const worldmodel_t* world;
 
 face_t* faces;
@@ -24,8 +24,6 @@ patch_t* face_patches[MAX_PATCHES];
 
 std::string* tex_strings;
 int num_tex_strings;
-
-#include <map>
 
 struct facelight_t
 {
@@ -54,7 +52,7 @@ int lm_height = 1200;
 // this is how many actual pixels are in the lightmap, each pixel gets supersampled with 4 additional samples 
 float density_per_unit = 8.f;
 // Determines size of a patch, more patches dramatically slow radiosity lighting time (its O(n^2))
-float patch_grid = 0.5f;
+float patch_grid = 2.0f;
 // Number of bounce iterations, you already pay the price computing form factors so might as well set it high
 int num_bounces = 64;
 // False means direct only
@@ -133,6 +131,11 @@ struct Image
 
 std::vector<Image> images;
 
+bool vec3_compare(vec3& v1, vec3& v2, float epsilon)
+{
+	return fabs(v1.x - v2.x) < epsilon && fabs(v1.y - v2.y) < epsilon && fabs(v1.z - v2.z) < epsilon;
+}
+
 const float RADIAL = patch_grid*4.f;
 const float RADIALSQRT = sqrt(RADIAL);
 
@@ -185,7 +188,8 @@ public:
 				if (i == 3) {
 					// prevents some light bleeding, some make it through though
 					trace_t check_wall_collison;
-					if (test_patch_visibility) {
+					// vec3 compare fixes cases where center and face middle are the same, if so, dont cast a ray
+					if (test_patch_visibility && !vec3_compare(p->center, face_middle, 0.01f)) {
 						check_wall_collison = global_world.tree.test_ray_fast(p->center, face_middle);
 					}
 					if (!test_patch_visibility || !check_wall_collison.hit) {
@@ -277,20 +281,26 @@ void patch_for_face(int face_num)
 	p->area = max(p->area, 0.1f);
 	p->center = p->winding.get_center();
 
+
 	texture_info_t* ti = tinfo + face->t_info_idx;
 	std::string* t_string = tex_strings + ti->t_index;
 	if (*t_string == "color/red") {
-		p->reflectance = rgb_to_float(237, 28, 36);
+		p->reflectivity = rgb_to_float(237, 28, 36);
 	}
 	else if (*t_string == "color/green") {
-		p->reflectance = rgb_to_float(34,177,76);
+		p->reflectivity = rgb_to_float(34,177,76);
 	}
 	else if (*t_string == "color/blue") {
-		p->reflectance = rgb_to_float(0, 128, 255);
+		p->reflectivity = rgb_to_float(0, 128, 255);
 	}
 	else if (*t_string == "color/yellow") {
-		p->reflectance = rgb_to_float(255, 242, 0);
+		p->reflectivity = rgb_to_float(255, 242, 0);
 	}
+
+	if (ti->flags & SURF_EMIT) {
+		p->total_light = vec3(1.f);
+	}
+
 
 	p->next = nullptr;
 }
@@ -346,7 +356,10 @@ void subdivide_patch(patch_t* p)
 	p->area = p->winding.get_area();
 	new_p->area = new_p->winding.get_area();
 
-	new_p->reflectance = p->reflectance;
+	new_p->reflectivity = p->reflectivity;
+
+	new_p->sample_light = p->sample_light;
+	new_p->total_light = p->total_light;
 
 	subdivide_patch(p);
 	subdivide_patch(new_p);
@@ -485,7 +498,7 @@ void collect_light()
 
 		patch_t* p = patches + i;
 		p->total_light += illumination[i] / p->area;
-		radiosity[i] = illumination[i] * p->reflectance;
+		radiosity[i] = illumination[i] * p->reflectivity;
 		illumination[i] = vec3(0.f);
 	}
 }
@@ -494,7 +507,7 @@ void start_radiosity()
 	for (int i = 0; i < num_patches; i++)
 	{
 		patch_t* p = &patches[i];
-		radiosity[i] = p->sample_light * p->reflectance * p->area;
+		radiosity[i] = p->sample_light * p->reflectivity * p->area;
 
 	}
 	for (int i = 0; i < num_bounces; i++)
@@ -519,7 +532,6 @@ void free_patches()
 const int MAX_POINTS = 256 * 256;
 struct LightmapState
 {
-	//std::vector<vec3> points;
 	vec3 face_middle = vec3(0);
 
 	vec3 tex_normal;
@@ -544,10 +556,18 @@ struct LightmapState
 	int surf_num = 0;
 	face_t* face = nullptr;
 };
+enum light_type_t
+{
+	LIGHT_POINT,
+	LIGHT_SURFACE,
+};
 struct light_t
 {
 	vec3 pos;
 	vec3 color;
+	vec3 normal;
+
+	light_type_t type;
 
 	int brightness;
 };
@@ -680,7 +700,7 @@ void calc_points(LightmapState& l, Image& img)
 {
 	int h = l.tex_size[1] * density_per_unit + 1;
 	int w = l.tex_size[0] * density_per_unit + 1;
-	float start_u = l.exact_min[0];	// added -0.25
+	float start_u = l.exact_min[0];	
 	float start_v = l.exact_min[1];
 	l.numpts = h * w;
 	if (l.numpts > MAX_POINTS) {
@@ -702,7 +722,7 @@ void calc_points(LightmapState& l, Image& img)
 	img.width = w;
 
 	float step[2];
-	step[0] = (l.exact_max[0] - l.exact_min[0]) / (w-1);	// added + 0.5
+	step[0] = (l.exact_max[0] - l.exact_min[0]) / (w-1);
 	step[1] = (l.exact_max[1] - l.exact_min[1]) / (h-1);
 
 	const face_t* f = l.face;
@@ -714,12 +734,8 @@ void calc_points(LightmapState& l, Image& img)
 	l.fl->pixel_colors = new vec3[l.numpts];
 	l.fl->sample_points = new vec3[l.numpts];
 
-
-
-	//float mid_u = (l.exact_min[0] + l.exact_max[0]) / 2.f;
-	//float mid_v = (l.exact_min[1] + l.exact_max[1]) / 2.f;
-	//vec3 face_mid = l.tex_origin + l.tex_to_world[0] * mid_u + l.tex_to_world[1] * mid_v + l.face->plane.normal * 0.01f;
 	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.01f;
+
 	for (int s = 0; s < l.num_samples; s++) {
 		int top_point = 0;
 		for (int y = 0; y < h; y++) {
@@ -728,8 +744,8 @@ void calc_points(LightmapState& l, Image& img)
 				ofs[0] = (l.num_samples == 1) ? 0 : sample_ofs[s][0];
 				ofs[1] = (l.num_samples == 1) ? 0 : sample_ofs[s][1];
 
-				float u = start_u + (x)*step[0] + ofs[0];//+step[0]/2.f;
-				float v = start_v + (y)*step[1] + ofs[1];// +step[1] / 2.f;
+				float u = start_u + (x)*step[0] + ofs[0];
+				float v = start_v + (y)*step[1] + ofs[1];
 
 				vec3 point = l.tex_origin + l.tex_to_world[0] * u + l.tex_to_world[1] * v + l.face->plane.normal * 0.01f;
 
@@ -771,16 +787,7 @@ void calc_vectors(LightmapState& l)
 	l.world_to_tex[0] = ti->axis[0];
 	l.world_to_tex[1] = ti->axis[1];
 
-
-
-	//va->push_2({ l.face->texture_axis[0],vec3(1,0,0) }, { vec3(0),vec3(1,0,0) });
-	//va->push_2({ l.face->texture_axis[1],vec3(0,1,0) }, { vec3(0),vec3(0,1,0) });
-
-
 	l.tex_normal = normalize(cross(ti->axis[1], ti->axis[0]));
-
-	//va->push_2({ l.tex_normal,vec3(0,0,1) }, { vec3(0),vec3(0,0,1) });
-
 
 	float ratio = dot(l.tex_normal, l.face->plane.normal);
 	if (ratio < 0) {
@@ -797,8 +804,6 @@ void calc_vectors(LightmapState& l)
 	float dist = -l.face->plane.d;
 	dist /= ratio;
 	l.tex_origin += l.tex_normal * dist;
-
-	//va->push_2({ l.tex_origin,vec3(0.2,0.5,1) }, { vec3(0),vec3(0.2,0.5,1) });s
 }
 
 void light_face(int num)
@@ -816,26 +821,11 @@ void light_face(int num)
 
 	calc_vectors(l);
 	calc_extents(l);
-	/*
-	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.02f;
-	trace_t test_if_outside_map = global_world.tree.test_ray_fast(face_mid, face_mid + l.face->plane.normal * 100.f);
-	total_rays_cast++;
 
-	if (!test_if_outside_map.hit) {
-		l.face->dont_draw = true;
-		return;
-	}
-	*/
 	calc_points(l, img);
-
-	//img.buffer_start = data_buffer.size();
-	//make_space(img.height * img.width);
-	// ambient term
-
 
 	for (int i = 0; i < l.numpts; i++) {
 		l.fl->pixel_colors[i] = vec3(0);
-		//add_color(img.buffer_start, i, vec3(0.05, 0.05, 0.05));
 	}
 	// calc middle points
 	for (int i = 0; i < l.numpts; i++) {
@@ -878,11 +868,15 @@ void light_face(int num)
 					continue;
 				}
 
-				vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f);
-				l.fl->pixel_colors[j] += final_color*sample_scale;
+				float surface_scale = 1.f;
+				if (lights[i].type == LIGHT_SURFACE) {
+					surface_scale = -dot(lights[i].normal, light_dir);
+					surface_scale = glm::max(surface_scale, 0.f);
+				}
 
-				//temp_image_buffer[j] = min(temp_image_buffer[j], vec3(1));
-				//add_color(img.buffer_start, j, final_color);
+
+				vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f) * surface_scale;
+				l.fl->pixel_colors[j] += final_color*sample_scale;
 			}
 		}
 		if (enable_radiosity) {
@@ -914,30 +908,10 @@ void final_light_face(int face_num)
 	img.buffer_start = data_buffer.size();
 	make_space(img.height * img.width);
 	
-
-	//triangulation_t* t=nullptr;
 	if (enable_radiosity) {
-		//t = new triangulation_t;
-		//t->color = random_color();
-		//t->face = face;
-		/*
-		patch_t* p = face_patches[face_num];
-		while (p)
-		{
-			t->add_point(p);
-			p = p->next;
-		}
-
-		t->triangulate_points();
-		*/
 		Radial radial(fl,face);
 		radial.build_ambient_samples(face_num);
 		for (int i = 0; i < fl->num_points; i++) {
-
-			vec3 sample_point = fl->sample_points[i];
-			vec3 gi_color;
-			//t->sample(sample_point, gi_color);
-
 			fl->pixel_colors[i] += radial.get_ambient(i);
 		}
 	}
@@ -949,38 +923,14 @@ void final_light_face(int face_num)
 			int offset = y * img.width + x;
 			total = fl->pixel_colors[y * img.width + x];
 			add_color(img.buffer_start, offset, total);
-
-			continue;
-
-			for (int i = -1; i <= 1; i++) {
-				for (int j = -1; j <= 1; j++) {
-					int ycoord = y + i;
-					int xcoord = x + j;
-					if (ycoord<0 || ycoord>img.height - 1 || xcoord <0 || xcoord> img.width - 1)
-						continue;
-
-					total += fl->pixel_colors[ycoord * img.width + xcoord];
-					added++;
-				}
-			}
-			total /= added;
-			//assert(offset < l.numpts);
-
-
-			//add_color(img.buffer_start, offset, total);
-
 		}
 	}
-
-
 
 	images.push_back(img);
 
 
-
 	delete[] fl->pixel_colors;
 	delete[] fl->sample_points;
-//	delete t;
 }
 
 
@@ -1031,9 +981,6 @@ void append_to_lightmap(const PackNode* pn, const Image* img)
 	int x_coord = pn->rc.x;
 	int y_coord = pn->rc.y;
 
-//	int actual_width = img->width - 2;
-//	int actual_height = img->height - 2;
-
 	for (int y = 0; y < img->height; y++) {
 		for (int x = 0; x <img->width; x++) {
 
@@ -1043,7 +990,6 @@ void append_to_lightmap(const PackNode* pn, const Image* img)
 			g = data_buffer.at(temp_buf_offset + 1);
 			b = data_buffer.at(temp_buf_offset + 2);
 
-			// plus one is to adjust for the padding on the sides
 			add_to_buffer(x_coord + x, y_coord + y, r, g, b);
 		}
 	}
@@ -1058,7 +1004,7 @@ void add_lights(worldmodel_t* wm)
 		entity_t* ent = &wm->entities.at(i);
 		auto find = ent->properties.find("classname");
 		vec3 color = vec3(1.0);
-		int brightness = 200;
+		float brightness = 200;
 		if (find->second == "light_torch_small_walltorch") {
 			color = vec3(1.0, 0.3, 0.0);
 			brightness = 100;
@@ -1100,9 +1046,36 @@ void add_lights(worldmodel_t* wm)
 			sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
 		}
 
-		lights.push_back({ org,color,brightness });
+		light_t l;
+		l.pos = org;
+		l.color = color;
+		l.brightness = brightness;
+		l.type = LIGHT_POINT;
 
+		lights.push_back(l);
 	}
+	for (int i = 0; i < num_patches; i++)
+	{
+		patch_t* p = patches + i;
+		float light_amt = dot(p->total_light, vec3(1.f));
+		if (light_amt < 1.f) {
+			continue;
+		}
+		
+		texture_info_t* ti = tinfo + faces[p->face].t_info_idx;
+
+		light_t l;
+		// brightness value is stored in the x texture scale
+		l.brightness = ti->uv_scale[0] * p->area;
+		l.color = vec3(1.f);
+		l.type = LIGHT_SURFACE;
+		l.normal = faces[p->face].plane.normal;
+		l.pos = p->center + l.normal * 0.01f;
+		
+		lights.push_back(l);
+	}
+
+
 }
 void mark_bad_faces()
 {
@@ -1150,7 +1123,6 @@ void create_light_map(worldmodel_t* wm)
 	tex_strings = wm->texture_names.data();
 	num_tex_strings = wm->texture_names.size();
 
-	add_lights(wm);
 	
 	if (inside_map) {
 		mark_bad_faces();
@@ -1161,6 +1133,8 @@ void create_light_map(worldmodel_t* wm)
 		make_patches();
 		subdivide_patches();
 	}
+
+	add_lights(wm);
 	// Used for random debug colors
 	srand(time(NULL));
 

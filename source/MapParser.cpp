@@ -38,6 +38,9 @@ void MapParser::start_file(std::string file)
 	std::cout << "Finished parse. Entities: " << entities.size() << "; Brushes: " << brushes.size() << "; Faces: " << faces.size() << "; Surface area: " << surf_area << '\n';
 	printf("Performing CSG union...\n");
 	CSG_union();
+
+	set_surface_flags();
+
 	post_process_pass();
 	std::cout << "Faces after CSG: "<< faces.size() << '\n';
 	surf_area = get_surface_area();
@@ -177,12 +180,21 @@ void MapParser::parse_file()
 
 	while (true)
 	{
-		Result r = parse_entity();
+		Result r;
+		try {
+			r = parse_entity();
+		}
+		// std::stoi throws an exception
+		catch (...) {
+			r = R_FAIL;
+		}
+
 		if (r == R_EOF) {
 			break;
 		}
 		else if (r == R_FAIL) {
-			std::cout << "Aborting!\n";
+			printf("Aborting!\n");
+			printf("Did you mean to parse the %s format instead?\n", ((quake_format) ? "valve" : "quake"));
 			exit(1);
 		}
 	}
@@ -595,14 +607,6 @@ MapParser::Result MapParser::read_str(bool in_quotes)
 }
 void MapParser::post_process_pass()
 {
-	int skip_idx = -1;
-	for (int i = 0; i < textures.size(); i++) {
-		if (textures[i] == "tools/skip") {
-			skip_idx = i;
-			break;
-		}
-	}
-	
 	for (int i = 0; i < vertex_list.size(); i++) {
 		auto& v = vertex_list.at(i);
 		v /= 32.f;
@@ -619,7 +623,7 @@ void MapParser::post_process_pass()
 	for (int i = 0; i < face_list.size(); i++) {
 		auto& f = face_list.at(i);
 		ti = &t_info.at(f.t_info_idx);
-		if (ti->t_index == skip_idx) {
+		if (ti->flags & SURF_NODRAW) {
 			f.dont_draw = true;
 		}
 	
@@ -675,6 +679,43 @@ void MapParser::compute_bounds(mapbrush_t* mb)
 			mb->max = glm::max(mb->max, mf->wind.v[j]);
 		}
 	}
+}
+
+struct SurfaceParam
+{
+	const char* keyword;
+	int flag;
+};
+SurfaceParam params[] = {
+	{"color/emit", SURF_EMIT},
+	{"tools/skip", SURF_NODRAW}
+};
+
+
+void MapParser::set_surface_flags()
+{
+	int param_count = sizeof(params) / sizeof(SurfaceParam);
+	for (int i = 0; i < textures.size(); i++)
+	{	
+		int flag_to_set = 0;
+		for (int j = 0; j < param_count; j++) {
+			if (textures.at(i) == params[j].keyword) {
+				flag_to_set = params[j].flag;
+				break;
+			}
+		}
+		if (flag_to_set == 0)
+			continue;
+
+		for (int j = 0; j < t_info.size(); j++) {
+			if (t_info[j].t_index == i) {
+				t_info[j].flags |= flag_to_set;
+			}
+		}
+	}
+
+
+
 }
 uint64 MapParser::get_surface_area()
 {

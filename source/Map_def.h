@@ -9,6 +9,13 @@ using namespace glm;
 class Texture;
 // Parsed from .map file
 
+
+enum MapSurfFlags
+{
+	SURF_NODRAW = 1,
+	SURF_EMIT = 2,
+
+};
 struct texture_info_t
 {
 	int t_index=0;
