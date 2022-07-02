@@ -69,9 +69,9 @@ const entity_t* find_entity_with_classname(const worldmodel_t* wm, const char* c
 void App::create_scene()
 {
 	
-	MapParser mp(true);
+	MapParser mp(false);
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/start.map");
+	mp.start_file("resources/maps/cornell_box.map");
 
 	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
 	mp.add_to_worldmodel(&world);

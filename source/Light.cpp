@@ -47,23 +47,22 @@ vec3 illumination[MAX_PATCHES];
 std::vector<u8> data_buffer;
 
 std::vector<u8> final_lightmap;
-
-int lm_width = 1500;
-int lm_height = 1500;
+int lm_width = 1200;
+int lm_height = 1200;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
 // this is how many actual pixels are in the lightmap, each pixel gets supersampled with 4 additional samples 
-float density_per_unit = 4.f;
-// Determines biggest side length of a patch, more patches dramatically slow lighting time
-float patch_grid = 4.0f;
+float density_per_unit = 8.f;
+// Determines size of a patch, more patches dramatically slow radiosity lighting time (its O(n^2))
+float patch_grid = 0.5f;
 // Number of bounce iterations, you already pay the price computing form factors so might as well set it high
 int num_bounces = 64;
-// Obvious
+// False means direct only
 bool enable_radiosity = true;
 // determine if "outward facing" faces are culled and not computed, helps performance and file space for Quake and indoor maps
 bool inside_map = true;
 // Cast a ray from the patch to the center of a face to prevent light bleeds, breaks on some maps
-bool test_patch_visibility = false;
+bool test_patch_visibility = true;
 
 VertexArray va;
 VertexArray point_array;
@@ -167,18 +166,6 @@ public:
 		get_extents(face_winding, face_min, face_max);
 
 		// Loop through all patches on the plane that the face is on
-		/*
-		p = face_patches[face_num];
-		while (p)
-		{
-			vec3 patch_min, patch_max;
-			get_extents(p->winding, patch_min, patch_max);
-			add_ambient_sample(p, patch_min, patch_max);
-			p = p->next;
-		}
-		return;
-		*/
-
 		pn = &planes[index_to_plane_list[face_num]];
 		while (pn)
 		{
@@ -279,7 +266,7 @@ void patch_for_face(int face_num)
 		return;
 	}
 	patch_t* p = &patches[num_patches++];
-	assert(num_patches < 0x1000);
+	assert(num_patches < 0x10000);
 	p->face = face_num;
 	face_patches[face_num] = p;
 
@@ -317,7 +304,6 @@ void make_patches()
 }
 
 static int failed_subdivide = 0;
-const float some_num = 20.f;
 void subdivide_patch(patch_t* p)
 {
 	vec3 min, max;
@@ -448,6 +434,7 @@ void make_transfers(int patch_num)
 		plane_t* planej = &faces[other->face].plane;
 		float angj = -dot(dir, planej->normal);
 		float factor = (angj * angi * other->area) / (dist_sq);
+
 		if (factor <= 0.00005) {
 			continue;
 		}
@@ -507,7 +494,8 @@ void start_radiosity()
 	for (int i = 0; i < num_patches; i++)
 	{
 		patch_t* p = &patches[i];
-		radiosity[i] = p->sample_light * p->reflectance*p->area;
+		radiosity[i] = p->sample_light * p->reflectance * p->area;
+
 	}
 	for (int i = 0; i < num_bounces; i++)
 	{
@@ -528,9 +516,7 @@ void free_patches()
 }
 
 
-const int MAP_PTS = 256 * 256;
-//std::vector<vec3> points(MAP_PTS);
-//std::vector<vec3> temp_image_buffer(MAP_PTS);
+const int MAX_POINTS = 256 * 256;
 struct LightmapState
 {
 	//std::vector<vec3> points;
@@ -697,8 +683,8 @@ void calc_points(LightmapState& l, Image& img)
 	float start_u = l.exact_min[0];	// added -0.25
 	float start_v = l.exact_min[1];
 	l.numpts = h * w;
-	if (l.numpts > MAP_PTS) {
-		l.numpts = MAP_PTS;
+	if (l.numpts > MAX_POINTS) {
+		l.numpts = MAX_POINTS;
 	}
 	total_pixels += l.numpts;
 
@@ -761,13 +747,13 @@ void calc_points(LightmapState& l, Image& img)
 					}
 				}
 
-				if (top_point >= MAP_PTS) {
-					l.numpts = MAP_PTS - 1;
+				if (top_point >= MAX_POINTS) {
+					l.numpts = MAX_POINTS - 1;
 					img.height = y - 1;
 					l.fl->height = y - 1;
 					goto face_too_big;
 				}
-				assert(top_point < MAP_PTS);
+				assert(top_point < MAX_POINTS);
 				l.sample_points[s][top_point++] = point;
 			}
 		}
@@ -879,7 +865,7 @@ void light_face(int num)
 				}
 
 				total_rays_cast++;
-				trace_t res = global_world.tree.test_ray_fast(sample_pos, light_p, -0.005f, true, 0.005f);
+				trace_t res = global_world.tree.test_ray_fast(sample_pos, light_p, -0.005f, 0.005f);
 				if (res.hit) {
 					continue;
 				}
@@ -907,7 +893,9 @@ void light_face(int num)
 		patch_t* patch = face_patches[num];
 		while (patch)
 		{
-			patch->sample_light /= patch->num_samples;
+			if (patch->num_samples > 0) {
+				patch->sample_light /= patch->num_samples;
+			}
 			patch = patch->next;
 		}
 	}
@@ -1043,8 +1031,11 @@ void append_to_lightmap(const PackNode* pn, const Image* img)
 	int x_coord = pn->rc.x;
 	int y_coord = pn->rc.y;
 
+//	int actual_width = img->width - 2;
+//	int actual_height = img->height - 2;
+
 	for (int y = 0; y < img->height; y++) {
-		for (int x = 0; x < img->width; x++) {
+		for (int x = 0; x <img->width; x++) {
 
 			int temp_buf_offset = img->buffer_start + y * img->width * 3 + x * 3;
 			u8 r, g, b;
@@ -1052,10 +1043,11 @@ void append_to_lightmap(const PackNode* pn, const Image* img)
 			g = data_buffer.at(temp_buf_offset + 1);
 			b = data_buffer.at(temp_buf_offset + 2);
 
-
+			// plus one is to adjust for the padding on the sides
 			add_to_buffer(x_coord + x, y_coord + y, r, g, b);
 		}
 	}
+
 }
 
 void add_lights(worldmodel_t* wm)
@@ -1204,9 +1196,9 @@ void create_light_map(worldmodel_t* wm)
 
 	final_lightmap.resize(lm_width * lm_height * 3, 0);
 	for (int i = 0; i < final_lightmap.size(); i += 3) {
-		//final_lightmap[i] = 255;
-		//final_lightmap[i+1] = 0;
-		//final_lightmap[i+2] = 255;
+		final_lightmap[i] = 255;
+		final_lightmap[i+1] = 0;
+		final_lightmap[i+2] = 255;
 
 	}
 
@@ -1221,6 +1213,10 @@ void create_light_map(worldmodel_t* wm)
 	root->rc.height = lm_height;
 	root->rc.width = lm_width;
 	for (int i = 0; i < images.size(); i++) {
+		Image* img = &images.at(i);
+		img->height;// += 2;
+		img->width;// += 2;
+
 		auto pnode = insert_imgage(root, &images.at(i));
 		if (!pnode) {
 			printf("Not enough room in lightmap\n");
@@ -1232,11 +1228,11 @@ void create_light_map(worldmodel_t* wm)
 		append_to_lightmap(pnode, &images.at(i));
 
 		face_t* f = &faces[images.at(i).face_num];
-		f->lightmap_min[0] = pnode->rc.x;
-		f->lightmap_min[1] = pnode->rc.y;
+		f->lightmap_min[0] = pnode->rc.x;// +1;
+		f->lightmap_min[1] = pnode->rc.y;// +1;
 
-		f->lightmap_size[0] = pnode->rc.width;
-		f->lightmap_size[1] = pnode->rc.height;
+		f->lightmap_size[0] = pnode->rc.width;// -1;
+		f->lightmap_size[1] = pnode->rc.height;// -1;
 	}
 
 	delete root;

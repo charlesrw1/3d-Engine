@@ -31,10 +31,6 @@ Renderer::Renderer()
 		std::cout << "Framebuffer not complete!" << std::endl;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	new_b.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::RGB, true));
-
-
 	HDRbuffer.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::FLOAT16, true));
 
 	depth_map.create(FramebufferSpec(SHADOW_WIDTH, SHADOW_WIDTH, 1, FBAttachments::DEPTH, false));
@@ -115,7 +111,6 @@ void Renderer::render_scene(SceneData& scene)
 
 
 	bloom_pass();
-	// ugly ass shit
 	if (bloom_debug) {
 		uint32_t id;
 		if (show_bright_pass) {

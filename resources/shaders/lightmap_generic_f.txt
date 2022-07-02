@@ -4,7 +4,8 @@ out vec4 FragColor;
 in vec3 Normal;  
 in vec3 FragPos;  
 in vec2 TexCoord;
-in vec2 LightMapCoord;
+// This fixes extrapolated UV's which ruin the lightmap
+centroid in vec2 LightMapCoord;
   
 
 uniform sampler2D baseTex;

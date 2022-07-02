@@ -224,7 +224,7 @@ trace_t BSPtree::test_ray_debug(vec3 start, vec3 end)
 #define LEAF_OFFSET(a) (a&0x7FFFFFFF)
 
 
-trace_t BSPtree::test_ray_fast(vec3 start, vec3 end, float epsilon, bool dif_first_epsilon, float first_epsilon)
+trace_t BSPtree::test_ray_fast(vec3 start, vec3 end, float epsilon, float first_epsilon)
 {
 	trace_t trace;
 	trace.dir = normalize(end - start);

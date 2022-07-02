@@ -69,12 +69,18 @@ void MapParser::CSG_union()
 		bm.face_start = face_list.size();
 		for (int i = 0; i < clipped_faces.size(); i++)
 		{
-			assert(clipped_faces[i].plane.d != NAN || clipped_faces[i].plane.d != -NAN);
 			face_t f;
 			f.plane = clipped_faces[i].plane;
 			f.t_info_idx = clipped_faces[i].t_info_idx;
 			f.v_start = vertex_list.size();
 			winding_t* w = &clipped_faces[i].wind;
+
+			if (w->num_verts < 3) {
+				printf("Not enough verts in winding, removing face\n");
+				continue;
+			}
+
+
 			for (int j = 0; j < w->num_verts; j++) {
 				vertex_list.push_back(w->v[j]);
 			}

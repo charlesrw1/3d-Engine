@@ -51,7 +51,7 @@ public:
 
 	// 10% faster than test_ray
 	// kinda gross arguments, but it lets a ray not end up hitting the plane it starts from which is annoying
-	trace_t test_ray_fast(vec3 start, vec3 end, float epsilon = -0.005f,bool dif_first_epsilon = false, float first_epsilon = -0.005f);
+	trace_t test_ray_fast(vec3 start, vec3 end, float epsilon = -0.005f,float first_epsilon = -0.005f);
 	void print_leaves_with_face(int face)
 	{
 		std::cout << "Printing leaves with face: " << face << '\n';

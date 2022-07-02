@@ -51,7 +51,6 @@ public:
 	VertexArray quad;
 
 	Framebuffer HDRbuffer;
-	Framebuffer new_b;
 	Framebuffer intermediate;
 	Framebuffer depth_map;
 
@@ -105,7 +104,7 @@ public:
 	// Matricies for the current frame
 	mat4 projection_matrix, view_matrix;
 
-	// Must be called every frame, or they get cleared
+	// Must be called every frame, they get cleared
 	void debug_line(vec3 start, vec3 end, vec3 color);
 	void debug_point(vec3 pos, vec3 color);
 	void debug_box(vec3 min, vec3 max, vec3 color);

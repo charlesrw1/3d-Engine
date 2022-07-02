@@ -103,7 +103,7 @@ void WorldGeometry::create_mesh()
 				//u = (u - 0.5) * 0.90 + 0.5;
 				
 				u = face.lightmap_min[i]+0.5 + u * (face.lightmap_size[i]-1);	// hack for now to remove pink borders
-				wrv.lightmap_uv[i] = u/1500;//256 = lightmap dimensions
+				wrv.lightmap_uv[i] = u/1200;//256 = lightmap dimensions
 			}
 
 			gpu_verts.push_back(wrv);

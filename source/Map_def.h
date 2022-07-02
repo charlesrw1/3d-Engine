@@ -87,17 +87,11 @@ struct LightmapVert
 struct worldmodel_t
 {
 	std::vector<brush_model_t> models;	// 0 is world model, rest are indexed by entity key: "model"
-
 	std::vector<vec3> verts;
-
 	std::vector<face_t> faces;
-
 	std::vector<texture_info_t> t_info;
-
 	std::vector<Texture*> textures;
-
 	std::vector<std::string> texture_names;
-
 	std::vector<entity_t> entities;
 };
 

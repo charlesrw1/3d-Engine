@@ -168,27 +168,6 @@ void MapParser::sort_verticies(mapface_t* face)
 
 }
 
-static const vec3 axis_dir[]
-{
-{0,0,1}	,		// floor
-{0,0,-1},		// ceiling
-{0,1,0}, 		// south wall
-{0,-1,0},		// north wall
-{1,0,0}, 			// west wall
-{-1,0,0}, 		// east wall
-};
-
-// amount to push clip hull
-static const float push_amt[]
-{
-	0,
-	64.f,
-	16.f,
-	16.f,
-	16.f,
-	16.f,
-};
-
 
 void MapParser::parse_file()
 {
@@ -207,6 +186,7 @@ void MapParser::parse_file()
 			exit(1);
 		}
 	}
+
 	// Finds verticies that belong to each face
 	for (int i = 0; i < brushes.size(); i++) {
 		compute_intersections(&brushes.at(i));
@@ -642,12 +622,13 @@ void MapParser::post_process_pass()
 		if (ti->t_index == skip_idx) {
 			f.dont_draw = true;
 		}
+	
 		//f.plane.normal = vec3(-f.plane.normal.x, f.plane.normal.z, f.plane.normal.y);
 		f.plane.init(vertex_list.at(f.v_start+1), vertex_list.at(f.v_start), vertex_list.at(f.v_start + 2));
 		//f.plane.normal *= -1.f;
 		//f.plane.d = -dot(f.plane.normal, vertex_list.at(f.v_start));
 		if (std::isnan(f.plane.d)) {
-			printf("Degenerate plane!\n");
+			printf("Degenerate face!\n");
 			f.plane.normal = vec3(1, 0, 0);
 			f.plane.d = 0;
 		}
