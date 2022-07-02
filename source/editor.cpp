@@ -200,7 +200,7 @@ void Editor::on_render()
 	vec3 min, max;
 	//global_world.tree.find_leaf(global_app.scene->active_camera()->position, min, max);
 	//global_app.r->debug_box(min, max, vec3(0, 0, 1));
-
+	/*
 	winding_t w;
 	w.add_vert({ 0,5,0 });
 	w.add_vert({ -3,5,2 });
@@ -212,7 +212,7 @@ void Editor::on_render()
 	}
 	auto point = w.closest_point_on_winding(global_app.scene->active_camera()->position);
 	r->debug_point(point, vec3(1, 0, 1));
-
+	*/
 
 
 	ImGui::Render();

@@ -52,16 +52,25 @@ int lm_width = 1500;
 int lm_height = 1500;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
-float density_per_unit = 2.f;
+float density_per_unit = 4.f;
 
-float patch_grid = 2.f;
-int num_bounces = 100;
+float patch_grid = 4.f;
+int num_bounces = 64;
 
-bool enable_radiosity = false;
+bool enable_radiosity = true;
 bool inside_map = true;
 
 VertexArray va;
 VertexArray point_array;
+
+struct planeneighbor_t
+{
+	planeneighbor_t* next = nullptr;
+	int face = 0;
+};
+static int num_planes = 0;
+planeneighbor_t planes[MAX_PATCHES];
+int index_to_plane_list[MAX_PATCHES];
 
 vec3 lerp(const vec3& a, const vec3& b, float percentage)
 {
@@ -130,7 +139,7 @@ struct triangle_t
 {
 	triedge_t* edges[3] = { nullptr,nullptr,nullptr };
 };
-#define MAX_TRI_POINTS 512
+#define MAX_TRI_POINTS 1024
 #define MAX_TRI_EDGES (MAX_TRI_POINTS*6)
 #define MAX_TRI_TRIS (MAX_TRI_POINTS*2)
 // shamelessly stolen from Quake 2...
@@ -310,7 +319,7 @@ struct triangulation_t
 			if (!point_in_tri(point, tri))
 				continue;
 			lerp_tri(tri, point, color);
-			return;
+			//return;
 		}
 		for (int i = 0; i < num_edges; i++) {
 			triedge_t* te = &edges[i];
@@ -331,7 +340,7 @@ struct triangulation_t
 			patch_t* pp0 = patch_points[te->p0];
 			patch_t* pp1 = patch_points[te->p1];
 			color = pp0->total_light + d * (pp1->total_light - pp0->total_light);
-			return;
+			//return;
 
 		}
 		float best_d = 10000;
@@ -353,6 +362,122 @@ struct triangulation_t
 	}
 
 };
+
+const float RADIAL = 8.f;
+const float RADIALSQRT = sqrt(RADIAL);
+
+// This is similar to what Valve uses in VRAD, Quake 2's triangulation method was garbage frankly
+class Radial
+{
+public:
+	Radial(facelight_t* fl, face_t* face) : fl(fl), face(face) {
+		weights = new float[fl->num_pixels];
+		memset(weights, 0, fl->num_pixels*sizeof(float));
+		ambient_light = new vec3[fl->num_pixels];
+		memset(ambient_light, 0, fl->num_pixels * sizeof(vec3));
+	}
+	~Radial() {
+		delete[] weights;
+		delete[] ambient_light;
+	}
+	void build_ambient_samples(int face_num) {
+		patch_t* p;
+		planeneighbor_t* pn;
+		
+		// Get face extents and middle
+		winding_t face_winding;
+		vec3 face_middle=vec3(0.0f);
+		vec3 face_min, face_max;
+		for (int i = 0; i < face->v_count; i++) {
+			face_winding.add_vert(verts[face->v_start + i]);
+			face_middle += verts[face->v_start + i];
+		}
+		face_middle /= face->v_count;
+		get_extents(face_winding, face_min, face_max);
+
+		// Loop through all patches on the plane that the face is on
+		/*
+		p = face_patches[face_num];
+		while (p)
+		{
+			vec3 patch_min, patch_max;
+			get_extents(p->winding, patch_min, patch_max);
+			add_ambient_sample(p, patch_min, patch_max);
+			p = p->next;
+		}
+		return;
+		*/
+
+		pn = &planes[index_to_plane_list[face_num]];
+		while (pn)
+		{
+			p = face_patches[pn->face];
+			while (p)
+			{
+				vec3 patch_min, patch_max;
+				get_extents(p->winding, patch_min, patch_max);
+				int i;
+				for (i = 0; i < 3; i++) {
+					// if patch is roughly inside the face bounds, keep it
+					if (patch_max[i]+patch_grid<face_min[i])
+						break;
+					if (patch_min[i]-patch_grid>face_max[i])
+						break;
+				}
+				if (i == 3) {
+					auto check_wall_collison = global_world.tree.test_ray_fast(p->center, face_middle);
+					if (!check_wall_collison.hit) {
+						add_ambient_sample(p, patch_min, patch_max);
+
+					}
+				}
+				p = p->next;
+			}
+			pn = pn->next;
+		}
+
+
+	}
+	// patch is roughly on the face, check all the points and how much the patch contributes to it
+	void add_ambient_sample(patch_t* p, vec3 min, vec3 max) {
+
+		vec3 size = max - min;
+		vec3 ext_min = min - size * vec3(RADIALSQRT);
+		vec3 ext_max = max + size * vec3(RADIALSQRT);
+		vec3 patch_center = p->center;
+		for (int i = 0; i < fl->num_points; i++) {
+			vec3 point = fl->sample_points[i];
+			int j;
+			for (j = 0; j < 3; j++) {
+				if (point[j]<ext_min[j]-0.1f || point[j]>ext_max[j]+0.1f)
+					break;
+			}
+			// point is outside the bounds of patchs "influence"
+			if (j != 3)
+				continue;
+
+			float sq_dist = dot(patch_center - point, patch_center - point);
+			float weight = RADIAL - sq_dist;
+			if (weight < 0)
+				continue;
+			weights[i] += weight;
+			ambient_light[i] += p->total_light * weight;
+		}
+	}
+	vec3 get_ambient(int sample_num) {
+		if (weights[sample_num] > 0) {
+			return ambient_light[sample_num] / weights[sample_num];
+		}
+		return vec3(1, 0, 1);
+	}
+
+private:
+	face_t* face = nullptr;
+	facelight_t* fl = nullptr;
+	float* weights = nullptr;
+	vec3* ambient_light = nullptr;
+};
+
 
 void make_space(int pixels)
 {
@@ -415,36 +540,6 @@ void make_patches()
 		patch_for_face(i);
 	}
 }
-/*
-
-	for (i = 0; i < 3; i++) {
-		//(floor(((min[i]+0.05)* some_num))/ some_num / patch_grid)
-		//(ceil(((max[i] - 0.05)* some_num)/ some_num) / patch_grid)
-		float f1 = floor(min[i] + 1);
-		float c1 = ceil(max[i] - 1);
-
-		if (f1<=c1) {
-			plane_t split;
-			split.normal = vec3(0);
-			split.normal[i] = 1.f;
-			//-(((floor((min[i] + 1) * some_num) / some_num) / patch_grid) + 1) * patch_grid;
-			split.d = -(floor(min[i] + 0.1) + 1);
-			bool res = try_split_winding(p->winding, split, front, back);
-			if (res) {
-				break;
-			}
-			failed_subdivide++;
-		}
-	}*/
-/*
-
-if ((floor(((min[i]+1)* some_num))/ some_num / patch_grid) < (ceil(((max[i] - 1)* some_num)/ some_num) / patch_grid)+0.01f) {
-			plane_t split;
-			split.normal = vec3(0);
-			split.normal[i] = 1.f;
-			split.d = -(((floor((min[i] + 1) * some_num) / some_num) / patch_grid) + 1) * patch_grid;
-			bool res = try_split_winding(p->winding, split, front, back);
-			*/
 
 static int failed_subdivide = 0;
 const float some_num = 20.f;
@@ -699,14 +794,6 @@ std::vector<light_t> lights; //= { { {2.f,20.f,-9.f},{0.3f,1.0f,0.4f} } };// , {
 static u32 total_pixels = 0;
 static u32 total_rays_cast = 0;
 
-struct planeneighbor_t
-{
-	planeneighbor_t* next=nullptr;
-	int face=0;
-};
-static int num_planes = 0;
-planeneighbor_t planes[MAX_PATCHES];
-int index_to_plane_list[MAX_PATCHES];
 static int num_unique_planes = 0;
 bool plane_equals(plane_t& p1, plane_t& p2)
 {
@@ -825,8 +912,8 @@ void calc_extents(LightmapState& l)
 		l.face->exact_span[i] = max[i] - min[i];
 	}
 }
-
-const float sample_ofs[4][2] = { {0.1,0.1},{0.1,-0.1},{-0.1,-0.1},{-0.1,0.1} };
+const float of_dist = 0.05f;
+const float sample_ofs[4][2] = { {of_dist,of_dist},{of_dist,-of_dist},{-of_dist,-of_dist},{-of_dist,of_dist} };
 
 void calc_points(LightmapState& l, Image& img)
 {
@@ -1067,11 +1154,13 @@ void final_light_face(int face_num)
 	img.width = fl->width;
 	img.buffer_start = data_buffer.size();
 	make_space(img.height * img.width);
-	triangulation_t* t=nullptr;
+	
+	//triangulation_t* t=nullptr;
 	if (enable_radiosity) {
-		t = new triangulation_t;
-		t->color = random_color();
-		t->face = face;
+		//t = new triangulation_t;
+		//t->color = random_color();
+		//t->face = face;
+		/*
 		patch_t* p = face_patches[face_num];
 		while (p)
 		{
@@ -1080,14 +1169,16 @@ void final_light_face(int face_num)
 		}
 
 		t->triangulate_points();
-
+		*/
+		Radial radial(fl,face);
+		radial.build_ambient_samples(face_num);
 		for (int i = 0; i < fl->num_points; i++) {
 
 			vec3 sample_point = fl->sample_points[i];
 			vec3 gi_color;
-			t->sample(sample_point, gi_color);
+			//t->sample(sample_point, gi_color);
 
-			fl->pixel_colors[i] += gi_color;
+			fl->pixel_colors[i] += radial.get_ambient(i);
 		}
 	}
 	
@@ -1129,7 +1220,7 @@ void final_light_face(int face_num)
 
 	delete[] fl->pixel_colors;
 	delete[] fl->sample_points;
-	delete t;
+//	delete t;
 }
 
 
@@ -1327,8 +1418,8 @@ void create_light_map(worldmodel_t* wm)
 		mark_bad_faces();
 	}
 
-	//find_coplanar_faces();
 	if (enable_radiosity) {
+		find_coplanar_faces();
 		make_patches();
 		subdivide_patches();
 	}
