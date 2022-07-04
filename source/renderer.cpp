@@ -20,8 +20,9 @@ Renderer::Renderer()
 	debug_points.init(VAPrim::POINTS);
 
 	quad.init(VAPrim::TRIANGLES);
-
+	overlay_quad.init(VAPrim::TRIANGLES);
 	quad.add_quad(vec2(-1, 1), vec2(2, 2));
+	overlay_quad.add_quad(vec2(0), vec2(512, 512));
 
 	white_tex = global_textures.find_or_load("white.png");
 
@@ -142,6 +143,21 @@ void Renderer::render_scene(SceneData& scene)
 	gamma_tm_bloom.set_float("exposure", exposure).set_int("screen_tex", 0).set_int("bloom_tex", 1);
 
 	quad.draw_array();
+
+
+	if (d_lightmap_overlay) {
+
+		mat4 two2d = glm::ortho(0.0f, (float)view.width, (float)-view.height, 0.0f);
+		textured_prim_transform.use();
+		textured_prim_transform.set_mat4("u_projection", two2d).set_mat4("u_view", mat4(1.0));
+		glDisable(GL_DEPTH_TEST);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, lightmap_tex_linear->get_ID());
+		overlay_quad.draw_array();
+		glEnable(GL_DEPTH_TEST);
+	}
+
+
 }
 
 void Renderer::upload_point_lights(SceneData& scene)
@@ -568,6 +584,7 @@ void Renderer::visualize_overdraw(SceneData& scene)
 }
 void Renderer::load_shaders()
 {
+	textured_prim_transform.load_from_file("textured_primitive_v.txt", "textured_primitive_f.txt");
 	debug_depth.load_from_file("no_transform_v.txt", "depth_map_debug_f.txt");
 
 	depth_render.load_from_file("depth_render_v.txt", "depth_render_f.txt");

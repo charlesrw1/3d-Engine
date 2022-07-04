@@ -48,6 +48,16 @@ struct Camera
 	mat4 get_view_matrix() {
 		return view_matrix;
 	}
+	void set_position(vec3 new_pos) {
+		position = new_pos;
+		update_view_matrix();
+	}
+	void set_angles(float yaw, float pitch) {
+		this->yaw = yaw;
+		this->pitch = pitch;
+		update_vectors();
+		update_view_matrix();
+	}
 	// input update
 	void keyboard_update(const uint8_t* key_state);
 	void mouse_update(int x_pos, int y_pos);

@@ -21,6 +21,8 @@ private:
 	bool show_light_lines = true;
 	bool show_shadow_map = false;
 
+	char buffer[256];
+
 
 	std::vector<trace_t> world_hits;
 

@@ -32,7 +32,8 @@ void MapParser::start_file(std::string file)
 		std::cout << "Couldn't open .map file, " << file << '\n';
 		exit(1);
 	}
-	
+	int start = file.rfind('/')+1;
+	map_name = file.substr(start, file.rfind('.')-start);
 	parse_file();
 	uint64 surf_area = get_surface_area();
 	std::cout << "Finished parse. Entities: " << entities.size() << "; Brushes: " << brushes.size() << "; Faces: " << faces.size() << "; Surface area: " << surf_area << '\n';

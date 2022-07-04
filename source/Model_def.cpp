@@ -184,3 +184,13 @@ bool Model::init_from_file(const char* file)
 
 	return true;
 }
+
+void Model::purge_model()
+{
+	for (int i = 0; i < meshes.size(); i++) {
+		glDeleteBuffers(1, &meshes[i].vbo);
+		glDeleteBuffers(1, &meshes[i].ebo);
+	}
+	meshes.clear();
+	loaded = false;
+}

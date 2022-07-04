@@ -21,6 +21,9 @@
 
 #include "WorldGeometry.h"
 #include "Light.h"
+
+#include <fstream>
+
 App global_app;
 
 void App::init()
@@ -31,7 +34,10 @@ void App::init()
 	scene = new SceneData;
 	editor = new Editor;
 
-	create_scene();
+	global_world.set_worldmodel(&world);
+	global_world.init_render_data();
+
+	//create_scene();
 	r->set_fov(45);
 	r->resize(width, height);
 }
@@ -42,14 +48,7 @@ void sdldie(const char* msg)
 	SDL_Quit();
 	exit(1);
 }
-/*
-GameObject* temp_create(const char* qobj, const char* texture)
-{
-	Mesh mes = load_qobj_mesh(qobj);
-	Material mat;
-	mat.diffuse = new Texture(load_texture_file(texture));
-	return new GameObject(mes, mat);
-}*/
+
 vec3 make_color(uint8_t r, uint8_t b, uint8_t g) {
 	return vec3(r / 255.f, b / 255.f, g / 255.f);
 }
@@ -71,21 +70,28 @@ void App::create_scene()
 	
 	MapParser mp(false);
 	u32 map_start = SDL_GetTicks();
-	mp.start_file("resources/maps/pillars.map");
+	load_compiled_map("pillars.cmf");
+	
+	//mp.start_file("resources/maps/pillars.map");
 
-	mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
-	mp.add_to_worldmodel(&world);
+	//mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
+	//mp.move_to_worldmodel(&world);
 
 	global_world.load_map(&world);
-	create_light_map(&world);
+	//create_light_map(&world);
 
-	r->lightmap_tex_nearest = global_textures.find_or_load("lightmap.bmp",NEAREST);
+	r->lightmap_tex_nearest = global_textures.find_or_load((world.name + "_lm.bmp").c_str(),NEAREST);
 	Texture* l_linear = new Texture;
-	l_linear->init_from_file("lightmap.bmp", LOAD_NOW);
+	l_linear->init_from_file(world.name+ "_lm.bmp", LOAD_NOW);
 	r->lightmap_tex_linear = l_linear;	// temporary, memory leak cause texture manager doesnt know multiple params
 
 
+	//load_compiled_map("pillars.cmf");
 	global_world.create_mesh();
+
+//	write_compiled_map();
+
+
 
 	u32 map_end = SDL_GetTicks();
 	printf("Loaded map in: %i ms\n", map_end - map_start);
@@ -221,6 +227,52 @@ void App::create_scene()
 
 }
 
+void App::compile_map(std::string map_name, LightmapSettings& lm_s, bool quake_format)
+{
+	MapParser mp(quake_format);
+	mp.start_file("resources/maps/" + map_name);
+	mp.move_to_worldmodel(&world);
+	global_world.upload_map_to_tree();
+
+	create_light_map(&world, lm_s);
+
+	write_compiled_map();
+}
+void App::setup_new_map()
+{
+	r->lightmap_tex_nearest = global_textures.find_or_load((world.name + "_lm.bmp").c_str(), NEAREST);
+	Texture* l_linear = new Texture;
+	l_linear->init_from_file(world.name + "_lm.bmp", LOAD_NOW);
+	r->lightmap_tex_linear = l_linear;	// temporary, memory leak cause texture manager doesnt know multiple params
+
+
+	global_world.create_mesh();
+	scene->cams[0].set_angles(0, 0);
+	const entity_t* player_start = find_entity_with_classname(&world, "info_player_start");
+	if (!player_start) {
+		scene->cams[0].position = vec3(0);
+		return;
+	}
+	auto org = player_start->properties.find("origin");
+	vec3 start = vec3(0);
+	if (org != player_start->properties.end()) {
+		sscanf_s(org->second.c_str(), "%f %f %f", &start.x, &start.y, &start.z);
+		start = vec3(-start.x, start.z, start.y) / 32.f;
+	}
+	scene->cams[0].set_position(start);
+}
+void App::load_map(std::string map_name)
+{
+	world.entities.clear();
+	load_compiled_map(map_name);
+	// This isnt really nessecary, but its nice to demo it
+	global_world.upload_map_to_tree();
+}
+void App::free_current_map()
+{
+	global_world.free_map();
+}
+
 void App::init_window()
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
@@ -341,4 +393,186 @@ void App::on_render()
 {
 	r->render_scene(*scene);
 	editor->on_render();
+}
+
+#define WRITE(ptr, count) outfile.write((char*)ptr, count)
+#define WRITE_ARRAY_SIZE(size) count_temp = size;\
+		WRITE(&count_temp,sizeof(int))
+
+static const char magic[] = { 'C', 'M', 'F' };
+void App::write_compiled_map()
+{
+	std::ofstream outfile("resources/maps/" + world.name + ".cmf", std::ios::binary);
+	int count_temp;
+	if (!outfile) {
+		printf("Failed to write compiled map\n");
+		return;
+	}
+	for (int i = 0; i < 3; i++) {
+		WRITE(&magic[i], 1);
+	}
+
+	WRITE(world.name.c_str(), world.name.size() + 1);
+
+	WRITE("MODELS", 7);
+	WRITE_ARRAY_SIZE(world.models.size());
+	for (int i = 0; i < world.models.size(); i++) {
+		WRITE(&world.models[i].face_start, sizeof(int));
+		WRITE(&world.models[i].face_count, sizeof(int));
+		WRITE(&world.models[i].min, sizeof(vec3));
+		WRITE(&world.models[i].max, sizeof(vec3));
+	}
+
+	assert(sizeof(vec3) == 12);
+	WRITE("VERTS", 6);
+	WRITE_ARRAY_SIZE(world.verts.size());
+	WRITE(world.verts.data(), world.verts.size() * sizeof(vec3));
+
+	assert(sizeof(plane_t) == 16);
+	WRITE("FACES", 6);
+	WRITE_ARRAY_SIZE(world.faces.size());
+	for (int i = 0; i < world.faces.size(); i++) {
+		WRITE(&world.faces[i].plane, sizeof(plane_t));
+		WRITE(&world.faces[i].v_start, sizeof(int));
+		WRITE(&world.faces[i].v_count, sizeof(int));
+		WRITE(&world.faces[i].t_info_idx, sizeof(int));
+		WRITE(&world.faces[i].lightmap_min[0], sizeof(short));
+		WRITE(&world.faces[i].lightmap_min[1], sizeof(short));
+		WRITE(&world.faces[i].lightmap_size[0], sizeof(short));
+		WRITE(&world.faces[i].lightmap_size[1], sizeof(short));
+		WRITE(&world.faces[i].lightmap_size[1], sizeof(short));
+		WRITE(&world.faces[i].exact_min[0], sizeof(float));
+		WRITE(&world.faces[i].exact_min[1], sizeof(float));
+		WRITE(&world.faces[i].exact_span[0], sizeof(float));
+		WRITE(&world.faces[i].exact_span[1], sizeof(float));
+		WRITE(&world.faces[i].dont_draw, 1);
+	}
+
+	assert(sizeof(texture_info_t) == 48);
+	WRITE("TINFO", 6);
+	WRITE_ARRAY_SIZE(world.t_info.size());
+	WRITE(world.t_info.data(), world.t_info.size() * sizeof(texture_info_t));
+
+	WRITE("TNAME", 6);
+	WRITE_ARRAY_SIZE(world.texture_names.size());
+	for (int i = 0; i < world.texture_names.size(); i++) {
+		WRITE(world.texture_names[i].c_str(), world.texture_names[i].size()+1);
+	}
+
+	WRITE("ENTS", 5);
+	WRITE_ARRAY_SIZE(world.entities.size());
+	for (int i = 0; i < world.entities.size(); i++) {
+		entity_t* e = &world.entities[i];
+		WRITE_ARRAY_SIZE(e->properties.size());
+		for (auto prop : e->properties) {
+			WRITE(prop.first.c_str(), prop.first.size() + 1);
+			WRITE(prop.second.c_str(), prop.second.size() + 1);
+		}
+	}	
+}
+#define READ(ptr,count)infile.read((char*)ptr, count)
+
+#define READ_STR(ptr) \
+	temp_str_ptr = ptr; \
+	while(infile.peek()!='\0') { \
+		*temp_str_ptr = infile.get();	\
+		temp_str_ptr++;	\
+	} \
+	*temp_str_ptr = infile.get(); 
+void App::load_compiled_map(std::string map_name)
+{
+	char string_buffer[256];
+	std::ifstream infile("resources/maps/" + map_name, std::ios::binary);
+	if (!infile) {
+		printf("Couldn't open compiled map\n");
+		return;
+	}
+	char magic_buf[3];
+	READ(&magic_buf[0], 3);
+	for (int i = 0; i < 3; i++) {
+		if (magic_buf[i] != magic[i]) {
+			printf("Unknown file format\n");
+			return;
+		}
+	}
+	char* temp_str_ptr = nullptr;
+	READ_STR(&string_buffer[0]);
+	world.name = std::string(string_buffer);
+
+	int count_temp{};
+
+	READ_STR(&string_buffer[0]);
+	READ(&count_temp, 4);
+	world.models.resize(count_temp);
+
+	for (int i = 0; i < world.models.size(); i++) {
+		READ(&world.models[i].face_start, sizeof(int));
+		READ(&world.models[i].face_count, sizeof(int));
+		READ(&world.models[i].min, sizeof(vec3));
+		READ(&world.models[i].max, sizeof(vec3));
+	}
+
+	assert(sizeof(vec3) == 12);
+	READ_STR(&string_buffer[0]);
+	READ(&count_temp, 4);
+	world.verts.resize(count_temp);
+
+	READ(world.verts.data(), world.verts.size() * sizeof(vec3));
+
+	assert(sizeof(plane_t) == 16);
+	READ_STR(&string_buffer[0]);
+	READ(&count_temp, 4);
+	world.faces.resize(count_temp);
+
+	for (int i = 0; i < world.faces.size(); i++) {
+		READ(&world.faces[i].plane, sizeof(plane_t));
+		READ(&world.faces[i].v_start, sizeof(int));
+		READ(&world.faces[i].v_count, sizeof(int));
+		READ(&world.faces[i].t_info_idx, sizeof(int));
+		READ(&world.faces[i].lightmap_min[0], sizeof(short));
+		READ(&world.faces[i].lightmap_min[1], sizeof(short));
+		READ(&world.faces[i].lightmap_size[0], sizeof(short));
+		READ(&world.faces[i].lightmap_size[1], sizeof(short));
+		READ(&world.faces[i].lightmap_size[1], sizeof(short));
+		READ(&world.faces[i].exact_min[0], sizeof(float));
+		READ(&world.faces[i].exact_min[1], sizeof(float));
+		READ(&world.faces[i].exact_span[0], sizeof(float));
+		READ(&world.faces[i].exact_span[1], sizeof(float));
+		READ(&world.faces[i].dont_draw, 1);
+	}
+	assert(sizeof(texture_info_t) == 48);
+	READ_STR(&string_buffer[0]);
+	READ(&count_temp, 4);
+	world.t_info.resize(count_temp);
+
+	READ(world.t_info.data(), world.t_info.size() * sizeof(texture_info_t));
+
+	READ_STR(&string_buffer[0]);
+	READ(&count_temp, 4);
+	world.texture_names.resize(count_temp);
+
+	for (int i = 0; i < world.texture_names.size(); i++) {
+		READ_STR(&string_buffer[0]);
+		world.texture_names[i] = string_buffer;
+	}
+
+	READ_STR(&string_buffer[0]);
+	READ(&count_temp, 4);
+	world.entities.resize(count_temp);
+
+	std::string s1, s2;
+	for (int i = 0; i < world.entities.size(); i++) {
+		entity_t* e = &world.entities[i];
+
+		READ(&count_temp, 4);
+
+		for (int j = 0; j < count_temp; j++) {
+			READ_STR(&string_buffer[0]);
+			s1 = string_buffer;
+			READ_STR(&string_buffer[0]);
+			s2 = string_buffer;
+			e->properties.insert({ s1,s2 });
+		}
+	}
+
 }

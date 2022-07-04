@@ -45,10 +45,12 @@ public:
 	Shader fresnel;
 	Shader overdraw;
 	Shader lightmap;
+	Shader textured_prim_transform;
 
 	Texture* white_tex;
 
 	VertexArray quad;
+	VertexArray overlay_quad;
 
 	Framebuffer HDRbuffer;
 	Framebuffer intermediate;
@@ -89,10 +91,11 @@ public:
 	bool d_world_face_edges = false;
 	bool d_lightmap_debug = false;
 	bool d_lightmap_patches = false;
-	bool d_trace_hits = true;
-	bool d_trace_boxes = true;
+	bool d_trace_hits = false;
+	bool d_trace_boxes = false;
 	bool d_tree_nodes = false;
-	bool lightmap_nearest = true;
+	bool lightmap_nearest = false;
+	bool d_lightmap_overlay = false;
 
 	struct ShadowMapProjection
 	{

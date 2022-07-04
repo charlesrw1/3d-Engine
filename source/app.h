@@ -4,6 +4,7 @@
 #include <SDL2/SDL.h>
 #include "glm/glm.hpp"
 #include "Map_def.h"
+#include "Light.h"
 class Renderer;
 class Editor;
 struct SceneData;
@@ -26,7 +27,6 @@ public:
 	bool running = true;
 
 	void init();
-	void shutdown();
 	void init_window();
 
 	void handle_event(SDL_Event& event);
@@ -37,9 +37,17 @@ public:
 
 	void create_scene();
 
-	void Printf();
-	void Warning();
-	void Error();
+	// Called after either loading a compiled map or compiling a map
+	void setup_new_map();
+	// Loads a compiled map
+	void load_map(std::string file);
+	// Compiles a map and writes to disk
+	void compile_map(std::string map_name, LightmapSettings& lm_s, bool quake_format);
+	// Called by "load_map"
+	void load_compiled_map(std::string map_file);
+	void write_compiled_map();
+	void free_current_map();
+
 
 	Renderer* r;
 	SceneData* scene;

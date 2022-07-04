@@ -50,9 +50,9 @@ int lm_height = 1200;
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
 // this is how many actual pixels are in the lightmap, each pixel gets supersampled with 4 additional samples 
-float density_per_unit = 8.f;
+float density_per_unit = 10.f;
 // Determines size of a patch, more patches dramatically slow radiosity lighting time (its O(n^2))
-float patch_grid = 2.0f;
+float patch_grid = 0.5f;
 // Number of bounce iterations, you already pay the price computing form factors so might as well set it high
 int num_bounces = 64;
 // False means direct only
@@ -61,6 +61,8 @@ bool enable_radiosity = true;
 bool inside_map = true;
 // Cast a ray from the patch to the center of a face to prevent light bleeds, breaks on some maps
 bool test_patch_visibility = true;
+// This is sort of hacky, it should be taken from the actual face textures themselves
+vec3 default_reflectivity = vec3(0.3);
 
 VertexArray va;
 VertexArray point_array;
@@ -136,8 +138,8 @@ bool vec3_compare(vec3& v1, vec3& v2, float epsilon)
 	return fabs(v1.x - v2.x) < epsilon && fabs(v1.y - v2.y) < epsilon && fabs(v1.z - v2.z) < epsilon;
 }
 
-const float RADIAL = patch_grid*4.f;
-const float RADIALSQRT = sqrt(RADIAL);
+ float RADIAL = patch_grid*4.f;
+ float RADIALSQRT = sqrt(RADIAL);
 
 // This is similar to what Valve uses in VRAD, Quake 2's triangulation method was garbage frankly
 class Radial
@@ -188,6 +190,7 @@ public:
 				if (i == 3) {
 					// prevents some light bleeding, some make it through though
 					trace_t check_wall_collison;
+					check_wall_collison.hit = false;
 					// vec3 compare fixes cases where center and face middle are the same, if so, dont cast a ray
 					if (test_patch_visibility && !vec3_compare(p->center, face_middle, 0.01f)) {
 						check_wall_collison = global_world.tree.test_ray_fast(p->center, face_middle);
@@ -295,6 +298,9 @@ void patch_for_face(int face_num)
 	}
 	else if (*t_string == "color/yellow") {
 		p->reflectivity = rgb_to_float(255, 242, 0);
+	}
+	else {
+		p->reflectivity = default_reflectivity;
 	}
 
 	if (ti->flags & SURF_EMIT) {
@@ -850,6 +856,7 @@ void light_face(int num)
 
 
 				float sqrd_dist = dot(light_p - sample_pos, light_p - sample_pos);
+				
 				if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
 					continue;
 				}
@@ -1102,8 +1109,18 @@ void mark_bad_faces()
 
 
 #include <algorithm>
-void create_light_map(worldmodel_t* wm)
+void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 {
+	patch_grid = settings.patch_grid;
+	density_per_unit = settings.texel_density;
+	enable_radiosity = settings.enable_radiosity;
+	test_patch_visibility = settings.test_patch_visibility;
+	inside_map = settings.inside_map;
+	num_bounces = settings.num_bounces;
+	default_reflectivity = settings.default_reflectivity;
+	RADIAL = patch_grid * 4.f;
+	RADIALSQRT = sqrt(RADIAL);
+
 	world = wm;
 	u32 start = SDL_GetTicks();
 	printf("Starting lightmap...\n");
@@ -1181,6 +1198,7 @@ void create_light_map(worldmodel_t* wm)
 	std::sort(images.begin(), images.end(), [](const Image& i1, const Image& i2)
 		{ return i1.height * i1.width > i2.height * i2.width; });
 
+
 	root = new PackNode;
 	root->rc.x = 0;
 	root->rc.y = 0;
@@ -1211,7 +1229,7 @@ void create_light_map(worldmodel_t* wm)
 
 	delete root;
 
-	stbi_write_bmp("resources/textures/lightmap.bmp", lm_width, lm_height, 3, final_lightmap.data());
+	stbi_write_bmp(("resources/textures/" + wm->name + "_lm.bmp").c_str(), lm_width, lm_height, 3, final_lightmap.data());
 	printf("Lightmap finished in %u ms\n", SDL_GetTicks() - start);
 	
 	cur_mode = PatchDebugMode::RADCOLOR;

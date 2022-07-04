@@ -31,8 +31,9 @@ public:
 
 	// Non-destructive towards parsed face/brush data
 	// Can call CSG union with a new filter to make a collision mesh with clip brushes
-	void add_to_worldmodel(worldmodel_t* wm) {
+	void move_to_worldmodel(worldmodel_t* wm) {
 		assert(wm);
+		wm->name = map_name;
 		wm->faces = std::move(face_list);
 		wm->entities = std::move(entities);
 		wm->models = std::move(model_list);
@@ -43,6 +44,8 @@ public:
 
 
 private:
+	std::string map_name;
+	
 	bool quake_format;
 
 	// Final data

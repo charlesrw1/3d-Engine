@@ -1,9 +1,22 @@
 #ifndef LIGHT_H
 #define LIGHT_H
-
 #include "geometry.h"
+
+struct LightmapSettings
+{
+	float patch_grid = 2.f;
+	float texel_density = 4.f;
+	int num_bounces = 64;
+	bool enable_radiosity = true;
+	bool inside_map = true;
+	bool test_patch_visibility = true;
+
+	vec3 default_reflectivity = vec3(0.5);
+};
+
+
 struct worldmodel_t;
-void create_light_map(worldmodel_t* wm);
+void create_light_map(worldmodel_t* wm, LightmapSettings settings);
 void draw_lightmap_debug();
 void draw_lightmap_patches();
 
@@ -35,7 +48,7 @@ struct patch_t
 	int face;
 	float area = 0;
 
-	vec3 reflectivity=vec3(0.8);
+	vec3 reflectivity=vec3(0.9);
 
 	vec3 sample_light = vec3(0);
 	int num_samples = 0;

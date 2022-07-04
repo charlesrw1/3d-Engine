@@ -49,6 +49,11 @@ public:
 	 Model* get_model()  {
 		return model;
 	}
+	 void set_worldmodel(worldmodel_t* worldmodel) {
+		 wm = worldmodel;
+	 }
+	 void init_render_data();
+	 void upload_map_to_tree();
 
 	 void print_info() const;
 	BSPtree tree;

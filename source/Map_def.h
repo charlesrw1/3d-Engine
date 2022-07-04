@@ -25,7 +25,6 @@ struct texture_info_t
 
 	int flags = 0;
 };
-
 struct mapface_t
 {
 	int t_info_idx=0;
@@ -74,6 +73,7 @@ struct face_t
 
 	bool dont_draw = false;
 }; 
+
 // collection of all faces for an entity/collision hull
 struct brush_model_t
 {
@@ -93,6 +93,10 @@ struct LightmapVert
 
 struct worldmodel_t
 {
+	std::string name;
+	int lightmap_width, lightmap_height;
+
+
 	std::vector<brush_model_t> models;	// 0 is world model, rest are indexed by entity key: "model"
 	std::vector<vec3> verts;
 	std::vector<face_t> faces;

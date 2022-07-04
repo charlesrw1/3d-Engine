@@ -53,7 +53,10 @@ struct VertexP
 struct VertexArray
 {
 	VertexArray() {}
-	~VertexArray();
+	~VertexArray() {}
+
+	void free();
+
 	using VP = VertexP;
 
 	enum Primitive
@@ -134,6 +137,8 @@ struct VertexArray
 
 
 	void add_quad(vec2 upper, vec2 lower);
+	void add_quad_different(vec2 upper, vec2 lower);	// ...
+
 
 private:
 	std::vector<VertexP> verts;

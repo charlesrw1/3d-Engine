@@ -61,7 +61,6 @@
     <ClInclude Include="source\deps\include\KHR\khrplatform.h" />
     <ClInclude Include="source\deps\include\stb_image\stb_image.h" />
     <ClInclude Include="source\editor.h" />
-    <ClInclude Include="source\Files.h" />
     <ClInclude Include="source\Geometry.h" />
     <ClInclude Include="source\IGame.h" />
     <ClInclude Include="source\BSPtree.h" />

@@ -19,6 +19,19 @@ void WorldGeometry::load_map(worldmodel_t* worldmodel)
 	tree.init(wm);
 	tree.create_va();
 }
+void WorldGeometry::upload_map_to_tree()
+{
+	tree.clear();
+	tree.init(wm);
+	tree.create_va();
+}
+void WorldGeometry::init_render_data()
+{
+	model = new Model;
+	line_va.init(VAPrim::LINES);
+	hit_faces.init(VAPrim::LINES);
+	hit_points.init(VAPrim::POINTS);
+}
 void WorldGeometry::create_mesh()
 {
 
@@ -134,6 +147,14 @@ void WorldGeometry::create_mesh()
 	}
 
 	print_info();
+}
+
+void WorldGeometry::free_map()
+{
+	face_textures.clear();
+	line_va.clear();
+	model->purge_model();
+	tree.clear();
 }
 
 void WorldGeometry::draw_trace_hits() {

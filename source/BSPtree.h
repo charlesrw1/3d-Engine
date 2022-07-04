@@ -39,6 +39,17 @@ public:
 	void draw_trace_boxes();
 	void print();
 
+	void clear() {
+		fast_list.clear();
+		face_index.clear();
+		nodes.clear();
+		leaves.clear();
+		planes.clear();
+
+		va.clear();
+		box_array.clear();
+	}
+
 	// Binary searches to find the leaf enclosing the point
 	int find_leaf(vec3 point) const;
 	// finds leaf and includes the box that surrounds the leaf

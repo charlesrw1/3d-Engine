@@ -33,7 +33,27 @@ void Editor::on_render()
 
 	ImGui::Begin("Editor");
 
-	ImGui::BeginChild("RENDERER");
+
+	ImGui::InputText("Enter map name", &buffer[0], 256);
+	if (ImGui::Button("Load new map")) {
+			global_app.free_current_map();
+			global_app.load_map(buffer);
+			global_app.setup_new_map();
+	}
+
+
+	Renderer* r = global_app.r;
+	R_BOOLEAN_IMGUI("d_world", d_world);
+	R_BOOLEAN_IMGUI("d_world_face_edges", d_world_face_edges);
+	R_BOOLEAN_IMGUI("d_trace_boxes", d_trace_boxes);
+	R_BOOLEAN_IMGUI("d_tree_nodes", d_tree_nodes);
+	R_BOOLEAN_IMGUI("d_trace_hits", d_trace_hits);
+	R_BOOLEAN_IMGUI("d_lightmap_patches", d_lightmap_patches);
+	R_BOOLEAN_IMGUI("d_lightmap_debug", d_lightmap_debug);
+	R_BOOLEAN_IMGUI("lightmap_nearest", lightmap_nearest);
+	R_BOOLEAN_IMGUI("d_lightmap_overlay", d_lightmap_overlay);
+
+
 	if (ImGui::Button("Reload Gamma/Tonemap shader")) {
 		// Temporary, should delete shader
 		global_app.r->gamma_tm_bloom = Shader("no_transform_v.txt", "gamma_bloom_f.txt");
@@ -56,19 +76,6 @@ void Editor::on_render()
 		global_app.r->down_sample = !global_app.r->down_sample;
 	}
 
-	Renderer* r = global_app.r;
-	R_BOOLEAN_IMGUI("d_world", d_world);
-	R_BOOLEAN_IMGUI("d_world_face_edges", d_world_face_edges);
-	R_BOOLEAN_IMGUI("d_trace_boxes", d_trace_boxes);
-	R_BOOLEAN_IMGUI("d_tree_nodes", d_tree_nodes);
-	R_BOOLEAN_IMGUI("d_trace_hits", d_trace_hits);
-	R_BOOLEAN_IMGUI("d_lightmap_patches", d_lightmap_patches);
-	R_BOOLEAN_IMGUI("d_lightmap_debug", d_lightmap_debug);
-	R_BOOLEAN_IMGUI("lightmap_nearest", lightmap_nearest);
-
-
-	ImGui::DragFloat3("camera_pos: ", (float*)&global_app.scene->active_camera()->position, 0.1);
-
 	ImGui::DragFloat("Gamma: ", &global_app.r->gamma, 0.1, 0.5, 4);
 	ImGui::DragFloat("Exposure: ", &global_app.r->exposure, 0.1, 0, 10);
 	ImGui::DragFloat("Threshold: ", &global_app.r->threshold, 0.1, 0.5, 10);
@@ -85,9 +92,6 @@ void Editor::on_render()
 	ImGui::SliderInt("Downsample #:", &downsample_selection, 0, 5);
 	ImGui::Image(reinterpret_cast<ImTextureID>(global_app.r->downsample[1][downsample_selection]), ImVec2(256, 256));
 
-
-
-	ImGui::EndChild();
 
 
 

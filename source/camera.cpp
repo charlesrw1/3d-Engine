@@ -109,7 +109,7 @@ void Camera::scroll_wheel_update(int amt)
 			global_app.r->set_fov(fov);
 		}
 		else {
-			move_speed += amt/10.f;
+			move_speed += (move_speed/5.f)*amt;
 		}
 	}
 	else {
