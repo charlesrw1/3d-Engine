@@ -13,7 +13,6 @@ public:
 	void on_update();
 	
 private:
-	void handle_scroll(SDL_Event& e);
 	void shoot_ray();
 	bool game_focused = true;
 	int cam_num = 0;
@@ -26,6 +25,5 @@ private:
 
 	std::vector<trace_t> world_hits;
 
-	//Bloom viwer
 };
 #endif // !EDITOR

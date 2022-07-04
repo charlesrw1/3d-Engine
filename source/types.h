@@ -81,18 +81,11 @@ struct SceneData
 		return &cams[cam_num];
 	}
 
-	/* list of entities */
 	std::vector<GameObject*> objects;
 
-	/* list of lights */
 	DirectionalLight sun;
 	PointLight lights[8];
 	uint8_t num_lights = 0;
-
-	/* static geometry data */
-	/* particle effects */
-	/* triggers */
-	/* skybox, water, fog, other enviorment params */
 
 	float wind_strength = 1;
 	float wind_speed = 1;
@@ -102,28 +95,5 @@ struct SceneData
 	VertexArray map_geo_edges;
 };
 
-struct MoveCircular
-{
-	struct Equation
-	{
-		struct Factor
-		{
-			enum Type
-			{
-				sin,
-				cos,
-				constant,
-			};
-			float value;	// either inside sin/cos or is constant
-			bool multiplied_by_t = false;
-		};
-
-		Factor factors[4];
-		uint8_t num_fac;
-
-		Factor offset;
-	};
-	Equation axis[3];
-};
 
 #endif

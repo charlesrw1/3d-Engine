@@ -699,7 +699,7 @@ void calc_extents(LightmapState& l)
 		l.face->exact_span[i] = max[i] - min[i];
 	}
 }
-const float of_dist = 0.05f;
+const float of_dist = 0.1f;
 const float sample_ofs[4][2] = { {of_dist,of_dist},{of_dist,-of_dist},{-of_dist,-of_dist},{-of_dist,of_dist} };
 
 void calc_points(LightmapState& l, Image& img)
@@ -1112,7 +1112,7 @@ void mark_bad_faces()
 void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 {
 	patch_grid = settings.patch_grid;
-	density_per_unit = settings.texel_density;
+	density_per_unit = settings.pixel_density;
 	enable_radiosity = settings.enable_radiosity;
 	test_patch_visibility = settings.test_patch_visibility;
 	inside_map = settings.inside_map;

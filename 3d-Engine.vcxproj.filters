@@ -19,9 +19,6 @@
     <Filter Include="Source Files\Renderer">
       <UniqueIdentifier>{b78358f5-49f3-4b9d-aeb9-e0b6ad7c84ef}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Scene">
-      <UniqueIdentifier>{ba39baf2-f97d-46ef-a3da-2c1c23d6706a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Lightmapping">
       <UniqueIdentifier>{6b1b170b-ca35-4e93-b4af-a6505331d700}</UniqueIdentifier>
     </Filter>
@@ -100,7 +97,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source\BrushCSG.cpp">
-      <Filter>Source Files\Scene</Filter>
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -172,15 +169,6 @@
     </ClInclude>
     <ClInclude Include="source\TextureManager.h">
       <Filter>Source Files\Renderer</Filter>
-    </ClInclude>
-    <ClInclude Include="source\Object.h">
-      <Filter>Source Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="source\IGame.h">
-      <Filter>Source Files\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="source\Scene.h">
-      <Filter>Source Files\Scene</Filter>
     </ClInclude>
     <ClInclude Include="source\MapParser.h">
       <Filter>Source Files</Filter>

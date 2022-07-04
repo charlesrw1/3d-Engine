@@ -22,7 +22,7 @@ Renderer::Renderer()
 	quad.init(VAPrim::TRIANGLES);
 	overlay_quad.init(VAPrim::TRIANGLES);
 	quad.add_quad(vec2(-1, 1), vec2(2, 2));
-	overlay_quad.add_quad(vec2(0), vec2(512, 512));
+	overlay_quad.add_quad(vec2(0), vec2(300, 300));
 
 	white_tex = global_textures.find_or_load("white.png");
 

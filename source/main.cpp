@@ -1,15 +1,7 @@
 ﻿#include <iostream>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_main.h>
-#include "glm/gtc/matrix_transform.hpp"
 
-#include "camera.h"
-
-#include "opengl_api.h"
-
-#include "types.h"
 #include "app.h"
-#include "renderer.h"
 
 #include "Light.h"
 #include <cstring>
@@ -18,16 +10,16 @@ void print_help()
 {
 	printf("usage: [options...] .map/.cmf\n\n"
 		"Options:\n"
-		"-bounces #			: number of bounces for radiosity (default 64)\n"
-		"-patchgrid #		: size of radiosity patch in the grid, lower sizes dramatically slow performance (default 2.0)\n"
-		"-texeldensity #	: number of lightmap texels per map unit (32 quake units = 1 unit), each texel is supersampled with an additional 4 samples (default 4.0)\n"
-		"-norad				: disables radiosity, only direct lighting\n"
-		"-outdoors			: don't cull away faces that point outwards\n"
-		"-nopatchvistest	: disables the patch-to-face raycast to avoid lightbleeds, breaks on Quake maps\n"
-		"-quakefmt			: parses the .map file using the Quake format instead of the Valve format\n"
-		"-reflectivity #	: how much light the default surface reflects (default 0.5)\n"
-
-		"-help				: prints the help menu\n\n"
+		" -bounces #       : number of bounces for radiosity (default 64)\n"
+		" -patchgrid #     : size of radiosity patch in the grid, lower sizes dramatically slow performance (default 2.0)\n"
+		" -lmdensity #     : number of lightmap texels per map unit (32 quake units = 1 unit), each texel is supersampled with an additional 4 samples (default 4.0)\n"
+		" -norad           : disables radiosity, only direct lighting\n"
+		" -outdoors        : don't cull away faces that point outwards\n"
+		" -nopatchvistest  : disables the patch-to-face raycast to avoid lightbleeds, breaks on Quake maps\n"
+		" -quakefmt        : parses the .map file using the Quake format instead of the Valve format\n"
+		" -reflectivity #  : how much light the default surface reflects (default 0.5)\n"
+		" -onlycompile     : only compile the map and write to disk\n"
+		" -help            : prints the help menu\n\n"
 
 		"Notes:\n"
 		"* Last parameter is just the .map/.cmf file name which will be looked for under root/resources/maps\n"
@@ -45,6 +37,7 @@ int main(int argc, char* argv[])
 	LightmapSettings lm_settings;
 	bool quake_format = false;
 	bool compile = true;
+	bool dont_run = false;
 	std::string file;
 
 	for (int i = 1; i < argc; i++) {
@@ -61,8 +54,8 @@ int main(int argc, char* argv[])
 			lm_settings.patch_grid = atof(argv[i + 1]);
 			i++;
 		}
-		else if (strcmp(argv[i], "-texeldensity") == 0) {
-			lm_settings.texel_density = atof(argv[i + 1]);
+		else if (strcmp(argv[i], "-lmdensity") == 0) {
+			lm_settings.pixel_density = atof(argv[i + 1]);
 			i++;
 		}
 		else if (strcmp(argv[i], "-norad") == 0) {
@@ -81,12 +74,15 @@ int main(int argc, char* argv[])
 			lm_settings.default_reflectivity = vec3(atof(argv[i + 1]));
 			i++;
 		}
+		else if (strcmp(argv[i], "-onlycompile") == 0) {
+			dont_run = true;
+		}
 		else if (strcmp(argv[i], "-help")==0) {
 			print_help();
 			return 1;
 		}
 		else {
-			printf("Unknown command\n");
+			printf("Unknown command: %s\n", argv[i]);
 			print_help();
 			return 1;
 		}
@@ -104,7 +100,7 @@ int main(int argc, char* argv[])
 		compile = false;
 	}
 	else if(extension!=".map"){
-		printf("Unknown file\n");
+		printf("Unknown file extension, only .map and .cmf accepted\n");
 		print_help();
 		return 1;
 	}
@@ -115,11 +111,12 @@ int main(int argc, char* argv[])
 
 	if (compile) {
 		app.compile_map(file, lm_settings, quake_format);
+		if (dont_run)
+			return 0;
 	}
 	else {
 		app.load_map(file);
 	}
-
 	app.setup_new_map();
 
 

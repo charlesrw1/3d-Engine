@@ -62,17 +62,14 @@
     <ClInclude Include="source\deps\include\stb_image\stb_image.h" />
     <ClInclude Include="source\editor.h" />
     <ClInclude Include="source\Geometry.h" />
-    <ClInclude Include="source\IGame.h" />
     <ClInclude Include="source\BSPtree.h" />
     <ClInclude Include="source\Light.h" />
     <ClInclude Include="source\MapParser.h" />
     <ClInclude Include="source\Map_def.h" />
     <ClInclude Include="source\ModelManager.h" />
     <ClInclude Include="source\Model_def.h" />
-    <ClInclude Include="source\Object.h" />
     <ClInclude Include="source\opengl_api.h" />
     <ClInclude Include="source\renderer.h" />
-    <ClInclude Include="source\Scene.h" />
     <ClInclude Include="source\TextureManager.h" />
     <ClInclude Include="source\Texture_def.h" />
     <ClInclude Include="source\types.h" />

@@ -59,8 +59,8 @@ public:
 	void render_scene(SceneData& scene);
 
 	void resize(int x, int y) {
-		view.x = x;
-		view.y = y;
+		view.width = x;
+		view.height = y;
 		HDRbuffer.resize(x, y);
 		intermediate.resize(x, y);
 	}

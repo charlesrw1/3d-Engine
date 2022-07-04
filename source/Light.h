@@ -5,7 +5,7 @@
 struct LightmapSettings
 {
 	float patch_grid = 2.f;
-	float texel_density = 4.f;
+	float pixel_density = 4.f;
 	int num_bounces = 64;
 	bool enable_radiosity = true;
 	bool inside_map = true;
@@ -41,7 +41,7 @@ struct transfer_t
 struct patch_t
 {
 	winding_t winding;
-	transfer_t* transfers=nullptr;	// array of all patches 
+	transfer_t* transfers = nullptr;
 	int num_transfers = 0;
 
 	vec3 center;
