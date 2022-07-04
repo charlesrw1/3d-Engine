@@ -37,7 +37,6 @@ void App::init()
 	global_world.set_worldmodel(&world);
 	global_world.init_render_data();
 
-	//create_scene();
 	r->set_fov(45);
 	r->resize(width, height);
 }
@@ -63,168 +62,6 @@ const entity_t* find_entity_with_classname(const worldmodel_t* wm, const char* c
 		}
 	}
 	return nullptr;
-}
-
-void App::create_scene()
-{
-	
-	MapParser mp(false);
-	u32 map_start = SDL_GetTicks();
-	load_compiled_map("pillars.cmf");
-	
-	//mp.start_file("resources/maps/pillars.map");
-
-	//mp.construct_mesh(scene->map_geo, scene->map_geo_edges);
-	//mp.move_to_worldmodel(&world);
-
-	global_world.load_map(&world);
-	//create_light_map(&world);
-
-	r->lightmap_tex_nearest = global_textures.find_or_load((world.name + "_lm.bmp").c_str(),NEAREST);
-	Texture* l_linear = new Texture;
-	l_linear->init_from_file(world.name+ "_lm.bmp", LOAD_NOW);
-	r->lightmap_tex_linear = l_linear;	// temporary, memory leak cause texture manager doesnt know multiple params
-
-
-	//load_compiled_map("pillars.cmf");
-	global_world.create_mesh();
-
-//	write_compiled_map();
-
-
-
-	u32 map_end = SDL_GetTicks();
-	printf("Loaded map in: %i ms\n", map_end - map_start);
-	//exit(1);
-	//return;
-	auto player_start = find_entity_with_classname(&world, "info_player_start");
-	auto org = player_start->properties.find("origin");
-	vec3 start = vec3(0);
-	if (org != player_start->properties.end()) {
-		sscanf_s(org->second.c_str(), "%f %f %f", &start.x, &start.y, &start.z);
-		start = vec3(-start.x, start.z, start.y)/32.f;
-	}
-	scene->cams[0].position = start;
-	
-
-
-	u32 start_load = SDL_GetTicks();
-
-	
-	// yes memory leaks galore
-	//scene->objects.push_back(temp_create("plane.qobj", "grid0.png"));
-	//scene->objects.back()->scale = 20;
-/*	scene->objects.push_back(temp_create("rep_inf_ep3trooper.qobj", "rep_inf_ep3trooper.png"));
-	// Engineer
-	GameObject* tmp = temp_create("engineer.qobj", "engineer_red.png");
-	tmp->model->meshes.at(0).mat.specular = new Texture(load_texture_file("engineer_exponent.png"));
-
-	for (int i = 0; i < 1; i++)
-	{
-		GameObject* eng = new GameObject(*tmp);
-		eng->position = vec3(-3,0,2);
-	//	eng->euler_y = 3.141 / 4;
-		scene->objects.push_back(eng);
-	}
-	*/
-
-	//GameObject* temp;
-	/*
-	Model* plane = new Model;
-	Texture* grid = new Texture;
-	*grid = load_texture_file("grid0.png");
-	plane->meshes.push_back(load_qobj_mesh("plane.qobj"));
-	plane->meshes.at(0).mat.diffuse = grid;
-	plane->meshes.at(0).mat.pong_exp = 10;
-
-	tmp = new GameObject(plane);
-	tmp->scale = vec3(20.f);
-	//tmp->euler_x = 3.14 / 5;
-	scene->objects.push_back(tmp);
-
-
-	// Cube
-	Model* cube = new Model;
-	cube->meshes.push_back(load_qobj_mesh("cube.qobj"));
-
-	tmp = new GameObject(cube);
-	tmp->color = vec3(1.0f, 0.5f, 0.31f);
-	tmp->position = vec3(8.f, 0.f, -4.f);
-	tmp->scale = vec3(1.f, 10.f, 7.f);
-	scene->objects.push_back(tmp);
-
-	tmp = new GameObject(cube);
-	tmp->color = vec3(1.f);
-	tmp->scale = vec3(0.7f);
-	tmp->position = vec3(2, 6, -6);
-	tmp->has_shading = false;
-	scene->objects.push_back(tmp);
-	*/
-
-
-	scene->sun.diffuse = vec3(1);//1.f*vec3(make_color(248, 197, 139));
-	scene->sun.ambient = vec3(0.2,0.2,0.2);//0.0f*vec3(make_color(142, 154, 185));
-	//scene->sun.diffuse = vec3(50, 45, 15);
-
-	scene->sun.specular = vec3(1);
-	scene->sun.direction = normalize(vec3(0, -1, 0));
-	scene->sun.direction = normalize(vec3(0.5, -1, 0.1));
-
-	const float PI = 3.1415;
-	float azimuth = PI/6;
-	float altidude = PI/6;
-	scene->sun.direction = normalize(-vec3(cos(azimuth) * sin(altidude), cos(altidude),sin(azimuth) * sin(altidude)));
-
-
-	//Model* soldier = global_models.find_or_load("soldier/soldier.dae");
-	////load_model_assimp(soldier, "soldier/soldier.dae", false);
-	//scene->objects.push_back(new GameObject(soldier));
-	//scene->objects.back()->scale = vec3(0.03);
-	//scene->objects.back()->position = vec3(1, 0, 0);
-
-//	make_qobj_from_assimp("sponza/sponza.obj", "sponza", true);
-	//Model* sponza = global_models.find_or_load("sponza/sponza.obj");
-	//load_model_assimp(sponza, "sponza/sponza.obj", true);
-	//load_model_qobj(sponza, "sponza.qobj");
-	//
-	//scene->objects.push_back(new GameObject(sponza));
-	//scene->objects.back()->scale = vec3(0.01);
-	
-	//Model* revant = global_models.find_or_load("Revenant/revenant.dae");
-	////load_model_assimp(revant, "Revenant/revenant.dae",false);
-	//scene->objects.push_back(new GameObject(revant));
-	//scene->objects.back()->scale = vec3(0.015);
-	//scene->objects.back()->position = vec3(2, 0, 1);
-	//scene->objects.back()->euler_x = - 3.14 / 2;
-
-	//Model* geo = global_models.find_or_load("TUNNELS.obj");
-	//scene->objects.push_back(new GameObject(geo));
-	//scene->objects.back()->scale = vec3(0.2);
-
-	scene->num_lights = 5;
-	scene->lights[0].color = 2.f*vec3(1, 0, 0);
-	scene->lights[0].position = vec3(1, 1, 0);
-
-	scene->lights[1].color = 2.f*vec3(0, 1, 0);
-	scene->lights[1].position = vec3(0, 1, 1);
-
-	scene->lights[2].color = 3.f*vec3(5, 2, 1);
-	scene->lights[2].position = vec3(-2, 2, 2);
-
-	scene->lights[3].color = 4.f*vec3(1, 1, 1);
-	scene->lights[3].position = vec3(-1, 3, -1);
-
-	scene->lights[4].color = 50.f*vec3(0, 0.4, 2);
-	scene->lights[4].position = vec3(-1, 3, -1);
-
-	u32 end = SDL_GetTicks();
-
-	global_textures.update();
-	printf("\n\n\n     TIME: %u\n\n\n", end - start_load);
-
-	//global_models.print_info();
-	//global_textures.print_info();
-
 }
 
 void App::compile_map(std::string map_name, LightmapSettings& lm_s, bool quake_format)
@@ -359,6 +196,9 @@ void App::handle_event(SDL_Event& event)
 }
 void App::quit()
 {
+	global_textures.shutdown();
+
+
 	SDL_GL_DeleteContext(context);
 	SDL_DestroyWindow(window);
 	SDL_Quit();

@@ -35,8 +35,6 @@ public:
 	void on_render();
 	void quit();
 
-	void create_scene();
-
 	// Called after either loading a compiled map or compiling a map
 	void setup_new_map();
 	// Loads a compiled map

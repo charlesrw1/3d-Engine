@@ -295,19 +295,3 @@ void VertexArray::add_quad(vec2 upper, vec2 size)
 	push_3(corners[0], corners[1], corners[2]);
 	push_3(corners[0], corners[2], corners[3]);
 }
-void VertexArray::add_quad_different(vec2 upper, vec2 size)
-{
-	VertexP corners[4];
-	corners[0].position = vec3(upper, 0);
-	corners[1].position = vec3(upper.x + size.x, upper.y, 0);
-	corners[2].position = vec3(upper.x + size.x, upper.y + size.y, 0);
-	corners[3].position = vec3(upper.x, upper.y + size.y, 0);
-	corners[0].uv = vec2(0);
-	corners[1].uv = vec2(1, 0);
-	corners[2].uv = vec2(1, 1);
-	corners[3].uv = vec2(0, 1);
-
-
-	push_3(corners[0], corners[1], corners[2]);
-	push_3(corners[0], corners[2], corners[3]);
-}

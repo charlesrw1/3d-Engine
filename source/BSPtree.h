@@ -37,7 +37,6 @@ public:
 	void create_va();
 	void draw_tree_nodes();
 	void draw_trace_boxes();
-	void print();
 
 	void clear() {
 		fast_list.clear();
@@ -55,13 +54,12 @@ public:
 	// finds leaf and includes the box that surrounds the leaf
 	int find_leaf(vec3 point, vec3& min_box, vec3& max_box) const;
 
-	// faster version
 	trace_t test_ray(vec3 start, vec3 end, float epsilon = -0.005f);
 	// same as above but with debug output
 	trace_t test_ray_debug(vec3 start, vec3 end);
 
 	// 10% faster than test_ray
-	// kinda gross arguments, but it lets a ray not end up hitting the plane it starts from which is annoying
+	// first epsilon is used for the first node checked, prevents annoying hits on the plane of the starting position
 	trace_t test_ray_fast(vec3 start, vec3 end, float epsilon = -0.005f,float first_epsilon = -0.005f);
 	void print_leaves_with_face(int face)
 	{

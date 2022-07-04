@@ -137,7 +137,6 @@ struct VertexArray
 
 
 	void add_quad(vec2 upper, vec2 lower);
-	void add_quad_different(vec2 upper, vec2 lower);	// ...
 
 
 private:

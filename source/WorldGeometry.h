@@ -35,8 +35,6 @@ class WorldGeometry
 {
 public:
 	WorldGeometry() {}
-	void load_map(worldmodel_t* worldmodel);
-	void free_map();
 
 	trace_t brute_force_raycast(const ray_t& r);
 
@@ -54,6 +52,7 @@ public:
 	 }
 	 void init_render_data();
 	 void upload_map_to_tree();
+	void free_map();
 
 	 void print_info() const;
 	BSPtree tree;

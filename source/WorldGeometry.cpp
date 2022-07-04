@@ -5,20 +5,7 @@
 #include "glad/glad.h"
 
 WorldGeometry global_world;
-// disaster code
-void WorldGeometry::load_map(worldmodel_t* worldmodel)
-{
-	wm = worldmodel;
 
-	model = new Model;
-	line_va.init(VAPrim::LINES);
-	hit_faces.init(VAPrim::LINES);
-	hit_points.init(VAPrim::POINTS);
-
-	// KD/bsp tree
-	tree.init(wm);
-	tree.create_va();
-}
 void WorldGeometry::upload_map_to_tree()
 {
 	tree.clear();
