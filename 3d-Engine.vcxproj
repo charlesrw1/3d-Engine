@@ -42,6 +42,7 @@
     <ClCompile Include="source\renderer.cpp" />
     <ClCompile Include="source\TextureManager.cpp" />
     <ClCompile Include="source\Texture_def.cpp" />
+    <ClCompile Include="source\ThreadTools.cpp" />
     <ClCompile Include="source\Trace.cpp" />
     <ClCompile Include="source\WorldGeometry.cpp" />
   </ItemGroup>
@@ -72,6 +73,7 @@
     <ClInclude Include="source\renderer.h" />
     <ClInclude Include="source\TextureManager.h" />
     <ClInclude Include="source\Texture_def.h" />
+    <ClInclude Include="source\ThreadTools.h" />
     <ClInclude Include="source\types.h" />
     <ClInclude Include="source\WorldGeometry.h" />
   </ItemGroup>

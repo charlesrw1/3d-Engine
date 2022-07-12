@@ -96,6 +96,7 @@ public:
 	bool d_tree_nodes = false;
 	bool lightmap_nearest = false;
 	bool d_lightmap_overlay = false;
+	bool no_textures = false;
 
 	struct ShadowMapProjection
 	{

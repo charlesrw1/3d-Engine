@@ -18,6 +18,7 @@ void print_help()
 		" -nopatchvistest  : disables the patch-to-face raycast to avoid lightbleeds, breaks on Quake maps\n"
 		" -quakefmt        : parses the .map file using the Quake format instead of the Valve format\n"
 		" -reflectivity #  : how much light the default surface reflects (default 0.5)\n"
+		" -sampleofs #     : how far each supersample is from original sample (default 0.1)\n"
 		" -onlycompile     : only compile the map and write to disk\n"
 		" -help            : prints the help menu\n\n"
 
@@ -74,6 +75,10 @@ int main(int argc, char* argv[])
 			lm_settings.default_reflectivity = vec3(atof(argv[i + 1]));
 			i++;
 		}
+		else if (strcmp(argv[i], "-sampleofs") == 0) {
+			lm_settings.sample_ofs = atof(argv[i + 1]);
+			i++;
+		}
 		else if (strcmp(argv[i], "-onlycompile") == 0) {
 			dont_run = true;
 		}
@@ -111,8 +116,10 @@ int main(int argc, char* argv[])
 
 	if (compile) {
 		app.compile_map(file, lm_settings, quake_format);
-		if (dont_run)
+		if (dont_run) {
+			app.quit();
 			return 0;
+		}
 	}
 	else {
 		app.load_map(file);

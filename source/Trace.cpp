@@ -425,7 +425,7 @@ void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& t
 	assert(count >= 0);
 
 	for (int i = offset; i <offset + count; i++) {
-		const face_t& f = geo->faces.at(face_index.at(i));
+		const face_t& f = geo->faces[face_index[i]];
 
 		float denom = dot(f.plane.normal, r.dir);
 

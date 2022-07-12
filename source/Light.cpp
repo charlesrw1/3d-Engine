@@ -1,6 +1,7 @@
 #include "Light.h"
 #include "WorldGeometry.h"
 #include "SDL2/SDL_timer.h"
+#include "ThreadTools.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include <random>
@@ -408,6 +409,7 @@ void create_patch_view(PatchDebugMode mode)
 			break;
 		case PDM::RADCOLOR:
 			color = p->total_light;
+			color = glm::pow(color, vec3(1.0 / 2.2));
 		}
 		for (int i = 0; i < w->num_verts-2; i++) {
 		//	patch_va.push_line(w->v[i], w->v[(i + 1)%w->num_verts], vec3(1.0));
@@ -425,9 +427,14 @@ void set_patch_debug(PatchDebugMode mode)
 }
 
 // RADIOSITY FUNCTIONS
-std::vector<float> transfers;	// work buffer
+//std::vector<float> transfers;	// work buffer
 void make_transfers(int patch_num)
 {
+	
+	std::vector<float> transfers;
+	transfers.resize(num_patches);
+
+
 	patch_t* patch = &patches[patch_num];
 	plane_t plane = faces[patch->face].plane;
 	const int i = patch_num;
@@ -700,7 +707,7 @@ void calc_extents(LightmapState& l)
 	}
 }
 const float of_dist = 0.1f;
-const float sample_ofs[4][2] = { {of_dist,of_dist},{of_dist,-of_dist},{-of_dist,-of_dist},{-of_dist,of_dist} };
+float sample_ofs[4][2] = { {1,1},{1,-1},{-1,-1},{-1,1} };
 
 void calc_points(LightmapState& l, Image& img)
 {
@@ -929,6 +936,7 @@ void final_light_face(int face_num)
 			int added = 0;
 			int offset = y * img.width + x;
 			total = fl->pixel_colors[y * img.width + x];
+			total = glm::pow(total, vec3(1.0 / 2.2));
 			add_color(img.buffer_start, offset, total);
 		}
 	}
@@ -1120,6 +1128,11 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	default_reflectivity = settings.default_reflectivity;
 	RADIAL = patch_grid * 4.f;
 	RADIALSQRT = sqrt(RADIAL);
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 2; j++) {
+			sample_ofs[i][j] *= settings.sample_ofs;
+		}
+	}
 
 	world = wm;
 	u32 start = SDL_GetTicks();
@@ -1160,19 +1173,26 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	u32 start_light_face = SDL_GetTicks();
 	printf("Lighting faces...\n");
 	const brush_model_t* bm = &wm->models[0];	// "worldspawn"
-	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
-		light_face(i);
-	}
+
+	run_threads_on_function(&light_face, bm->face_start, bm->face_start + bm->face_count);
+
+	//for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
+	//	light_face(i);
+	//}
+
 	printf("Total pixels: %u\n", total_pixels);
 	printf("Total raycasts: %u\n", total_rays_cast);
 	printf("Face lighting time: %u\n", SDL_GetTicks() - start_light_face);
 
 	if (enable_radiosity) {
 		printf("Making transfers...\n");
-		transfers.resize(MAX_PATCHES);
-		for (int i = 0; i < num_patches; i++) {
-			make_transfers(i);
-		}
+		//transfers.resize(MAX_PATCHES);
+
+		run_threads_on_function(&make_transfers, 0, num_patches);
+
+		//for (int i = 0; i < num_patches; i++) {
+		//	make_transfers(i);
+		//}
 		printf("Finished transfers\n");
 
 		printf("Bouncing light...\n");
@@ -1180,6 +1200,7 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	}
 
 	printf("Final light pass...\n");
+
 	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
 		final_light_face(i);
 	}

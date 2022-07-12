@@ -35,11 +35,11 @@ void main()
 	
 	hdr_color += texture(bloom_tex, TexCoords).rgb;
 	
-	vec3 mapped = vec3(1.0)-exp(-hdr_color*exposure);
+	//vec3 mapped = vec3(1.0)-exp(-hdr_color*exposure);
 	
 	//vec3 mapped = reinhard_luminance(hdr_color, 3.5);
 	
-	//vec3 mapped = hdr_color;
+	vec3 mapped = hdr_color;
 	
 	//vec3 mapped = hdr_color/(hdr_color+vec3(1.0));
 	

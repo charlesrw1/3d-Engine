@@ -524,7 +524,7 @@ void Renderer::lightmap_geo()
 
 		const RenderMesh* rm = m->mesh(i);
 
-		if (rm->diffuse) {
+		if (rm->diffuse && !no_textures) {
 			rm->diffuse->bind(0);
 		}
 		else {

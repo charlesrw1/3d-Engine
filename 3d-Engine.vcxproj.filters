@@ -99,6 +99,9 @@
     <ClCompile Include="source\BrushCSG.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source\ThreadTools.cpp">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\app.h">
@@ -184,6 +187,9 @@
     </ClInclude>
     <ClInclude Include="source\Map_def.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\ThreadTools.h">
+      <Filter>Source Files\Lightmapping</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

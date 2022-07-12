@@ -28,7 +28,7 @@ void WorldGeometry::create_mesh()
 	std::vector<ivec2> texture_sizes;
 	// first load textures, non-async because width/height is needed for uv coords
 	for (const auto& t : wm->texture_names) {
-		face_textures.push_back(global_textures.find_or_load((t + ".png").c_str(), TParams::LOAD_NOW | TParams::GEN_MIPS | TParams::NEAREST));
+		face_textures.push_back(global_textures.find_or_load((t + ".png").c_str(), TParams::LOAD_NOW | TParams::GEN_MIPS));
 		if (face_textures.back()->is_loaded()) {
 			texture_sizes.push_back(face_textures.back()->get_dimensions());
 		}
@@ -88,8 +88,8 @@ void WorldGeometry::create_mesh()
 			texture_info_t* ti = &wm->t_info.at(face.t_info_idx);
 
 			// Texture coordinates
-			wrv.texture_uv.x = dot(wrv.position * 32.f, ti->axis[0]) / texture_sizes.at(ti->t_index).x / ti->uv_scale.x + ti->offset[0] / texture_sizes.at(ti->t_index).x;
-			wrv.texture_uv.y = dot(wrv.position * 32.f, ti->axis[1]) / texture_sizes.at(ti->t_index).y / ti->uv_scale.y + ti->offset[1] / texture_sizes.at(ti->t_index).y;
+			wrv.texture_uv.x = dot(wrv.position * 32.f, ti->axis[0]) / texture_sizes.at(ti->t_index).x / ti->uv_scale.x + ti->offset[0] / (float)texture_sizes.at(ti->t_index).x;
+			wrv.texture_uv.y = dot(wrv.position * 32.f, ti->axis[1]) / texture_sizes.at(ti->t_index).y / ti->uv_scale.y + ti->offset[1] / (float)texture_sizes.at(ti->t_index).y;
 			if (abs(wrv.texture_uv.x) > 50) {
 				wrv.texture_uv.x = 0;
 			}

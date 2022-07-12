@@ -17,8 +17,11 @@ void main()
     vec4 col = texture(baseTex, TexCoord);
 	vec4 lm_color = texture(lightmap, LightMapCoord);
 	
-	vec3 result = lm_color.rgb*col.rgb;//*min(lm_color.rgb,1.0);
+	// Convert back to linear space, final gamma is done for the whole framebuffer later
+	//lm_color = pow(lm_color,vec4(2.2));
 	
+	vec3 result = lm_color.rgb*col.rgb;//*min(lm_color.rgb,1.0);
+	result = pow(result,vec3(2.2));
 	
     FragColor = vec4(result, 1.0);
 } 

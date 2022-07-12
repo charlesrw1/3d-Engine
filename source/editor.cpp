@@ -52,6 +52,8 @@ void Editor::on_render()
 	R_BOOLEAN_IMGUI("d_lightmap_debug", d_lightmap_debug);
 	R_BOOLEAN_IMGUI("lightmap_nearest", lightmap_nearest);
 	R_BOOLEAN_IMGUI("d_lightmap_overlay", d_lightmap_overlay);
+	R_BOOLEAN_IMGUI("no_textures", no_textures);
+
 
 
 	if (ImGui::Button("Reload Gamma/Tonemap shader")) {
