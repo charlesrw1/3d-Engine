@@ -1,0 +1,76 @@
+#version 430 core
+out vec4 FragColor;
+
+in vec3 Normal;  
+in vec3 FragPos;  
+in vec2 TexCoord;
+in vec4 FragPosLightSpace;
+
+struct PointLight
+{
+	vec4 pos;
+	vec4 color;
+	vec4 radius_and_padding;
+};
+struct FruxelOffset
+{
+	int offset;
+};
+struct VisibleIndex
+{
+	int index;
+};	
+
+layout(std430, binding = 0) readonly buffer LightBuffer {
+	PointLight data[];
+} light_buffer;
+
+layout(std430, binding = 1) readonly buffer OffsetBuffer {
+	FruxelOffset data[];
+} offset_buffer;
+
+layout(std430, binding = 1) readonly buffer IndiciesBuffer {
+	VisibleIndex data[];
+} indicies_buffer;
+
+
+uniform vec3 viewPos;
+uniform sampler2D baseTex;
+uniform sampler2D shinyTex;
+uniform float shininess;
+
+uniform int num_x_tiles;
+
+void main()
+{
+	vec4 base_color = texture(baseTex,TexCoord);
+	vec3 ambient = vec3(0.3) * base_color.rgb;
+	
+	ivec2 location = ivec2(gl_FragCoord.xy);
+	ivec2 tileID = location/ivec2(64,64);
+	uint index_to_ofs_buf = tileID.y*num_x_tiles+tileID.x;
+	
+	vec3 viewdir = normalize(viewPos-FragPos);
+	vec3 norm = normalize(Normal);
+	
+	uint offset = offset_buffer.data[index_to_ofs_buf].offset;
+	vec3 sum_color=vec3(0.0);
+	for(int i=0;indicies_buffer.data[offset+i].index != -1;i++) {
+		uint light_index = indicies_buffer.data[offset+i].index;
+		PointLight light = light_buffer.data[light_index];
+		// Diffuse
+		vec3 light_dir  =normalize(light.pos.rgb - FragPos);
+		float diff = max(dot(norm,light_dir),0.0);
+		// Specular
+		vec3 halfway = normalize(viewdir+light_dir);
+		float specular = pow(max(dot(halfway,norm),0.0),36);
+		
+		float dist = length(FragPos-light.pos.rgb);
+		float dist_scale = max(1.0 / (dist * dist + light.radius_and_padding.x) * (light.radius_and_padding.x - dist), 0.0);
+
+		vec3 result = light.color.rgb*((base_color.rgb*diff)+vec3(specular))*dist_scale;
+		sum_color += result;
+	}
+
+	FragColor = vec4(sum_color,1.0);
+}

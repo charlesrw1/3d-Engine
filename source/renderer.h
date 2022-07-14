@@ -3,11 +3,6 @@
 
 #include "opengl_api.h"
 
-struct rendersettings_t
-{
-	
-};
-
 struct View
 {
 	int x = 0, y = 0;
@@ -17,6 +12,36 @@ struct View
 
 	float znear=0.1f, zfar=200.f;
 };
+struct Renderstats
+{
+	int draw_calls;
+	int tris;
+
+	float total_ms;
+	float bloom_ms;
+	float world_ms;
+};
+
+// Forward+ structures
+// Fragments find Fruxel theyre in
+struct FruxelOffset_GPU
+{
+	int offset;
+};
+// Fruxel's offsets points to an array of Indicies, terminated with a -1 index
+struct VisibleIndex_GPU
+{
+	int index;
+};
+struct PointLight_GPU
+{
+	vec4 pos;
+	vec4 color;
+	vec4 radius_and_padding;
+};
+
+const int FRUXEL_SIZE = 64;
+
 
 class Texture;
 class App;
@@ -26,26 +51,24 @@ class Renderer
 public:
 	Renderer();
 
-	Shader untextured;
-	Shader untextured_unshaded;
-	Shader textured_mesh;
 	Shader point_lights;
 	Shader debug_depth;
 	Shader depth_render;
 	Shader gamma_tm;
 	Shader bright_pass_filter;
 	Shader guassian_blur;
-	Shader upsample_shade;
 	Shader no_transform;
 	Shader gamma_tm_bloom;
 	Shader directional_shadows;
 	Shader transformed_primitives;
-	Shader leaf;
 	Shader model_primitives;
 	Shader fresnel;
 	Shader overdraw;
 	Shader lightmap;
 	Shader textured_prim_transform;
+	Shader upsample_shade;
+
+	Shader forward_plus;
 
 	Texture* white_tex;
 
@@ -87,7 +110,12 @@ public:
 
 	View view;
 
+	Renderstats stats;
+
+	int stress_test_world_draw_count = 1;
+
 	bool d_world = true;
+	bool d_ents = true;
 	bool d_world_face_edges = false;
 	bool d_lightmap_debug = false;
 	bool d_lightmap_patches = false;
@@ -126,32 +154,37 @@ public:
 
 	Texture* lightmap_tex_nearest;
 	Texture* lightmap_tex_linear;
+
+	// Clustered forward storage buffers
+	uint32_t light_buffer;
+	uint32_t visible_buffer;
+	uint32_t offset_buffer;
+
+	int fruxel_width;
+	int fruxel_height;
+
+
 private:
-	
+
+	void init_tiled_rendering();
+
+	// Forward+ funcitons
+	void push_lights_to_buffer();
+	void calc_fruxel_visibility();
+
 	void lightmap_geo();
 	void init_basic_sphere();
-
 	void halt_and_render_to_screen(uint32_t texture_id);
-
 	mat4 render_shadow_map(SceneData& scene);
-
 	void init_bloom();
 	void bloom_pass();
-
 	void visualize_overdraw(SceneData& scene);
-
 	void scene_pass(SceneData& scene, Shader& shader);
-
 	void draw_world_geo(Shader& shader);
-
 	void upload_point_lights(SceneData& scene);
-
 	void primitive_debug_pass();
-
 	void bounding_sphere_pass(SceneData& scene);
-
 	void load_shaders();
-
 	mat4 get_projection_matrix();
 };
 #endif

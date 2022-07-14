@@ -82,6 +82,9 @@ int main(int argc, char* argv[])
 		else if (strcmp(argv[i], "-onlycompile") == 0) {
 			dont_run = true;
 		}
+		else if (strcmp(argv[i], "-nodirect") == 0) {
+			lm_settings.no_direct = true;
+		}
 		else if (strcmp(argv[i], "-help")==0) {
 			print_help();
 			return 1;

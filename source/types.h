@@ -63,7 +63,7 @@ public:
 struct DirectionalLight
 {
 	vec3 direction;
-	vec3 ambient, diffuse, specular;
+	vec3 ambient=vec3(0.3), diffuse=vec3(1.0), specular=vec3(1.0);
 };
 struct PointLight
 {
@@ -83,6 +83,9 @@ struct SceneData
 
 	std::vector<GameObject*> objects;
 
+	std::vector<PointLight> point_lights;
+
+
 	DirectionalLight sun;
 	PointLight lights[8];
 	uint8_t num_lights = 0;
@@ -93,6 +96,13 @@ struct SceneData
 
 	VertexArray map_geo;
 	VertexArray map_geo_edges;
+
+	void free_objects() {
+		for (int i = 0; i < objects.size(); i++) {
+			delete objects[i];
+		}
+		objects.clear();
+	}
 };
 
 

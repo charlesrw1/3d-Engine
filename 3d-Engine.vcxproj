@@ -32,6 +32,7 @@
     <ClCompile Include="source\deps\imgui_tables.cpp" />
     <ClCompile Include="source\deps\imgui_widgets.cpp" />
     <ClCompile Include="source\editor.cpp" />
+    <ClCompile Include="source\ForwardPlus.cpp" />
     <ClCompile Include="source\Geometry.cpp" />
     <ClCompile Include="source\Light.cpp" />
     <ClCompile Include="source\main.cpp" />
@@ -44,6 +45,7 @@
     <ClCompile Include="source\Texture_def.cpp" />
     <ClCompile Include="source\ThreadTools.cpp" />
     <ClCompile Include="source\Trace.cpp" />
+    <ClCompile Include="source\Voxelizer.cpp" />
     <ClCompile Include="source\WorldGeometry.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -64,6 +66,7 @@
     <ClInclude Include="source\editor.h" />
     <ClInclude Include="source\Geometry.h" />
     <ClInclude Include="source\BSPtree.h" />
+    <ClInclude Include="source\Voxelizer.h" />
     <ClInclude Include="source\Light.h" />
     <ClInclude Include="source\MapParser.h" />
     <ClInclude Include="source\Map_def.h" />

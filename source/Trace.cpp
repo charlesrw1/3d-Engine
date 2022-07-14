@@ -461,7 +461,7 @@ void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& t
 			trace.length = t;
 			trace.normal = f.plane.normal;
 			trace.d = f.plane.d;
-			//trace.face = i;//leaf->face_index;
+			trace.face = face_index[i];
 		}
 	}
 }

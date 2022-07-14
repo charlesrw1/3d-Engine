@@ -97,6 +97,8 @@ void App::setup_new_map()
 		start = vec3(-start.x, start.z, start.y) / 32.f;
 	}
 	scene->cams[0].set_position(start);
+
+	load_gameobjects();
 }
 void App::load_map(std::string map_name)
 {
@@ -108,14 +110,76 @@ void App::load_map(std::string map_name)
 void App::free_current_map()
 {
 	global_world.free_map();
+	scene->free_objects();
 }
+void App::load_gameobjects()
+{
+	for (int i = 0; i < world.entities.size(); i++)
+	{
+		entity_t* e = &world.entities[i];
+		auto classname = e->properties.find("classname");
+		if (classname == e->properties.end())
+			continue;
+		if (classname->second != "StaticModel")
+			continue;
+		std::string modelstr = e->properties.find("model")->second;
+		Model* model = global_models.find_or_load(modelstr.c_str());
+		if (!model->is_loaded())
+			continue;
+		GameObject* obj = new GameObject;
+		obj->model = model;
+		std::string orgstr = e->properties.find("origin")->second;
+		vec3 origin;
+		sscanf_s(orgstr.c_str(), "%f %f %f", &origin.x, &origin.y, &origin.z);
+		origin = vec3(-origin.x, origin.z, origin.y) / 32.f;
+		obj->position = origin;
+		scene->objects.push_back(obj);
+	}
 
+	for (int i = 0; i < world.entities.size(); i++)
+	{
+		entity_t* e = &world.entities[i];
+		auto classname = e->properties.find("classname");
+		if (classname == e->properties.end())
+			continue;
+		if (classname->second != "light")
+			continue;
+
+		std::string orgstr = e->properties.find("origin")->second;
+		vec3 org;
+		sscanf_s(orgstr.c_str(), "%f %f %f", &org.x, &org.y, &org.z);
+		org /= 32.f;	// scale down
+
+		org = vec3(-org.x, org.z, org.y);
+
+		float brightness_radius=200.f;
+		auto brightness_str = e->properties.find("light");
+		if (brightness_str != e->properties.end()) {
+			brightness_radius = std::stoi(brightness_str->second);
+		}
+		brightness_radius /= 32.f;
+
+		vec3 color = vec3(1.0);
+		auto color_str = e->properties.find("color");
+		if (color_str != e->properties.end()) {
+			sscanf_s(color_str->second.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
+		}
+
+		PointLight pl;
+		pl.color = color;
+		pl.position = org;
+		pl.radius = brightness_radius;
+
+		scene->point_lights.push_back(pl);
+	}
+
+}
 void App::init_window()
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
 		sdldie("SDL init failed");
 	}
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);

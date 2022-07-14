@@ -46,6 +46,7 @@ public:
 	void write_compiled_map();
 	void free_current_map();
 
+	void load_gameobjects();
 
 	Renderer* r;
 	SceneData* scene;

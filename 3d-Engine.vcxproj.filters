@@ -102,6 +102,12 @@
     <ClCompile Include="source\ThreadTools.cpp">
       <Filter>Source Files\Lightmapping</Filter>
     </ClCompile>
+    <ClCompile Include="source\ForwardPlus.cpp">
+      <Filter>Source Files\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Voxelizer.cpp">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\app.h">
@@ -189,6 +195,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="source\ThreadTools.h">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Voxelizer.h">
       <Filter>Source Files\Lightmapping</Filter>
     </ClInclude>
   </ItemGroup>

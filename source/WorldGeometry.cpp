@@ -53,17 +53,18 @@ void WorldGeometry::create_mesh()
 
 		// We have a new texture, append previous mesh
 		if (current_t != wm->t_info.at(face.t_info_idx).t_index) {
-			RenderMesh rm;
-			rm.diffuse = face_textures.at(current_t);
-			if (!rm.diffuse->is_loaded()) rm.diffuse = nullptr;
-			M_upload_lightmap_mesh(&rm, gpu_verts.data(), elements.data(), gpu_verts.size(), elements.size());
+			if (!gpu_verts.empty()) {
+				RenderMesh rm;
+				rm.diffuse = face_textures.at(current_t);
+				if (!rm.diffuse->is_loaded()) rm.diffuse = nullptr;
+				M_upload_lightmap_mesh(&rm, gpu_verts.data(), elements.data(), gpu_verts.size(), elements.size());
 
-			gpu_verts.clear();
-			elements.clear();
+				gpu_verts.clear();
+				elements.clear();
 
+				model->append_mesh(rm);
+			}
 			current_t = wm->t_info.at(face.t_info_idx).t_index;
-
-			model->append_mesh(rm);
 		}
 		
 		// Generate verts for GPU

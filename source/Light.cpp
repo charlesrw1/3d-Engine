@@ -65,8 +65,12 @@ bool test_patch_visibility = true;
 // This is sort of hacky, it should be taken from the actual face textures themselves
 vec3 default_reflectivity = vec3(0.3);
 
+// Dont add direct lighting to final lightmap, still gets computed for radiosity patch reflectivity 
+bool no_direct = false;
+
 VertexArray va;
 VertexArray point_array;
+VertexArray voxels;
 
 struct planeneighbor_t
 {
@@ -926,6 +930,9 @@ void final_light_face(int face_num)
 		Radial radial(fl,face);
 		radial.build_ambient_samples(face_num);
 		for (int i = 0; i < fl->num_points; i++) {
+			if (no_direct) {
+				fl->pixel_colors[i] = vec3(0.0);
+			}
 			fl->pixel_colors[i] += radial.get_ambient(i);
 		}
 	}
@@ -1117,6 +1124,7 @@ void mark_bad_faces()
 
 
 #include <algorithm>
+#include "Voxelizer.h"
 void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 {
 	patch_grid = settings.patch_grid;
@@ -1126,6 +1134,7 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	inside_map = settings.inside_map;
 	num_bounces = settings.num_bounces;
 	default_reflectivity = settings.default_reflectivity;
+	no_direct = settings.no_direct;
 	RADIAL = patch_grid * 4.f;
 	RADIALSQRT = sqrt(RADIAL);
 	for (int i = 0; i < 4; i++) {
@@ -1139,7 +1148,13 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	printf("Starting lightmap...\n");
 	va.init(VertexArray::Primitive::LINES);
 	point_array.init(VertexArray::Primitive::POINTS);
+	voxels.init(VertexArray::TRIANGLES);
 
+	// Used for random debug colors
+	srand(time(NULL));
+
+	Voxelizer vox(wm, 1.0,2);
+	vox.add_points(&voxels);
 
 	faces = wm->faces.data();
 	num_faces = wm->faces.size();
@@ -1165,8 +1180,6 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	}
 
 	add_lights(wm);
-	// Used for random debug colors
-	srand(time(NULL));
 
 	printf("Total patches: %u\n", num_patches);
 
@@ -1264,6 +1277,13 @@ void draw_lightmap_debug()
 	va.draw_array();
 	glPointSize(4);
 	point_array.draw_array();
+	
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_CULL_FACE);
+	voxels.draw_array();
+	glEnable(GL_CULL_FACE);
+	glDisable(GL_BLEND);
 	
 }
 void draw_lightmap_patches()

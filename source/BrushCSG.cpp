@@ -66,6 +66,8 @@ void MapParser::CSG_union()
 			clipped_faces.insert(clipped_faces.end(), final_faces.begin(), final_faces.end());
 		}
 		brush_model_t bm;
+		bm.min = vec3(0);
+		bm.max = vec3(0);
 		bm.face_start = face_list.size();
 		for (int i = 0; i < clipped_faces.size(); i++)
 		{
@@ -79,8 +81,7 @@ void MapParser::CSG_union()
 				printf("Not enough verts in winding, removing face\n");
 				continue;
 			}
-
-
+		
 			for (int j = 0; j < w->num_verts; j++) {
 				vertex_list.push_back(w->v[j]);
 			}

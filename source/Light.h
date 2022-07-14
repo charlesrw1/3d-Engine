@@ -10,9 +10,11 @@ struct LightmapSettings
 	bool enable_radiosity = true;
 	bool inside_map = true;
 	bool test_patch_visibility = true;
+	bool no_direct = false;
 	float sample_ofs = 0.1;
 
-	vec3 default_reflectivity = vec3(0.5);
+
+	vec3 default_reflectivity = vec3(0.4);
 };
 
 

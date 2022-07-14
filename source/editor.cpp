@@ -29,6 +29,20 @@ void Editor::on_render()
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui::NewFrame();
 	ImGui::ShowDemoWindow();
+	
+	Renderer* r = global_app.r;
+	
+	const Renderstats* rs = &r->stats;
+	ImGui::Begin("Stats");
+	ImGui::Text("Render MS  : %f", rs->total_ms);
+	ImGui::Text("World MS   : %f", rs->world_ms);
+	ImGui::Text("Bloom MS   : %f", rs->bloom_ms);
+	ImGui::Text("Draw calls : %d", rs->draw_calls);
+	ImGui::Text("Tris       : %d", rs->tris);
+	ImGui::End();
+
+
+
 
 
 	ImGui::Begin("Editor");
@@ -42,7 +56,6 @@ void Editor::on_render()
 	}
 
 
-	Renderer* r = global_app.r;
 	R_BOOLEAN_IMGUI("d_world", d_world);
 	R_BOOLEAN_IMGUI("d_world_face_edges", d_world_face_edges);
 	R_BOOLEAN_IMGUI("d_trace_boxes", d_trace_boxes);
@@ -54,7 +67,7 @@ void Editor::on_render()
 	R_BOOLEAN_IMGUI("d_lightmap_overlay", d_lightmap_overlay);
 	R_BOOLEAN_IMGUI("no_textures", no_textures);
 
-
+	ImGui::SliderInt("stress test world calls", &r->stress_test_world_draw_count, 0, 25);
 
 	if (ImGui::Button("Reload Gamma/Tonemap shader")) {
 		// Temporary, should delete shader

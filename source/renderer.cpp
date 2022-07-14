@@ -10,8 +10,26 @@
 #include "WorldGeometry.h"
 #include "Light.h"
 #include <iostream>
+#include <chrono>
 
 const int SHADOW_WIDTH = 2048;
+
+class Stopwatch
+{
+public:
+	using Clock =std::chrono::high_resolution_clock;
+	using Time = std::chrono::steady_clock::time_point;
+	void start() {
+		start_time = Clock::now();
+	}
+	float end() {
+		auto m = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-start_time);
+		return m.count()/1000.f;
+	}
+private:
+		Time start_time;
+};
+
 
 Renderer::Renderer()
 {
@@ -50,17 +68,26 @@ Renderer::Renderer()
 
 	init_basic_sphere();
 
+	init_tiled_rendering();
+
 
 }
 
 void Renderer::render_scene(SceneData& scene)
 {
+	//calc_fruxel_visibility();
+	
+	Stopwatch total, world, bloom;
+	total.start();
+	stats = {};
+
+	
 	glClearColor(0, 0, 0, 1);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	mat4 light_space_matrix = render_shadow_map(scene);
 
-	glViewport(0, 0, global_app.width, global_app.height);
+	glViewport(0, 0, view.width,view.height);
 
 	glEnable(GL_CULL_FACE);
 	HDRbuffer.bind();
@@ -70,7 +97,14 @@ void Renderer::render_scene(SceneData& scene)
 	projection_matrix = get_projection_matrix(), view_matrix = scene.active_camera()->view_matrix;
 	
 
-	if (!d_world) {
+	if (d_world)
+	{
+		world.start();
+		lightmap_geo();
+		stats.world_ms = world.end();
+	}
+
+	if (d_ents) {
 		// Directional light pass + ambient
 		directional_shadows.use();
 		directional_shadows.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix).set_vec3("light.direction", scene.sun.direction)
@@ -94,9 +128,6 @@ void Renderer::render_scene(SceneData& scene)
 		glDisable(GL_BLEND);
 		glDepthMask(GL_TRUE);
 	}
-	else {
-		lightmap_geo();
-	}
 
 	//glDisable(GL_CULL_FACE);
 	glFrontFace(GL_CW);
@@ -108,10 +139,12 @@ void Renderer::render_scene(SceneData& scene)
 	// unbind framebuffer, blit to resolve multisample
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, HDRbuffer.ID);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediate.ID);
-	glBlitFramebuffer(0, 0, global_app.width, global_app.height, 0, 0, global_app.width, global_app.height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+	glBlitFramebuffer(0, 0, view.width, view.height, 0, 0, view.width, view.height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
-
+	bloom.start();
 	bloom_pass();
+	stats.bloom_ms = bloom.end();
+
 	if (bloom_debug) {
 		uint32_t id;
 		if (show_bright_pass) {
@@ -157,7 +190,7 @@ void Renderer::render_scene(SceneData& scene)
 		glEnable(GL_DEPTH_TEST);
 	}
 
-
+	stats.total_ms = total.end();
 }
 
 void Renderer::upload_point_lights(SceneData& scene)
@@ -250,9 +283,6 @@ void Renderer::scene_pass(SceneData& scene, Shader& shader)
 
 			}
 		}
-	}
-	if (d_world) {
-		//draw_world_geo(shader);
 	}
 }
 
@@ -519,26 +549,30 @@ void Renderer::lightmap_geo()
 	else {
 	lightmap_tex_linear->bind(1);
 	}
-	 Model* m = global_world.get_model();
-	for (int i = 0; i < m->num_meshes(); i++) {
+	for (int j = 0; j < stress_test_world_draw_count; j++) {
+		Model* m = global_world.get_model();
+		for (int i = 0; i < m->num_meshes(); i++) {
 
-		const RenderMesh* rm = m->mesh(i);
+			const RenderMesh* rm = m->mesh(i);
 
-		if (rm->diffuse && !no_textures) {
-			rm->diffuse->bind(0);
+			if (rm->diffuse && !no_textures) {
+				rm->diffuse->bind(0);
+			}
+			else {
+				white_tex->bind(0);
+			}
+
+
+			//shader.set_mat4("u_model", obj->model_matrix).set_mat4("normal_mat", obj->inverse_matrix);
+
+			//	sm.mesh.bind();
+			glBindVertexArray(rm->vao);
+			glDrawElements(GL_TRIANGLES, rm->num_indices, GL_UNSIGNED_INT, NULL);
+			stats.draw_calls++;
+			stats.tris += rm->num_indices / 3;
+			//sm.mesh.draw_indexed_primitive();
+
 		}
-		else {
-			white_tex->bind(0);
-		}
-
-
-		//shader.set_mat4("u_model", obj->model_matrix).set_mat4("normal_mat", obj->inverse_matrix);
-
-		//	sm.mesh.bind();
-		glBindVertexArray(rm->vao);
-		glDrawElements(GL_TRIANGLES, rm->num_indices, GL_UNSIGNED_INT, NULL);
-		//sm.mesh.draw_indexed_primitive();
-
 	}
 	glFrontFace(GL_CCW);
 
@@ -589,10 +623,6 @@ void Renderer::load_shaders()
 
 	depth_render.load_from_file("depth_render_v.txt", "depth_render_f.txt");
 
-	untextured.load_from_file("basic_lighting_vr.txt", "basic_lighting_fr.txt");
-	untextured_unshaded = Shader("light_cube_vr.txt", "light_cube_fr.txt");
-	textured_mesh = Shader("directional.vert", "directional.frag");
-
 	point_lights = Shader("point_light_v.txt", "point_light_f.txt");
 
 	gamma_tm = Shader("no_transform_v.txt", "gamma_f.txt");
@@ -611,12 +641,12 @@ void Renderer::load_shaders()
 	transformed_primitives = Shader("transform_p_v.txt", "transform_p_f.txt");
 	model_primitives = Shader("transform_pmodel_v.txt", "transform_pmodel_f.txt");
 
-	leaf = Shader("leaf_shader_v.txt", "directional.frag");
-
 	fresnel = Shader("point_light_v.txt", "fresnel_f.txt");
 	overdraw = Shader("point_light_v.txt", "overdraw_f.txt");
 
 	lightmap = Shader("lightmap_generic_v.txt", "lightmap_generic_f.txt");
+
+	forward_plus.load_from_file("directional_shadows_v.txt", "forward_plus_f.txt");
 }
 mat4 Renderer::get_projection_matrix()
 {
