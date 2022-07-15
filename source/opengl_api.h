@@ -115,6 +115,21 @@ struct VertexArray
 		push_square(corners[2], corners[1], corners[5], corners[6], color);//+Z
 
 	}
+	// color param is a pointer to 6 colors for each face
+	void add_solid_box(vec3 min, vec3 max, vec3* color)
+	{
+		vec3 corners[8] = { max, vec3(max.x,max.y,min.z),vec3(min.x,max.y,min.z),vec3(min.x,max.y,max.z),	// top CCW
+							vec3(max.x,min.y,max.z), vec3(max.x,min.y,min.z),min,vec3(min.x,min.y,max.z) };	// bottom
+		push_square(corners[0], corners[1], corners[2], corners[3], vec4(color[0],1.0));// top
+		push_square(corners[4], corners[5], corners[6], corners[7], vec4(color[1], 1.0));// bottom
+		push_square(corners[0], corners[1], corners[5], corners[4], vec4(color[2], 1.0));//+X
+		push_square(corners[3], corners[2], corners[6], corners[7], vec4(color[3], 1.0));//-X
+		push_square(corners[3], corners[0], corners[4], corners[7], vec4(color[4], 1.0));//+Z
+		push_square(corners[2], corners[1], corners[5], corners[6], vec4(color[5], 1.0));//+Z
+
+	}
+
+
 	void add_line_box(vec3 min, vec3 max, vec3 color)
 	{
 		using VP = VertexP;

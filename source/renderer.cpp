@@ -106,7 +106,7 @@ void Renderer::render_scene(SceneData& scene)
 
 	if (d_ents) {
 		// Directional light pass + ambient
-		directional_shadows.use();
+		/*directional_shadows.use();
 		directional_shadows.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix).set_vec3("light.direction", scene.sun.direction)
 			.set_vec3("light.ambient", scene.sun.ambient).set_vec3("light.diffuse", scene.sun.diffuse)
 			.set_vec3("light.specular", scene.sun.specular).set_int("baseTex", 0).set_int("shinyTex", 1).set_int("shadow_map", 2)
@@ -115,18 +115,73 @@ void Renderer::render_scene(SceneData& scene)
 		glActiveTexture(GL_TEXTURE0 + 2);
 		glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
 		scene_pass(scene, directional_shadows);
-
+		*/
 		// Point lights pass
-		upload_point_lights(scene);
-		point_lights.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix)
+		//upload_point_lights(scene);
+
+		ambientcube_shade.use();
+		ambientcube_shade.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix)
 			.set_vec3("view_pos", scene.active_camera()->position).set_int("diffuse_tex", 0).set_int("shiny_tex", 1);
+
+		for (const auto obj : scene.objects) {
+			ambientcube_shade.set_vec3("light.position", scene.point_lights.at(obj->closest_light).position);
+			ambientcube_shade.set_vec3("light.color", scene.point_lights.at(obj->closest_light).color);
+			ambientcube_shade.set_float("light.radius", scene.point_lights.at(obj->closest_light).radius);
+
+			for (int i = 0; i < 6; i++) {
+				ambientcube_shade.set_vec3(("ambient_cube[" + std::to_string(i) + "]").c_str(), 
+					global_app.world.ambient_grid.at(obj->closest_ambient_cube).axis_colors[i]);
+			}
+
+			
+
+
+			// this should be changed, the list should only be textured items
+			if (obj->has_shading) {
+
+				// this is going to go
+				if (obj->matrix_needs_update) {
+					obj->update_matrix();
+					obj->matrix_needs_update = false;
+				}
+				// Check if previous draw call used same texture or buffer!
+				//Model::SubMesh& sm = obj->model->meshes.at(0);
+				for (int i = 0; i < obj->model->num_meshes(); i++) {
+
+					const RenderMesh* rm = obj->model->mesh(i);
+
+					if (rm->diffuse) {
+						rm->diffuse->bind(0);
+					}
+					else {
+						white_tex->bind(0);
+					}
+
+					if (rm->specular) {
+						rm->specular->bind(1);
+					}
+					else {
+						white_tex->bind(1);
+					}
+
+					ambientcube_shade.set_mat4("u_model", obj->model_matrix).set_mat4("normal_mat", obj->inverse_matrix);
+
+					//	sm.mesh.bind();
+					glBindVertexArray(rm->vao);
+					glDrawElements(GL_TRIANGLES, rm->num_indices, GL_UNSIGNED_INT, NULL);
+					//sm.mesh.draw_indexed_primitive();
+
+				}
+			}
+		}
+
 		// Enable additive blending
-		glDepthMask(GL_FALSE);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE);
-		scene_pass(scene, point_lights);
-		glDisable(GL_BLEND);
-		glDepthMask(GL_TRUE);
+		//glDepthMask(GL_FALSE);
+		//glEnable(GL_BLEND);
+		//glBlendFunc(GL_ONE, GL_ONE);
+		//scene_pass(scene, point_lights);
+		//glDisable(GL_BLEND);
+		//glDepthMask(GL_TRUE);
 	}
 
 	//glDisable(GL_CULL_FACE);
@@ -647,6 +702,8 @@ void Renderer::load_shaders()
 	lightmap = Shader("lightmap_generic_v.txt", "lightmap_generic_f.txt");
 
 	forward_plus.load_from_file("directional_shadows_v.txt", "forward_plus_f.txt");
+
+	ambientcube_shade.load_from_file("point_light_v.txt", "ambient_cube_f.txt");
 }
 mat4 Renderer::get_projection_matrix()
 {

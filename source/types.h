@@ -50,6 +50,11 @@ public:
 	bool is_leaf = false;
 
 
+	// Temporary data
+	int closest_light;
+	int closest_ambient_cube;
+
+
 	void update_matrix() {
 		model_matrix = mat4(1);
 		model_matrix = translate(model_matrix, position);

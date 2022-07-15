@@ -134,6 +134,7 @@ void App::load_gameobjects()
 		origin = vec3(-origin.x, origin.z, origin.y) / 32.f;
 		obj->position = origin;
 		scene->objects.push_back(obj);
+
 	}
 
 	for (int i = 0; i < world.entities.size(); i++)
@@ -172,6 +173,31 @@ void App::load_gameobjects()
 
 		scene->point_lights.push_back(pl);
 	}
+
+	for (int i = 0; i < scene->objects.size(); i++) {
+		auto obj = scene->objects[i];
+		float closest_dist = 2000.0;
+		int closest_idx = 0;
+		for (int j = 0; j < world.ambient_grid.size(); j++) {
+			float dist = length(world.ambient_grid[j].position - obj->position);
+			if (dist < closest_dist) {
+				closest_idx = j;
+				closest_dist = dist;
+			}
+		}
+		obj->closest_ambient_cube = closest_idx;
+		
+		closest_dist = 2000.0;
+		closest_idx = 0;
+		for (int j = 0; j < scene->point_lights.size(); j++) {
+			float dist = length(scene->point_lights[j].position - obj->position);
+			if (dist < closest_dist)
+				closest_idx = j;
+		}
+		obj->closest_light = closest_idx;
+	}
+
+
 
 }
 void App::init_window()
@@ -288,6 +314,12 @@ void App::update_loop()
 	scene->lights[4].position.x = 3 * sin(sec_elap / 2) * sin(sec_elap * 2);
 	scene->lights[4].position.z = 6 * cos(sec_elap / 5);
 
+	for (int i = 0; i < scene->objects.size(); i++) {
+		scene->objects[i]->euler_y = sec_elap*(i*0.25+1)*0.75;
+		scene->objects[i]->update_matrix();
+	}
+
+
 	const float PI = 3.1415;
 	float azimuth = SDL_GetTicks() / 5000.f;
 	float altidude = PI / 3;
@@ -372,7 +404,10 @@ void App::write_compiled_map()
 			WRITE(prop.first.c_str(), prop.first.size() + 1);
 			WRITE(prop.second.c_str(), prop.second.size() + 1);
 		}
-	}	
+	}
+	WRITE("LIGHTGRID", 10);
+	WRITE_ARRAY_SIZE(world.ambient_grid.size());
+	WRITE(world.ambient_grid.data(), world.ambient_grid.size() * sizeof(AmbientCube));
 }
 #define READ(ptr,count)infile.read((char*)ptr, count)
 
@@ -479,4 +514,8 @@ void App::load_compiled_map(std::string map_name)
 		}
 	}
 
+	READ_STR(&string_buffer[0]);
+	READ(&count_temp, 4);
+	world.ambient_grid.resize(count_temp);
+	READ(world.ambient_grid.data(), world.ambient_grid.size() * sizeof(AmbientCube));
 }

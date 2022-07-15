@@ -67,6 +67,7 @@ public:
 	Shader lightmap;
 	Shader textured_prim_transform;
 	Shader upsample_shade;
+	Shader ambientcube_shade;
 
 	Shader forward_plus;
 

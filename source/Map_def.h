@@ -91,6 +91,12 @@ struct LightmapVert
 	vec2 lightmap_uv;
 };
 
+struct AmbientCube
+{
+	vec3 position;
+	vec3 axis_colors[6];	// x,-x,y,...
+};
+
 struct worldmodel_t
 {
 	std::string name;
@@ -104,6 +110,10 @@ struct worldmodel_t
 	std::vector<Texture*> textures;
 	std::vector<std::string> texture_names;
 	std::vector<entity_t> entities;
+
+
+
+	std::vector<AmbientCube> ambient_grid;
 };
 
 
