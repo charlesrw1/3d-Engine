@@ -269,7 +269,7 @@ bool winding_t::point_inside(const vec3& point) const
 	for (int i = 0; i < num_verts; i++) {
 		vec3 vec = point - v[i];
 		vec3 c = cross(v[(i + 1) % num_verts] - v[i], vec);
-		float angle = dot(p.normal, c);
+		float angle = dot(-p.normal, c);
 		if (angle < -0.005f) {
 			return false;
 		}

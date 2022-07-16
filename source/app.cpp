@@ -126,6 +126,13 @@ void App::load_gameobjects()
 		Model* model = global_models.find_or_load(modelstr.c_str());
 		if (!model->is_loaded())
 			continue;
+
+		auto reflection = e->properties.find("reflection");
+		float reflection_amt = 0.0;
+		if (reflection != e->properties.end()) {
+			reflection_amt = std::stof(reflection->second);
+		}
+
 		GameObject* obj = new GameObject;
 		obj->model = model;
 		std::string orgstr = e->properties.find("origin")->second;
@@ -133,6 +140,7 @@ void App::load_gameobjects()
 		sscanf_s(orgstr.c_str(), "%f %f %f", &origin.x, &origin.y, &origin.z);
 		origin = vec3(-origin.x, origin.z, origin.y) / 32.f;
 		obj->position = origin;
+		obj->reflection_strength = reflection_amt;
 		scene->objects.push_back(obj);
 
 	}
@@ -173,6 +181,17 @@ void App::load_gameobjects()
 
 		scene->point_lights.push_back(pl);
 	}
+	for (const auto& ent : world.entities) {
+		if (ent.get_classname() != "reflection_probe")
+			continue;
+
+		EnviormentProbe evp;
+		if (ent.properties.find("dont_draw") != ent.properties.end())
+			evp.dont_draw = true;
+
+		evp.position = ent.get_transformed_origin();
+		scene->enviorment_probes.push_back(evp);
+	}
 
 	for (int i = 0; i < scene->objects.size(); i++) {
 		auto obj = scene->objects[i];
@@ -191,12 +210,27 @@ void App::load_gameobjects()
 		closest_idx = 0;
 		for (int j = 0; j < scene->point_lights.size(); j++) {
 			float dist = length(scene->point_lights[j].position - obj->position);
-			if (dist < closest_dist)
+			if (dist < closest_dist) {
 				closest_idx = j;
+				closest_dist = dist;
+			}
 		}
 		obj->closest_light = closest_idx;
-	}
 
+		closest_dist = 2000.0;
+		closest_idx = -1;
+		obj->closest_reflection_probe = -1;
+		if (obj->reflection_strength > 0.01) {
+			for (int j = 0; j < scene->enviorment_probes.size(); j++) {
+				float dist = length(scene->enviorment_probes.at(j).position - obj->position);
+				if (dist < closest_dist) {
+					closest_idx = j;
+					closest_dist = dist;
+				}
+			}
+			obj->closest_reflection_probe = closest_idx;
+		}
+	}
 
 
 }
@@ -324,11 +358,14 @@ void App::update_loop()
 	float azimuth = SDL_GetTicks() / 5000.f;
 	float altidude = PI / 3;
 	scene->sun.direction = normalize(-vec3(cos(azimuth) * sin(altidude), cos(altidude), sin(azimuth) * sin(altidude)));
+
+
 }
 void App::on_render()
 {
 	r->render_scene(*scene);
 	editor->on_render();
+	r->update_world_cubemaps(scene);
 }
 
 #define WRITE(ptr, count) outfile.write((char*)ptr, count)

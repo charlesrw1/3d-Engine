@@ -28,6 +28,11 @@ struct trace_t
 	int face{};
 	// material hit
 	Texture* tex = nullptr;
+
+
+	bool hit_backface() {
+		return dot(dir, normal) >= 0.1;
+	}
 };
 
 

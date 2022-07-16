@@ -129,4 +129,6 @@ private:
 	VertexArray box_array;
 };
 
+void print_rays_cast();
+
 #endif // !BSPTREE_H

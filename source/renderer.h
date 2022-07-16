@@ -2,7 +2,7 @@
 #define RENDERER_H
 
 #include "opengl_api.h"
-
+#include "Texture_def.h"
 struct View
 {
 	int x = 0, y = 0;
@@ -46,6 +46,7 @@ const int FRUXEL_SIZE = 64;
 class Texture;
 class App;
 struct SceneData;
+struct EnviormentProbe;
 class Renderer
 {
 public:
@@ -68,7 +69,7 @@ public:
 	Shader textured_prim_transform;
 	Shader upsample_shade;
 	Shader ambientcube_shade;
-
+	Shader ambientcube_reflection;
 	Shader forward_plus;
 
 	Texture* white_tex;
@@ -94,6 +95,11 @@ public:
 	void set_fov(int new_fov) {
 		view.fov_y = new_fov;
 	}
+
+	void reset_cubemaps() {
+		world_cubemaps.clear();
+	}
+	void update_world_cubemaps(SceneData* scene);
 
 	// BLOOM
 	uint32_t bright_pass;
@@ -126,6 +132,7 @@ public:
 	bool lightmap_nearest = false;
 	bool d_lightmap_overlay = false;
 	bool no_textures = false;
+	bool d_enviorment_probes = true;
 
 	struct ShadowMapProjection
 	{
@@ -161,11 +168,23 @@ public:
 	uint32_t visible_buffer;
 	uint32_t offset_buffer;
 
+
 	int fruxel_width;
 	int fruxel_height;
 
-
+	VertexArray cube_with_normals;
+	uint32_t cubemap_framebuffer;
+	uint32_t cubemap_depth_renderbuffer;
+	Shader cubemap_shader;
+	u32 cubemap_textures[6];
+	int cube_num = 0;
+	std::vector<Cubemap> world_cubemaps;
 private:
+
+	void world_pass(SceneData& scene);
+	void render_to_cubemap(const EnviormentProbe* ep, SceneData* scene);
+
+	void draw_cubemaps(SceneData* scene);
 
 	void init_tiled_rendering();
 

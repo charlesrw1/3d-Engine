@@ -62,4 +62,26 @@ private:
 	u32 ID{};
 };
 
+class Cubemap
+{
+public:
+
+	void init_empty(int size);
+	void purge();
+
+	u32 get_ID() const {
+		return ID;
+	}
+	bool is_loaded() const {
+		return loaded;
+	}
+	int get_size() const {
+		return size;
+	}
+private:
+	int size{};
+	u32 ID{};
+	bool loaded = false;
+};
+
 #endif // !TEXTUREDEF_H

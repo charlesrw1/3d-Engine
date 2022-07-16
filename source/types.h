@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "Model_def.h"
+#include "Map_def.h"
 
 using namespace glm;
 
@@ -36,6 +37,8 @@ public:
 	bool draw_wireframe = false;
 	Model* model = nullptr;
 
+	float reflection_strength = 0.0;
+
 	vec3 color = vec3(1.f);
 	bool transparent = false;
 	float transparency = 1.f;
@@ -53,6 +56,7 @@ public:
 	// Temporary data
 	int closest_light;
 	int closest_ambient_cube;
+	int closest_reflection_probe;
 
 
 	void update_matrix() {
@@ -108,6 +112,7 @@ struct SceneData
 		}
 		objects.clear();
 	}
+	std::vector<EnviormentProbe> enviorment_probes;
 };
 
 

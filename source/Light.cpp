@@ -86,6 +86,10 @@ bool test_patch_visibility = true;
 vec3 default_reflectivity = vec3(0.3);
 // Dont add direct lighting to final lightmap, still gets computed for radiosity patch reflectivity 
 bool no_direct = false;
+
+// Use random vectors vs exact for patch-to-patch form factor
+//#define USE_RANDOM_VECTORS
+const int NUM_PATCH_RAYCASTS=1000;
 // ---------------------------------
 
 // ---------- DEBUG ---------------
@@ -129,16 +133,36 @@ std::vector<vec3> ambient_cubes;
 std::vector<AmbCubeTransfer> amb_cube_transfers;
 // -----------------------------------
 
+// ------------ UTILITIES --------------
+float random_float()
+{
+	return rand() / (RAND_MAX + 1.0f);
+}
+float random_float(float min, float max)
+{
+	return min + (max - min) * random_float();
+}
+vec3 random_vec3(float min, float max)
+{
+	return vec3(random_float(min,max), random_float(min,max),random_float(min,max));
+}
+vec3 random_in_unit_sphere()
+{
+	while (1)
+	{
+		vec3 v = random_vec3(-1.f, 1.f);
+		if (dot(v, v) >= 1) continue;
+		return v;
+	}
+}
 vec3 lerp(const vec3& a, const vec3& b, float percentage)
 {
 	return a + (b - a) * percentage;
 }
 
-
 vec3 rgb_to_float(uint8 r, uint g, uint b) {
 	return vec3(r / 255.f, g / 255.f, b / 255.f);
 }
-
 vec3 random_color()
 {
 	vec3 v;
@@ -147,6 +171,7 @@ vec3 random_color()
 	}
 	return v;
 }
+// --------------------------------------
 
 struct Rectangle
 {
@@ -359,7 +384,14 @@ void patch_for_face(int face_num)
 		p->reflectivity = rgb_to_float(255, 242, 0);
 	}
 	else {
-		p->reflectivity = default_reflectivity;
+		auto rflc_idx = t_string->find("dev/rflc");
+		if (rflc_idx != std::string::npos) {
+			int brightness = std::stoi(t_string->substr(t_string->size() - 2, 2));
+			p->reflectivity = vec3(brightness/100.0);
+		}
+		else {
+			p->reflectivity = default_reflectivity;
+		}
 	}
 
 	if (ti->flags & SURF_EMIT) {
@@ -465,7 +497,6 @@ void create_patch_view(PatchDebugMode mode)
 			break;
 		case PDM::RADCOLOR:
 			color = p->total_light;
-			color = glm::pow(color, vec3(1.0 / 2.2));
 		}
 		for (int i = 0; i < w->num_verts-2; i++) {
 		//	patch_va.push_line(w->v[i], w->v[(i + 1)%w->num_verts], vec3(1.0));
@@ -484,11 +515,15 @@ void set_patch_debug(PatchDebugMode mode)
 
 // RADIOSITY FUNCTIONS
 //std::vector<float> transfers;	// work buffer
+
+struct TempTransfer
+{
+	int patch_idx;
+	float transfer_amt;
+};
+
 void make_transfers(int patch_num)
 {
-	
-	std::vector<float> transfers;
-	transfers.resize(num_patches);
 
 
 	patch_t* patch = &patches[patch_num];
@@ -497,6 +532,9 @@ void make_transfers(int patch_num)
 	float total = 0;
 	vec3 center_with_offset = patch->center + plane.normal * 0.01f;
 	patch->num_transfers = 0;
+#ifndef USE_RANDOM_VECTORS
+	std::vector<float> transfers;
+	transfers.resize(num_patches);
 	for (int j = 0; j < num_patches; j++)
 	{
 		transfers[j] = 0;
@@ -546,9 +584,96 @@ void make_transfers(int patch_num)
 			final_total += t->factor;
 
 			t = &patch->transfers[t_index++];
-			assert(t_index <= patch->num_transfers+1);
+			assert(t_index <= patch->num_transfers + 1);
+		}
+}
+#else
+	std::vector<TempTransfer> temp_transfers;
+	for (int i = 0; i < NUM_PATCH_RAYCASTS; i++) 
+	{
+		vec3 direction;
+		float length;
+		do {
+		 direction = plane.normal + random_vec3(-1.0, 1.0);
+		 length = glm::length(direction);
+		} while (length < 0.0001f);	// prevent divide by zero
+		direction = normalize(direction);
+
+		trace_t res = global_world.tree.test_ray_fast(center_with_offset, center_with_offset + direction * 300.f,-0.005,0.005);
+		if (!res.hit)
+			continue;
+
+		// Find patch that was hit
+		patch_t* p = face_patches[res.face];
+		while (p)
+		{
+			if (p->winding.point_inside(res.end_pos)) break;
+			p = p->next;
+		}
+		if (p == nullptr) {
+			//printf("Face hit but patch not found\n");
+			continue;
+		}
+		patch_t* other = p;
+		int patch_idx = (long long(other) - (long long)&patches[0]) / sizeof(patch_t);
+		if (patch_idx == patch_num) {
+			continue;
+		}
+		vec3 dir = normalize(other->center - patch->center);
+		
+		float angi = dot(dir, plane.normal);
+		if (angi <= 0) {
+			continue;
+		}
+		float dist_sq = dot(other->center - patch->center, other->center - patch->center);
+
+		plane_t* planej = &faces[other->face].plane;
+		float angj = -dot(dir, planej->normal);
+		float factor = (angj * angi * other->area) / (dist_sq);
+
+		if (factor <= 0.00005) {
+			continue;
+		}
+
+
+		TempTransfer tt;
+		tt.patch_idx = (long long(other) - (long long)&patches[0]) / sizeof(patch_t);
+		tt.transfer_amt = factor;
+		temp_transfers.push_back(tt);
+
+		//transfers[j] = factor;
+		total += factor;
+		patch->num_transfers++;
+	}
+
+	std::sort(temp_transfers.begin(), temp_transfers.end(), [](const TempTransfer& t1, const TempTransfer& t2)
+		{
+			return t1.patch_idx < t2.patch_idx;
+		});
+	std::vector<TempTransfer> temp_temp;
+	int last_index = -1;
+	for (int i = 0; i < temp_transfers.size(); i++) {
+		if (temp_transfers[i].patch_idx != last_index) {
+			last_index = temp_transfers[i].patch_idx;
+			temp_temp.push_back(temp_transfers[i]);
+		}
+		else {
+			total -= temp_transfers[i].transfer_amt;
 		}
 	}
+	temp_transfers = std::move(temp_temp);
+	patch->num_transfers = temp_transfers.size();
+
+	if (patch->num_transfers > 0) {
+		patch->transfers = new transfer_t[patch->num_transfers];
+		for (int i = 0; i < patch->num_transfers; i++) {
+			patch->transfers[i].patch_num = temp_transfers.at(i).patch_idx;
+			patch->transfers[i].factor = temp_transfers.at(i).transfer_amt/total;
+		}
+	}
+
+
+#endif // !USE_RANDOM_VECTORS
 }
 
 
@@ -560,6 +685,7 @@ void make_ambient_transfers(int ambient_num)
 	std::vector<int> patch_nums;
 	patch_nums.reserve(256);
 	// Gather patches in all directions
+	int backface_hits = 0;
 	for (int i = 0; i < num_patches; i++) {
 		patch_t* p = patches + i;
 		/*float dist = sqrt(dot(point - p->center, point - p->center));
@@ -574,8 +700,18 @@ void make_ambient_transfers(int ambient_num)
 			//continue;
 			*/
 		trace_t res = global_world.tree.test_ray_fast(point, p->center + faces[p->face].plane.normal * 0.01f);
-		if (res.hit)
+		if (res.hit) {
+			if (res.hit_backface()) {
+				backface_hits++;
+				// Mother of hacks...
+				if (backface_hits >= 25) {
+					act->inside_wall = true;
+					return;
+				}
+			}
 			continue;
+		}
+		 
 
 		patch_nums.push_back(i);
 	}
@@ -697,7 +833,6 @@ void start_radiosity()
 	{
 		patch_t* p = &patches[i];
 		radiosity[i] = p->sample_light * p->reflectivity * p->area;
-
 	}
 	for (int i = 0; i < num_bounces; i++)
 	{
@@ -1293,14 +1428,29 @@ void ambient_voxel_debug()
 
 
 		vec3 colors[6];
-		colors[0] = act.sides[2].total_light;// y
-		colors[1] = act.sides[3].total_light;// -y
-		colors[2] = act.sides[0].total_light;// x
-		colors[3] = act.sides[1].total_light;// -x
+		colors[0] = act.sides[0].total_light;// x
+		colors[1] = act.sides[1].total_light;// -x
+		colors[2] = act.sides[2].total_light;// y
+		colors[3] = act.sides[3].total_light;// -y
 		colors[4] = act.sides[4].total_light;// z
 		colors[5] = act.sides[5].total_light;// -
 
 		voxels.add_solid_box(point - vec3(0.25), point + vec3(0.25), colors);
+	}
+}
+
+void add_manual_ambient_cubes()
+{
+	for (const auto& ent : world->entities) {
+		auto classname = ent.properties.find("classname");
+		if (classname == ent.properties.end())
+			continue;
+		if (classname->second != "AmbientCube")
+			continue;
+
+		vec3 origin = ent.get_transformed_origin();
+
+		ambient_cubes.push_back(origin);
 	}
 }
 
@@ -1336,7 +1486,10 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	Voxelizer vox(wm, 1.0,2);
 	//vox.add_points(&voxels);
 	vox.move_final_samples(ambient_cubes);
+	add_manual_ambient_cubes();
 	amb_cube_transfers.resize(ambient_cubes.size());
+
+
 
 	faces = wm->faces.data();
 	num_faces = wm->faces.size();
@@ -1385,13 +1538,13 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 
 		run_threads_on_function(&make_transfers, 0, num_patches);
 
+		//for (int i = 0; i < num_patches; i++) {
+		//	make_transfers(i);
+		//}
 		for (int i = 0; i < amb_cube_transfers.size(); i++) {
 			make_ambient_transfers(i);
 		}
 
-		//for (int i = 0; i < num_patches; i++) {
-		//	make_transfers(i);
-		//}
 		printf("Finished transfers\n");
 
 		printf("Bouncing light...\n");
@@ -1451,7 +1604,7 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 
 	stbi_write_bmp(("resources/textures/" + wm->name + "_lm.bmp").c_str(), lm_width, lm_height, 3, final_lightmap.data());
 	printf("Lightmap finished in %u ms\n", SDL_GetTicks() - start);
-	
+	print_rays_cast();
 	cur_mode = PatchDebugMode::RADCOLOR;
 	create_patch_view(PatchDebugMode::RADCOLOR);
 

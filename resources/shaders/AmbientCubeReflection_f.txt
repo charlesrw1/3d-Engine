@@ -1,0 +1,73 @@
+#version 330 core
+
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec2 TexCoord;
+
+struct Light
+{
+	vec3 position;
+	vec3 color;
+	float radius;
+};
+
+uniform Light light;
+
+uniform sampler2D diffuse_tex;
+uniform sampler2D shiny_tex;
+
+uniform vec3 view_pos;
+
+uniform samplerCube cubemap;
+uniform float reflection_str;
+
+uniform vec3 ambient_cube[6];
+
+vec3 sample_ambient_cube(vec3 normal)
+{
+	vec3 nsquared = normal*normal;
+	ivec3 isnegative;
+	isnegative.x = int(normal.x <0.0);
+	isnegative.y = int(normal.y < 0.0);
+	isnegative.z = int(normal.z < 0.0);
+	vec3 linearcolor;
+	linearcolor = nsquared.x*ambient_cube[isnegative.x] + 
+				nsquared.y * ambient_cube[isnegative.y+2] + 
+				nsquared.z * ambient_cube[isnegative.z+4];
+	return linearcolor;
+}
+	
+
+
+void main()
+{
+	vec3 color = texture(diffuse_tex, TexCoord).rgb;
+	
+	
+	// Diffuse
+	vec3 light_dir = normalize(light.position - FragPos);
+	vec3 normal = normalize(Normal);
+	float diff = max(dot(normal, light_dir), 0.0);
+	
+	float dist = length(FragPos-light.position);
+	vec3 diffuse = diff * light.color;// * max((light.radius-dist)/light.radius,0.0);
+	// Specular
+	vec3 view_dir = normalize(view_pos - FragPos);
+	vec3 halfway = normalize(view_dir+light_dir);
+	float specular = pow(max(dot(halfway,normal),0),36);
+	
+	vec3 ambient = sample_ambient_cube(normal);
+	
+	// attenuate
+	// light attenuation, real time rendering
+	view_dir = normalize(FragPos-view_pos);
+	vec3 R = reflect(view_dir,normal);
+	
+	vec3 result = (ambient)*color.rgb*(1.0-reflection_str) + texture(cubemap, R).rgb*reflection_str;//+specular*0.1;
+
+	
+	FragColor = vec4(result,1.0);
+}
+		

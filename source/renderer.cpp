@@ -30,7 +30,7 @@ private:
 		Time start_time;
 };
 
-
+void gen_cubemap_views();
 Renderer::Renderer()
 {
 	load_shaders();
@@ -70,7 +70,39 @@ Renderer::Renderer()
 
 	init_tiled_rendering();
 
+	glGenFramebuffers(1, &cubemap_framebuffer);
+	glGenRenderbuffers(1, &cubemap_depth_renderbuffer);
 
+	glBindFramebuffer(GL_FRAMEBUFFER, cubemap_framebuffer);
+	glBindRenderbuffer(GL_RENDERBUFFER, cubemap_depth_renderbuffer);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 256, 256);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, cubemap_depth_renderbuffer);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		std::cout << "Framebuffer not complete!" << std::endl;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glGenTextures(6, cubemap_textures);
+	for (int i = 0; i < 6; i++) {
+		glBindTexture(GL_TEXTURE_2D, cubemap_textures[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+
+	cube_with_normals.init(VertexArray::TRIANGLES);
+	vec3 normals[6];
+	for (int i = 0; i < 6; i++) {
+		normals[i] = vec3(0);
+		normals[i][i / 2] = (i & 1) ? -1.0 : 1.0;
+	}
+	cube_with_normals.add_solid_box(-vec3(1), vec3(1), normals);
+
+	gen_cubemap_views();
 }
 
 void Renderer::render_scene(SceneData& scene)
@@ -96,12 +128,97 @@ void Renderer::render_scene(SceneData& scene)
 
 	projection_matrix = get_projection_matrix(), view_matrix = scene.active_camera()->view_matrix;
 	
+	world.start();
+	world_pass(scene);
+	stats.world_ms = world.end();
 
+	if (d_enviorment_probes) {
+		draw_cubemaps(&scene);
+	}
+
+
+	//glDisable(GL_CULL_FACE);
+	glFrontFace(GL_CW);
+	primitive_debug_pass();
+	glFrontFace(GL_CCW);
+	
+	//glEnable(GL_CULL_FACE);
+
+	// unbind framebuffer, blit to resolve multisample
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, HDRbuffer.ID);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediate.ID);
+	glBlitFramebuffer(0, 0, view.width, view.height, 0, 0, view.width, view.height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+	bloom.start();
+	bloom_pass();
+	stats.bloom_ms = bloom.end();
+
+	if (bloom_debug) {
+		uint32_t id;
+		if (show_bright_pass) {
+			id = bright_pass;
+		}
+		else {
+			if (down_sample) {
+				id = downsample[!first_blur_pass][sample_num];
+			}
+			else {
+				id = upsample[sample_num];
+			}
+		}
+		halt_and_render_to_screen(id);
+		return;
+	}
+
+
+	glDisable(GL_CULL_FACE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, global_app.width, global_app.height);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, intermediate.color_id);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, upsample[0]);
+
+
+	gamma_tm_bloom.use();
+	gamma_tm_bloom.set_float("gamma", gamma);
+	gamma_tm_bloom.set_float("exposure", exposure).set_int("screen_tex", 0).set_int("bloom_tex", 1);
+
+	quad.draw_array();
+
+
+
+
+	if (d_lightmap_overlay) {
+
+		mat4 two2d = glm::ortho(0.0f, (float)view.width, (float)-view.height, 0.0f);
+		textured_prim_transform.use();
+		textured_prim_transform.set_mat4("u_projection", two2d).set_mat4("u_view", mat4(1.0));
+		glDisable(GL_DEPTH_TEST);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, cubemap_textures[cube_num]);
+		overlay_quad.draw_array();
+		glEnable(GL_DEPTH_TEST);
+	}
+
+	stats.total_ms = total.end();
+}
+
+void Renderer::upload_point_lights(SceneData& scene)
+{
+	point_lights.use();
+	for (int i = 0; i < scene.num_lights; i++) {
+		point_lights.set_vec3(("lights[" + std::to_string(i) + "].position").c_str(), scene.lights[i].position);
+		point_lights.set_vec3(("lights[" + std::to_string(i) + "].color").c_str(), scene.lights[i].color);
+		point_lights.set_float(("lights[" + std::to_string(i) + "].radius").c_str(), scene.lights[i].radius);
+	}
+}
+
+void Renderer::world_pass(SceneData& scene)
+{
 	if (d_world)
 	{
-		world.start();
 		lightmap_geo();
-		stats.world_ms = world.end();
 	}
 
 	if (d_ents) {
@@ -124,16 +241,20 @@ void Renderer::render_scene(SceneData& scene)
 			.set_vec3("view_pos", scene.active_camera()->position).set_int("diffuse_tex", 0).set_int("shiny_tex", 1);
 
 		for (const auto obj : scene.objects) {
+			
+			if (obj->closest_reflection_probe != -1)
+				continue;
+			
 			ambientcube_shade.set_vec3("light.position", scene.point_lights.at(obj->closest_light).position);
 			ambientcube_shade.set_vec3("light.color", scene.point_lights.at(obj->closest_light).color);
 			ambientcube_shade.set_float("light.radius", scene.point_lights.at(obj->closest_light).radius);
 
 			for (int i = 0; i < 6; i++) {
-				ambientcube_shade.set_vec3(("ambient_cube[" + std::to_string(i) + "]").c_str(), 
+				ambientcube_shade.set_vec3(("ambient_cube[" + std::to_string(i) + "]").c_str(),
 					global_app.world.ambient_grid.at(obj->closest_ambient_cube).axis_colors[i]);
 			}
 
-			
+
 
 
 			// this should be changed, the list should only be textured items
@@ -175,88 +296,77 @@ void Renderer::render_scene(SceneData& scene)
 			}
 		}
 
-		// Enable additive blending
-		//glDepthMask(GL_FALSE);
-		//glEnable(GL_BLEND);
-		//glBlendFunc(GL_ONE, GL_ONE);
-		//scene_pass(scene, point_lights);
-		//glDisable(GL_BLEND);
-		//glDepthMask(GL_TRUE);
-	}
+		ambientcube_reflection.use();
+		ambientcube_reflection.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix)
+			.set_vec3("view_pos", scene.active_camera()->position).set_int("diffuse_tex", 0).set_int("shiny_tex", 1);
 
-	//glDisable(GL_CULL_FACE);
-	glFrontFace(GL_CW);
-	primitive_debug_pass();
-	glFrontFace(GL_CCW);
-	
-	//glEnable(GL_CULL_FACE);
+		ambientcube_reflection.set_int("cubemap", 2);
 
-	// unbind framebuffer, blit to resolve multisample
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, HDRbuffer.ID);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediate.ID);
-	glBlitFramebuffer(0, 0, view.width, view.height, 0, 0, view.width, view.height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		for (const auto obj : scene.objects) {
 
-	bloom.start();
-	bloom_pass();
-	stats.bloom_ms = bloom.end();
+			if (obj->closest_reflection_probe == -1)
+				continue;
 
-	if (bloom_debug) {
-		uint32_t id;
-		if (show_bright_pass) {
-			id = bright_pass;
-		}
-		else {
-			if (down_sample) {
-				id = downsample[!first_blur_pass][sample_num];
+			ambientcube_reflection.set_vec3("light.position", scene.point_lights.at(obj->closest_light).position);
+			ambientcube_reflection.set_vec3("light.color", scene.point_lights.at(obj->closest_light).color);
+			ambientcube_reflection.set_float("light.radius", scene.point_lights.at(obj->closest_light).radius);
+
+			for (int i = 0; i < 6; i++) {
+				ambientcube_reflection.set_vec3(("ambient_cube[" + std::to_string(i) + "]").c_str(),
+					global_app.world.ambient_grid.at(obj->closest_ambient_cube).axis_colors[i]);
 			}
-			else {
-				id = upsample[sample_num];
+
+			ambientcube_reflection.set_float("reflection_str", obj->reflection_strength);
+			glActiveTexture(GL_TEXTURE0 + 2);
+			int index = scene.enviorment_probes.at(obj->closest_reflection_probe).cubemap_index;
+			if (index != -1) {
+				glBindTexture(GL_TEXTURE_CUBE_MAP,
+					world_cubemaps.at(index).get_ID());
+			}
+
+
+			// this should be changed, the list should only be textured items
+			if (obj->has_shading) {
+
+				// this is going to go
+				if (obj->matrix_needs_update) {
+					obj->update_matrix();
+					obj->matrix_needs_update = false;
+				}
+				// Check if previous draw call used same texture or buffer!
+				//Model::SubMesh& sm = obj->model->meshes.at(0);
+				for (int i = 0; i < obj->model->num_meshes(); i++) {
+
+					const RenderMesh* rm = obj->model->mesh(i);
+
+					if (rm->diffuse) {
+						rm->diffuse->bind(0);
+					}
+					else {
+						white_tex->bind(0);
+					}
+
+					if (rm->specular) {
+						rm->specular->bind(1);
+					}
+					else {
+						white_tex->bind(1);
+					}
+
+					ambientcube_reflection.set_mat4("u_model", obj->model_matrix).set_mat4("normal_mat", obj->inverse_matrix);
+
+					//	sm.mesh.bind();
+					glBindVertexArray(rm->vao);
+					glDrawElements(GL_TRIANGLES, rm->num_indices, GL_UNSIGNED_INT, NULL);
+					//sm.mesh.draw_indexed_primitive();
+
+				}
 			}
 		}
-		halt_and_render_to_screen(id);
-		return;
 	}
-
-	glDisable(GL_CULL_FACE);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, global_app.width, global_app.height);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, intermediate.color_id);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, upsample[0]);
-
-
-	gamma_tm_bloom.use();
-	gamma_tm_bloom.set_float("gamma", gamma);
-	gamma_tm_bloom.set_float("exposure", exposure).set_int("screen_tex", 0).set_int("bloom_tex", 1);
-
-	quad.draw_array();
-
-
-	if (d_lightmap_overlay) {
-
-		mat4 two2d = glm::ortho(0.0f, (float)view.width, (float)-view.height, 0.0f);
-		textured_prim_transform.use();
-		textured_prim_transform.set_mat4("u_projection", two2d).set_mat4("u_view", mat4(1.0));
-		glDisable(GL_DEPTH_TEST);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, lightmap_tex_linear->get_ID());
-		overlay_quad.draw_array();
-		glEnable(GL_DEPTH_TEST);
-	}
-
-	stats.total_ms = total.end();
 }
 
-void Renderer::upload_point_lights(SceneData& scene)
-{
-	point_lights.use();
-	for (int i = 0; i < scene.num_lights; i++) {
-		point_lights.set_vec3(("lights[" + std::to_string(i) + "].position").c_str(), scene.lights[i].position);
-		point_lights.set_vec3(("lights[" + std::to_string(i) + "].color").c_str(), scene.lights[i].color);
-		point_lights.set_float(("lights[" + std::to_string(i) + "].radius").c_str(), scene.lights[i].radius);
-	}
-}
+
 void Renderer::draw_world_geo(Shader& s)
 {
 	glFrontFace(GL_CW);
@@ -704,8 +814,155 @@ void Renderer::load_shaders()
 	forward_plus.load_from_file("directional_shadows_v.txt", "forward_plus_f.txt");
 
 	ambientcube_shade.load_from_file("point_light_v.txt", "ambient_cube_f.txt");
+
+	ambientcube_reflection.load_from_file("point_light_v.txt", "AmbientCubeReflection_f.txt");
+
+	cubemap_shader.load_from_file("transform_pmodel_v.txt", "ReflectionProbe_f.txt");
 }
 mat4 Renderer::get_projection_matrix()
 {
 	return glm::perspective(glm::radians(view.fov_y), (float)view.width / (float)view.height, view.znear, view.zfar);
+}
+
+void Renderer::update_world_cubemaps(SceneData* scene)
+{
+	for (int i = 0; i < scene->enviorment_probes.size(); i++) {
+		EnviormentProbe* ep = &scene->enviorment_probes.at(i);
+		if (ep->cubemap_index == -1) {
+			ep->cubemap_index = world_cubemaps.size();
+			Cubemap cm;
+			cm.init_empty(256);
+			world_cubemaps.push_back(cm);
+		}
+
+		render_to_cubemap(ep, scene);
+	}
+}
+
+
+static mat4 cubemap_views[6];
+void gen_cubemap_views()
+{
+	vec3 front, right, up;
+
+	for (int i = 0; i < 6; i++)
+	{
+		// From Khronos wiki
+		switch (i)
+		{
+
+		case 0:	// +X
+			front = vec3(1, 0, 0);
+			up = vec3(0, -1, 0);
+			right = vec3(0, 0, -1);
+			break;
+		case 1:	// -X
+			front = vec3(-1, 0, 0);
+			up = vec3(0, -1, 0);
+			right = vec3(0, 0, 1);
+			break;
+		case 2: // +Y
+			front = vec3(0, 1, 0);
+			up = vec3(0, 0, 1);
+			right = vec3(1, 0, 0);
+			break;
+		case 3: // -Y
+			front = vec3(0, -1, 0);
+			up = vec3(0, 0, -1);
+			right = vec3(1, 0, 0);
+			break;
+		case 4:
+			front = vec3(0, 0, 1);
+			up = vec3(0, -1, 0);
+			right = vec3(1, 0, 0);
+			break;
+		case 5:
+			front = vec3(0, 0, -1);
+			up = vec3(0, -1, 0);
+			right = vec3(-1, 0, 0);
+			break;
+		}
+		cubemap_views[i] = mat4(1);
+
+		cubemap_views[i][0][0] = right.x;
+		cubemap_views[i][1][0] = right.y;
+		cubemap_views[i][2][0] = right.z;
+		cubemap_views[i][0][1] = up.x;
+		cubemap_views[i][1][1] = up.y;
+		cubemap_views[i][2][1] = up.z;
+		cubemap_views[i][0][2] = -front.x;
+		cubemap_views[i][1][2] = -front.y;
+		cubemap_views[i][2][2] = -front.z;
+	}
+
+}
+
+
+void Renderer::render_to_cubemap(const EnviormentProbe* ep, SceneData* scene)
+{
+	projection_matrix = glm::perspective(glm::radians(90.0), 1.0, 0.5, 100.0);
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, cubemap_framebuffer);
+	glViewport(0, 0, 256, 256);
+
+	Cubemap* cm = &world_cubemaps.at(ep->cubemap_index);
+
+	for (int i = 0; i < 6; i++)
+	{
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm->get_ID(), 0);
+		//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, cubemap_textures[i], 0);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+		/*
+		vec3 front = vec3(0);
+		front[i / 2] = (i & 1) ? -1.f : 1.f;
+		
+		vec3 up = vec3(0, 1, 0);
+		if (i / 2 == 1) {
+			up = vec3((i & 1) ? 1.0 : -1.0, 0, 0);
+		}
+		*/
+		// Set translation part of view matrix
+		vec3 side = vec3(cubemap_views[i][0][0], cubemap_views[i][1][0], cubemap_views[i][2][0]);
+		vec3 up = vec3(cubemap_views[i][0][1], cubemap_views[i][1][1], cubemap_views[i][2][1]);
+		vec3 front = vec3(cubemap_views[i][0][2], cubemap_views[i][1][2], cubemap_views[i][2][2]);
+
+		view_matrix = cubemap_views[i];
+
+		view_matrix[3][0] = -dot(side, ep->position);
+		view_matrix[3][1] = -dot(up, ep->position);
+		view_matrix[3][2] = -dot(front, ep->position);
+
+
+		//view_matrix = glm::lookAt(ep->position, ep->position + front, up);
+
+		world_pass(*scene);
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::draw_cubemaps(SceneData* scene)
+{
+	glDisable(GL_CULL_FACE);
+	cubemap_shader.use();
+	cubemap_shader.set_mat4("u_projection", projection_matrix).set_mat4("u_view", view_matrix);
+	cubemap_shader.set_vec3("ViewPos", scene->active_camera()->position);
+	for (int i = 0; i < scene->enviorment_probes.size(); i++)
+	{
+		const auto& ep = scene->enviorment_probes[i];
+		if (ep.cubemap_index == -1 || ep.dont_draw)
+			continue;
+		mat4 model = mat4(1.f);
+
+		model = translate(model, ep.position);
+		cubemap_shader.set_mat4("u_model", model);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, world_cubemaps.at(ep.cubemap_index).get_ID());
+		//glBindTexture(GL_TEXTURE_2D, cubemap_textures[cube_num]);
+
+		cube_with_normals.draw_array();
+	}
+	glEnable(GL_CULL_FACE);
+
 }

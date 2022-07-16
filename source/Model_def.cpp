@@ -84,7 +84,7 @@ void load_model_assimp(Model* model, const char* file, bool pretransform_verts)
 	assert(model != nullptr);
 	std::string true_path = model_path + file;
 	Assimp::Importer imp;
-	const aiScene* scene = imp.ReadFile(true_path, aiProcess_Triangulate | aiProcess_FlipUVs | ((pretransform_verts) ? aiProcess_PreTransformVertices : 0));
+	const aiScene* scene = imp.ReadFile(true_path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs | ((pretransform_verts) ? aiProcess_PreTransformVertices : 0));
 	if (scene == nullptr || scene->mRootNode == nullptr || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) {
 		printf("\x1B[31mCouldn't load model: %s\x1B[37m: %s\n", file, imp.GetErrorString());
 		return;
@@ -147,10 +147,12 @@ RenderMesh process_mesh(aiMesh* mesh, const aiScene* scene)
 	std::vector<uint32_t> indicies;
 
 	for (int i = 0; i < mesh->mNumVertices; i++) {
-		verts.push_back(
-			RenderVert(to_vec3(mesh->mVertices[i]),
-				to_vec3(mesh->mNormals[i]),
-				to_vec2(mesh->mTextureCoords[0][i])));
+		RenderVert rv;
+		rv.position = to_vec3(mesh->mVertices[i]);
+		rv.normal = to_vec3( mesh->mNormals[i]);
+		if(mesh->HasTextureCoords(0))
+			rv.uv = to_vec2(mesh->mTextureCoords[0][i]);
+		verts.push_back(rv);
 	}
 	for (int i = 0; i < mesh->mNumFaces; i++) {
 		aiFace face = mesh->mFaces[i];

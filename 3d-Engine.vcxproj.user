@@ -1,19 +1,19 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommandArguments>-reflectivity 0.4 -lmdensity 8.0 -patchgrid 1.0 -quakefmt subwaytunnel.map</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-patchgrid 1.0 -lmdensity 8.0 pillars.map</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>-reflectivity 0.4 -lmdensity 8.0 -patchgrid 1.0 -quakefmt subwaytunnel.map</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-patchgrid 1.0 -lmdensity 8.0 pillars.map</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>subwaytunnel.cmf</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>subway.cmf</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>subwaytunnel.cmf</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>subway.cmf</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

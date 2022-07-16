@@ -69,6 +69,9 @@ void Editor::on_render()
 
 	ImGui::SliderInt("stress test world calls", &r->stress_test_world_draw_count, 0, 25);
 
+	ImGui::SliderInt("cube_num", &r->cube_num, 0, 5);
+
+
 	if (ImGui::Button("Reload Gamma/Tonemap shader")) {
 		// Temporary, should delete shader
 		global_app.r->gamma_tm_bloom = Shader("no_transform_v.txt", "gamma_bloom_f.txt");

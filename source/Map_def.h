@@ -55,6 +55,26 @@ struct entity_t
 	std::unordered_map<std::string, std::string> properties;
 	// associated brush (optional); Only used in parse phase
 	int brush_start{}, brush_count{};
+
+
+	vec3 get_transformed_origin() const {
+		auto org = properties.find("origin");
+		if (org == properties.end())
+			return vec3(0);
+		vec3 res;
+		
+		sscanf_s(org->second.c_str(), "%f %f %f", &res.x, &res.y, &res.z);
+		res /= 32.f;	// scale down
+
+		return vec3(-res.x, res.z, res.y);
+	}
+
+	std::string get_classname() const {
+		auto classname = properties.find("classname");
+		if (classname == properties.end())
+			return "NOCLASSNAME";
+		return classname->second;
+	}
 };
 
 struct face_t
@@ -97,6 +117,13 @@ struct AmbientCube
 	vec3 axis_colors[6];	// x,-x,y,...
 };
 
+struct EnviormentProbe
+{
+	vec3 position;
+	int cubemap_index=-1;
+	bool dont_draw = false;
+};
+
 struct worldmodel_t
 {
 	std::string name;
@@ -110,7 +137,6 @@ struct worldmodel_t
 	std::vector<Texture*> textures;
 	std::vector<std::string> texture_names;
 	std::vector<entity_t> entities;
-
 
 
 	std::vector<AmbientCube> ambient_grid;

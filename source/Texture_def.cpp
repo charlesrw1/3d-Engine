@@ -95,7 +95,6 @@ void Texture::internal_init(u8* data)
 	loaded = true;
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB + has_alpha, width, height, 0, GL_RGB + has_alpha, GL_UNSIGNED_BYTE, data);
-
 	if (params & TParams::GEN_MIPS) {
 		glGenerateMipmap(GL_TEXTURE_2D);
 	}
@@ -120,4 +119,34 @@ void Texture::upload_raw_data()
 	stbi_image_free(raw_data);
 	raw_data = nullptr;
 	print();
+}
+
+// ------------ CUBEMAP ------------------
+
+void Cubemap::init_empty(int size)
+{
+	glGenTextures(1, &ID);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, ID);
+
+	for (int i = 0; i < 6; i++) {
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, size, size, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	}
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+	loaded = true;
+	this->size = size;
+}
+
+void Cubemap::purge() 
+{
+	glDeleteTextures(1, &ID);
+	loaded = false;
 }

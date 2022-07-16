@@ -1,5 +1,11 @@
 #include "WorldGeometry.h"
 
+static unsigned long long TOTAL_RAYS_CAST = 0;
+void print_rays_cast()
+{
+	printf("Total rays cast since program start: %llu\n", TOTAL_RAYS_CAST);
+}
+
 struct tracestack_t
 {
 	vec3 backpt;
@@ -244,7 +250,7 @@ trace_t BSPtree::test_ray_fast(vec3 start, vec3 end, float epsilon, float first_
 	front = start;
 	back = end;
 	bool seen_first = false;
-
+	TOTAL_RAYS_CAST++;
 	while (1)
 	{
 		node = &fast_list[node_n];

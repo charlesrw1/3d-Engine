@@ -8,12 +8,12 @@ uniform mat4 u_projection;
 uniform mat4 u_model;
 
 out vec4 VertColor;
-out vec3 FragPos;
+out vec2 TexCoord;
 
 void main()
 {
-    gl_Position = u_projection * u_view * u_model*vec4(a_pos,1.0);
+    gl_Position = u_projection * vec4(a_pos,1.0);
 	
-	FragPos = vec3(u_model*vec4(a_pos,1.0));
 	VertColor = a_color;
+	TexCoord = a_texcoords;
 }  

@@ -12,7 +12,7 @@ struct RenderVert
 {
 	vec3 position;
 	vec3 normal;
-	vec2 uv;
+	vec2 uv=vec2(0.0);
 
 	RenderVert() {}
 	RenderVert(vec3 pos, vec3 normal, vec2 uv) 

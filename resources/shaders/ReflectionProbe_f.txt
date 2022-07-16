@@ -1,0 +1,19 @@
+#version 330 core
+
+out vec4 FragColor;
+
+in vec4 VertColor;
+in vec3 FragPos;
+
+uniform vec3 ViewPos;
+
+uniform samplerCube cubemap;
+//uniform sampler2D tex;
+void main()
+{
+	vec3 Normal = normalize(VertColor.rgb);
+	vec3 ViewDir = normalize(FragPos-ViewPos);
+	vec3 R = reflect(ViewDir,Normal);
+	
+	FragColor = vec4(texture(cubemap, R).rgb,1.0);
+}
