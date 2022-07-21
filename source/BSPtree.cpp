@@ -126,11 +126,11 @@ void BSPtree::subdivide(int node_idx, int depth)
 		all_leaves++;
 		int next = l->next;
 		// face in front
-		if (first > -0.01 && second > -0.01) {
+		if (first > -0 && second > -0) {
 			front++;
 		}
 		// face behind
-		else if (first < 0.01 && second < 0.01) {
+		else if (first < 0 && second < 0) {
 			back++;
 		}
 		// face spans dividing plane
@@ -165,13 +165,13 @@ void BSPtree::subdivide(int node_idx, int depth)
 		all_leaves++;
 		int next = l->next;
 		// face in front
-		if (first > -0.01 && second > -0.01) {
+		if (first > -0 && second > -0) {
 			l->next = child[0].first_child;
 			child[0].first_child = current_idx;
 			child[0].num_faces++;
 		}
 		// face behind
-		else if (first < 0.01 && second < 0.01) {
+		else if (first < 0 && second < 0) {
 			l->next = child[1].first_child;
 			child[1].first_child = current_idx;
 			child[1].num_faces++;
@@ -183,7 +183,7 @@ void BSPtree::subdivide(int node_idx, int depth)
 			winding_t front;
 			face_ex_t back_face;
 
-			split_winding(face_extended.at(l->face_index).verts, p,front,back_face.verts);
+			try_split_winding(face_extended.at(l->face_index).verts, p,front,back_face.verts);
 
 			l->next = child[0].first_child;
 			child[0].first_child = current_idx;

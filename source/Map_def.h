@@ -14,7 +14,7 @@ enum MapSurfFlags
 {
 	SURF_NODRAW = 1,
 	SURF_EMIT = 2,
-
+	SURF_SKYBOX = 4,
 };
 struct texture_info_t
 {
@@ -22,7 +22,7 @@ struct texture_info_t
 	vec2 uv_scale;
 	vec3 axis[2];
 	int offset[2];
-
+	
 	int flags = 0;
 };
 struct mapface_t

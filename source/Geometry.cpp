@@ -92,7 +92,7 @@ bool try_split_winding(const winding_t& a, const plane_t& plane, winding_t& fron
 
 		int next_idx = (i + 1) % a.num_verts;
 		if (next_idx == a.num_verts) next_idx = 0;
-		assert(next_idx != i);
+		//assert(next_idx != i);
 
 		bool ignore = false;
 

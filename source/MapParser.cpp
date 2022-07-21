@@ -687,9 +687,10 @@ struct SurfaceParam
 	const char* keyword;
 	int flag;
 };
-SurfaceParam params[] = {
+static const SurfaceParam params[] = {
 	{"color/emit", SURF_EMIT},
-	{"tools/skip", SURF_NODRAW}
+	{"tools/skip", SURF_NODRAW},
+	{"tools/skybox", SURF_SKYBOX}
 };
 
 

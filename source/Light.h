@@ -14,7 +14,7 @@ struct LightmapSettings
 	float sample_ofs = 0.1;
 
 
-	vec3 default_reflectivity = vec3(0.4);
+	vec3 default_reflectivity = vec3(0.3);
 };
 
 
@@ -59,6 +59,7 @@ struct patch_t
 	vec3 total_light = vec3(0);
 
 	patch_t* next = nullptr;
+	bool is_sky = false;
 };
 
 

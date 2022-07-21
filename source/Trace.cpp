@@ -454,7 +454,7 @@ void BSPtree::check_ray_bsp_node(const BSPNode& node, const ray_t& r, trace_t& t
 			vec3 v = point - geo->verts[f.v_start + i];
 			vec3 c = cross(geo->verts[f.v_start + (i + 1) % v_count]- geo->verts[f.v_start + i], v);
 			float angle = dot(-f.plane.normal, c);
-			if (angle < -0.005f) {
+			if (angle < 0.f) {
 				// point is outside the edges of the polygon
 				hit = false;
 				break;

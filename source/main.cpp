@@ -33,6 +33,7 @@ void print_help()
 
 }
 
+
 int main(int argc, char* argv[])
 {
 	LightmapSettings lm_settings;

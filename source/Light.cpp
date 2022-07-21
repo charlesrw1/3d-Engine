@@ -46,6 +46,8 @@ enum light_type_t
 {
 	LIGHT_POINT,
 	LIGHT_SURFACE,
+
+	LIGHT_SUN,
 };
 struct light_t
 {
@@ -58,6 +60,10 @@ struct light_t
 	int brightness;
 };
 std::vector<light_t> lights;
+static int env_light_index = -1;
+
+static const int NUM_SKY_SAMPLES = 30;
+
 // --------------------------------
 
 
@@ -89,7 +95,7 @@ bool no_direct = false;
 
 // Use random vectors vs exact for patch-to-patch form factor
 //#define USE_RANDOM_VECTORS
-const int NUM_PATCH_RAYCASTS=1000;
+//const int NUM_PATCH_RAYCASTS=50;
 // ---------------------------------
 
 // ---------- DEBUG ---------------
@@ -353,7 +359,10 @@ void add_color(int start, int offset, vec3 color)
 void patch_for_face(int face_num)
 {
 	const face_t* face = &faces[face_num];
-	if (face->dont_draw) {
+	texture_info_t* ti = tinfo + face->t_info_idx;
+	std::string* t_string = tex_strings + ti->t_index;
+	// Skybox doesn't make patches
+	if (face->dont_draw || ti->flags & SURF_SKYBOX) {
 		return;
 	}
 	patch_t* p = &patches[num_patches++];
@@ -369,8 +378,6 @@ void patch_for_face(int face_num)
 	p->center = p->winding.get_center();
 
 
-	texture_info_t* ti = tinfo + face->t_info_idx;
-	std::string* t_string = tex_strings + ti->t_index;
 	if (*t_string == "color/red") {
 		p->reflectivity = rgb_to_float(237, 28, 36);
 	}
@@ -397,7 +404,7 @@ void patch_for_face(int face_num)
 	if (ti->flags & SURF_EMIT) {
 		p->total_light = vec3(1.f);
 	}
-
+	
 
 	p->next = nullptr;
 }
@@ -421,7 +428,7 @@ void subdivide_patch(patch_t* p)
 		// Quake 2 had the patch grid as an actual grid thats not relative to a specific patch
 		// However this leads to some really small patches, more matches no matter the size tank performance (n^2)
 		// Instead make it relative to the face
-		if (min[i]+patch_grid+0.25f <= max[i]) {
+		if (min[i]+patch_grid+(patch_grid) <= max[i]) {
 			plane_t split;
 			split.normal = vec3(0);
 			split.normal[i] = 1.f;
@@ -524,8 +531,6 @@ struct TempTransfer
 
 void make_transfers(int patch_num)
 {
-
-
 	patch_t* patch = &patches[patch_num];
 	plane_t plane = faces[patch->face].plane;
 	const int i = patch_num;
@@ -586,17 +591,54 @@ void make_transfers(int patch_num)
 			t = &patch->transfers[t_index++];
 			assert(t_index <= patch->num_transfers + 1);
 		}
-}
+	}
+	return;
+	
+	// Calc indirect lighting from skybox, this should go elsewhere
+	if (env_light_index == -1)
+		return;
+
+	light_t* env_light = &lights[env_light_index];
+
+	int num_skybox_hits = 0;
+	float total_accumulation = 0;
+
+	for (int i = 0; i < NUM_SKY_SAMPLES; i++) {
+		vec3 direction;
+		float length;
+		do {
+			direction = plane.normal + random_vec3(-1.0, 1.0);
+			length = glm::length(direction);
+		} while (length < 0.0001f);	// prevent divide by zero
+		direction = normalize(direction);
+		trace_t res = global_world.tree.test_ray_fast(center_with_offset, center_with_offset + direction * 300.f, -0.005, 0.005);
+		if (!res.hit)
+			continue;
+		texture_info_t* ti = tinfo + faces[res.face].t_info_idx;
+		if (ti->flags & SURF_SKYBOX) {
+			num_skybox_hits++;
+			total_accumulation += dot(plane.normal, direction);
+		}
+	}
+	// Skycolor * brightness scale * directional scale * occlusion scale
+	patch->total_light += vec3(0.5, 0.6, 0.8) * 0.1f * (total_accumulation / (num_skybox_hits / float(NUM_SKY_SAMPLES)));
+
+
 #else
 	std::vector<TempTransfer> temp_transfers;
 	for (int i = 0; i < NUM_PATCH_RAYCASTS; i++) 
 	{
-		vec3 direction;
-		float length;
-		do {
-		 direction = plane.normal + random_vec3(-1.0, 1.0);
-		 length = glm::length(direction);
-		} while (length < 0.0001f);	// prevent divide by zero
+		//vec3 direction;
+		//float length;
+		//do {
+		// direction = plane.normal + random_vec3(-1.0, 1.0);
+		// length = glm::length(direction);
+		//} while (length < 0.0001f);	// prevent divide by zero
+
+		vec3 direction = random_vec3(-1.0, 1.0);
+		if (dot(direction, plane.normal) <= 0)
+			direction = -direction;
+
 		direction = normalize(direction);
 
 		trace_t res = global_world.tree.test_ray_fast(center_with_offset, center_with_offset + direction * 300.f,-0.005,0.005);
@@ -1128,7 +1170,8 @@ void light_face(int num)
 	l.fl = &facelights[num];
 	img.face_num = num;
 
-	if (l.face->dont_draw)
+	texture_info_t* ti = tinfo + l.face->t_info_idx;
+	if (l.face->dont_draw || ti->flags & SURF_SKYBOX)
 		return;
 
 	calc_vectors(l);
@@ -1152,43 +1195,63 @@ void light_face(int num)
 	for (int j = 0; j < l.numpts; j++) {
 		for (int i = 0; i < lights.size(); i++) {
 			for (int s = 0; s < l.num_samples; s++) {
-				vec3 light_p = lights[i].pos;
+				light_t* light = &lights[i];
 				vec3 sample_pos = l.sample_points[s][j];
+				vec3 final_color = vec3(0.0);
 
-				float plane_dist = l.face->plane.distance(light_p);
-				if (plane_dist < 0) {
-					continue;
+				switch (light->type) {
+				case LIGHT_POINT:
+				{
+					vec3 light_p = lights[i].pos;
+					float plane_dist = l.face->plane.distance(light_p);
+					if (plane_dist < 0) {
+						continue;
+					}
+					float sqrd_dist = dot(light_p - sample_pos, light_p - sample_pos);
+					if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
+						continue;
+					}
+					total_rays_cast++;
+					trace_t res = global_world.tree.test_ray_fast(sample_pos, light_p, -0.005f, 0.005f);
+					if (res.hit) {
+						continue;
+					}
+					vec3 light_dir = light_p - sample_pos;
+					float dist = length(light_dir);
+					light_dir = normalize(light_dir);
+					float dif = dot(light_dir, l.face->plane.normal);
+					if (dif < 0) {
+						continue;
+					}
+
+					float surface_scale = 1.f;
+					if (lights[i].type == LIGHT_SURFACE) {
+						surface_scale = -dot(lights[i].normal, light_dir);
+						surface_scale = glm::max(surface_scale, 0.f);
+					}
+					final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f) * surface_scale;
+				} break;
+				case LIGHT_SUN:
+				{
+					float angle = dot(l.face->plane.normal, -light->normal);
+					if (angle <= 0)
+						continue;
+					total_rays_cast++;
+					trace_t res = global_world.tree.test_ray_fast(sample_pos, sample_pos + (-light->normal * 300.f));
+					// If it traces to the sun, it should hit a skybox face
+					if (res.hit) {
+						face_t* face = faces + res.face;
+						texture_info_t* ti = tinfo + face->t_info_idx;
+						if (!(ti->flags & SURF_SKYBOX))
+							continue;
+					}
+					//va.push_line(sample_pos, sample_pos + (-light->normal * 300.f), vec3(1, 0, 0));
+					final_color = light->color * angle * (float)light->brightness;
+				} break;
+				default:
+					break;
 				}
 
-
-				float sqrd_dist = dot(light_p - sample_pos, light_p - sample_pos);
-				
-				if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
-					continue;
-				}
-
-				total_rays_cast++;
-				trace_t res = global_world.tree.test_ray_fast(sample_pos, light_p, -0.005f, 0.005f);
-				if (res.hit) {
-					continue;
-				}
-
-				vec3 light_dir = light_p - sample_pos;
-				float dist = length(light_dir);
-				light_dir = normalize(light_dir);
-				float dif = dot(light_dir, l.face->plane.normal);
-				if (dif < 0) {
-					continue;
-				}
-
-				float surface_scale = 1.f;
-				if (lights[i].type == LIGHT_SURFACE) {
-					surface_scale = -dot(lights[i].normal, light_dir);
-					surface_scale = glm::max(surface_scale, 0.f);
-				}
-
-
-				vec3 final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f) * surface_scale;
 				l.fl->pixel_colors[j] += final_color*sample_scale;
 			}
 		}
@@ -1212,7 +1275,8 @@ void final_light_face(int face_num)
 {
 	face_t* face = &faces[face_num];
 	facelight_t* fl = &facelights[face_num];
-	if (face->dont_draw)
+	texture_info_t* ti = tinfo + face->t_info_idx;
+	if (face->dont_draw || ti->flags & SURF_SKYBOX)
 		return;
 	Image img;
 	img.face_num = face_num;
@@ -1389,7 +1453,35 @@ void add_lights(worldmodel_t* wm)
 		l.normal = faces[p->face].plane.normal;
 		l.pos = p->center + l.normal * 0.01f;
 		
+		env_light_index = lights.size();
+
 		lights.push_back(l);
+	}
+
+	for (const auto& e : world->entities)
+	{
+		if (e.get_classname() != "enviorment_light")
+			continue;
+
+		std::string angle = e.properties.find("mangle")->second;
+		int angles[3];
+		sscanf_s(angle.c_str(), "%d %d %d", &angles[0], &angles[1], &angles[2]);
+
+		vec3 sun_direction = vec3(0);
+		sun_direction.x = cos(radians((float)angles[1])) * cos((radians((float)angles[0])));
+		sun_direction.y = sin((radians((float)angles[0])));
+		sun_direction.z = -sin(radians((float)angles[1])) * cos(radians((float)angles[0]));
+
+		light_t l;
+		l.type = LIGHT_SUN;
+		l.brightness = std::stoi(e.properties.find("brightness")->second);
+		l.color = vec3(1.f);
+		l.normal = -normalize(sun_direction);
+		lights.push_back(l);
+
+		//va.push_line(vec3(0), l.normal, vec3(1, 1, 0));
+		
+		break;
 	}
 
 

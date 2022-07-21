@@ -48,7 +48,8 @@ void WorldGeometry::create_mesh()
 	int current_t = 0;
 	for (int i =0; i < bm->face_count; i++) {
 		auto& face = wm->faces.at(indicies.at(i));
-		if (face.dont_draw)
+		const texture_info_t* ti = &wm->t_info.at(face.t_info_idx);
+		if (face.dont_draw || ti->flags & SURF_SKYBOX)
 			continue;
 
 		// We have a new texture, append previous mesh
@@ -72,7 +73,6 @@ void WorldGeometry::create_mesh()
 
 		// Lightmap data
 		// recomputed data from lightmapper functions
-		const texture_info_t* ti = &wm->t_info.at(face.t_info_idx);
 		vec3 tex_normal = normalize(cross(ti->axis[1], ti->axis[0]));
 		float ratio = dot(tex_normal, face.plane.normal);
 		if (ratio < 0) {
