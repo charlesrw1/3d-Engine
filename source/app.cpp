@@ -349,8 +349,8 @@ void App::update_loop()
 	scene->lights[4].position.z = 6 * cos(sec_elap / 5);
 
 	for (int i = 0; i < scene->objects.size(); i++) {
-		scene->objects[i]->euler_y = sec_elap*(i*0.25+1)*0.75;
-		scene->objects[i]->update_matrix();
+		//scene->objects[i]->euler_y = sec_elap*(i*0.25+1)*0.75;
+		//scene->objects[i]->update_matrix();
 	}
 
 

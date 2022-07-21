@@ -362,7 +362,7 @@ void patch_for_face(int face_num)
 	texture_info_t* ti = tinfo + face->t_info_idx;
 	std::string* t_string = tex_strings + ti->t_index;
 	// Skybox doesn't make patches
-	if (face->dont_draw || ti->flags & SURF_SKYBOX) {
+	if (face->dont_draw) {
 		return;
 	}
 	patch_t* p = &patches[num_patches++];
@@ -592,7 +592,7 @@ void make_transfers(int patch_num)
 			assert(t_index <= patch->num_transfers + 1);
 		}
 	}
-	return;
+	/*//return;
 	
 	// Calc indirect lighting from skybox, this should go elsewhere
 	if (env_light_index == -1)
@@ -610,6 +610,12 @@ void make_transfers(int patch_num)
 			direction = plane.normal + random_vec3(-1.0, 1.0);
 			length = glm::length(direction);
 		} while (length < 0.0001f);	// prevent divide by zero
+
+		//vec3 direction = random_vec3(-1.0, 1.0);
+		//if (dot(direction, plane.normal) <= 0)
+		//	direction = -direction;
+		//
+
 		direction = normalize(direction);
 		trace_t res = global_world.tree.test_ray_fast(center_with_offset, center_with_offset + direction * 300.f, -0.005, 0.005);
 		if (!res.hit)
@@ -621,9 +627,11 @@ void make_transfers(int patch_num)
 		}
 	}
 	// Skycolor * brightness scale * directional scale * occlusion scale
-	patch->total_light += vec3(0.5, 0.6, 0.8) * 0.1f * (total_accumulation / (num_skybox_hits / float(NUM_SKY_SAMPLES)));
+	//patch->total_light += vec3(0.2, 0.2, 1.0) * 0.03f* (total_accumulation * (num_skybox_hits / float(NUM_SKY_SAMPLES)));
+	patch->sample_light += vec3(0.2, 0.2, 1.0) * 0.03f * (total_accumulation * (num_skybox_hits / float(NUM_SKY_SAMPLES)));
 
 
+	*/
 #else
 	std::vector<TempTransfer> temp_transfers;
 	for (int i = 0; i < NUM_PATCH_RAYCASTS; i++) 
@@ -1171,7 +1179,7 @@ void light_face(int num)
 	img.face_num = num;
 
 	texture_info_t* ti = tinfo + l.face->t_info_idx;
-	if (l.face->dont_draw || ti->flags & SURF_SKYBOX)
+	if (l.face->dont_draw)
 		return;
 
 	calc_vectors(l);
@@ -1276,7 +1284,7 @@ void final_light_face(int face_num)
 	face_t* face = &faces[face_num];
 	facelight_t* fl = &facelights[face_num];
 	texture_info_t* ti = tinfo + face->t_info_idx;
-	if (face->dont_draw || ti->flags & SURF_SKYBOX)
+	if (face->dont_draw)
 		return;
 	Image img;
 	img.face_num = face_num;
@@ -1452,8 +1460,7 @@ void add_lights(worldmodel_t* wm)
 		l.type = LIGHT_SURFACE;
 		l.normal = faces[p->face].plane.normal;
 		l.pos = p->center + l.normal * 0.01f;
-		
-		env_light_index = lights.size();
+	
 
 		lights.push_back(l);
 	}
@@ -1477,6 +1484,9 @@ void add_lights(worldmodel_t* wm)
 		l.brightness = std::stoi(e.properties.find("brightness")->second);
 		l.color = vec3(1.f);
 		l.normal = -normalize(sun_direction);
+		
+		env_light_index = lights.size();
+		
 		lights.push_back(l);
 
 		//va.push_line(vec3(0), l.normal, vec3(1, 1, 0));
@@ -1575,7 +1585,7 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	// Used for random debug colors
 	srand(time(NULL));
 
-	Voxelizer vox(wm, 1.0,2);
+	Voxelizer vox(wm, 1.0,5);
 	//vox.add_points(&voxels);
 	vox.move_final_samples(ambient_cubes);
 	add_manual_ambient_cubes();
