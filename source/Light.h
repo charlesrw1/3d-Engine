@@ -4,6 +4,7 @@
 
 struct LightmapSettings
 {
+	int samples_per_patch = 100;
 	float patch_grid = 2.f;
 	float pixel_density = 4.f;
 	int num_bounces = 64;
@@ -11,7 +12,7 @@ struct LightmapSettings
 	bool inside_map = true;
 	bool test_patch_visibility = true;
 	bool no_direct = false;
-	float sample_ofs = 0.1;
+	float sample_ofs = 0.05;
 
 
 	vec3 default_reflectivity = vec3(0.3);
@@ -30,6 +31,7 @@ enum class PatchDebugMode
 	NUMTRANSFERS,
 	AREA,
 	RADCOLOR,
+	VARIANCE,
 };
 void set_patch_debug(PatchDebugMode mode);
 
@@ -60,12 +62,6 @@ struct patch_t
 
 	vec3 total_light = vec3(0);
 	vec3 emission = vec3(0.0);
-
-	// Variance tracking variables
-	float mean_dist2 = 0;
-	// mean = total_light
-	int count = 0;
-	// variance = mean_dist2 / (count-1)
 
 
 	patch_t* next = nullptr;

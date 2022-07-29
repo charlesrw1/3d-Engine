@@ -46,6 +46,7 @@ void print_help()
 		" -quakefmt        : parses the .map file using the Quake format instead of the Valve format\n"
 		" -reflectivity #  : how much light the default surface reflects (default 0.5)\n"
 		" -sampleofs #     : how far each supersample is from original sample (default 0.1)\n"
+		" -samples #       : how many samples (raycasts) are used per radiosity patch (default 100)\n"
 		" -onlycompile     : only compile the map and write to disk\n"
 		" -help            : prints the help menu\n\n"
 
@@ -112,6 +113,10 @@ int main(int argc, char* argv[])
 		}
 		else if (strcmp(argv[i], "-nodirect") == 0) {
 			lm_settings.no_direct = true;
+		}
+		else if (strcmp(argv[i], "-samples") == 0) {
+			lm_settings.samples_per_patch = atoi(argv[i + 1]);
+			i++;
 		}
 		else if (strcmp(argv[i], "-help")==0) {
 			print_help();

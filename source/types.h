@@ -113,6 +113,8 @@ struct SceneData
 		objects.clear();
 	}
 	std::vector<EnviormentProbe> enviorment_probes;
+
+	vec3 env_ambient_light = vec3(0.0);
 };
 
 

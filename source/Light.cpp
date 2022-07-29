@@ -46,6 +46,7 @@ enum light_type_t
 {
 	LIGHT_POINT,
 	LIGHT_SURFACE,
+	LIGHT_SPOT,
 
 	LIGHT_SUN,
 };
@@ -53,17 +54,18 @@ struct light_t
 {
 	vec3 pos;
 	vec3 color;
-	vec3 normal;
+	vec3 normal;	// sun/spot direction
+	float width;	// spot cone width
 
 	light_type_t type;
 
-	int brightness;
+	float brightness;
+	int face_idx;	// area lights
 };
+
 std::vector<light_t> lights;
 static int env_light_index = -1;
-vec3 sky_color = vec3(0.5, 0.7, 1.0);
-
-static const int NUM_SKY_SAMPLES = 30;
+vec3 sky_color = vec3(0);// vec3(0.5, 0.7, 1.0);
 
 // --------------------------------
 
@@ -71,7 +73,6 @@ static const int NUM_SKY_SAMPLES = 30;
 
 // ------ RADIOSITY ARRAYS -------
 vec3 radiosity[MAX_PATCHES];	// excindent
-vec3 illumination[MAX_PATCHES];	// incindent
 // -------------------------------
 
 // -------- SETTINGS --------------
@@ -96,13 +97,7 @@ bool no_direct = false;
 
 // Use random vectors vs exact for patch-to-patch form factor
 #define USE_RANDOM_VECTORS
-const int NUM_PATCH_RAYCASTS=400;
-
-//// Don't do radiosity, use radiosity caching and random ray tracing
-//#define RAYTRACED_NO_TRANSFERS
-//const int RAYS_PER_TEXEL = 50;
-
-
+ int NUM_PATCH_RAYCASTS=100;
 // ---------------------------------
 
 // ---------- DEBUG ---------------
@@ -130,12 +125,6 @@ int index_to_plane_list[MAX_PATCHES];
 struct AmbCubeTransfer
 {
 	struct CubeSide {
-		~CubeSide() {
-			delete[] transfer_list;
-		}
-		transfer_t* transfer_list = nullptr;
-		int num_transfers = 0;
-
 		vec3 total_light = vec3(0.0);
 
 	}sides[6];
@@ -214,6 +203,21 @@ bool vec3_compare(vec3& v1, vec3& v2, float epsilon)
 {
 	return fabs(v1.x - v2.x) < epsilon && fabs(v1.y - v2.y) < epsilon && fabs(v1.z - v2.z) < epsilon;
 }
+
+
+// Assumes face is rectangular
+vec3 random_point_on_rectangular_face(int face_idx)
+{
+	face_t* f = faces + face_idx;
+	vec3 V0 = verts[f->v_start] - verts[f->v_start + 1];
+	vec3 V1 = verts[f->v_start + 1] - verts[f->v_start + 2];
+
+	float u = random_float();
+	float v = random_float();
+
+	return verts[f->v_start + 2] + u * V0 + v * V1;
+}
+
 
  float RADIAL = patch_grid*4.f;
  float RADIALSQRT = sqrt(RADIAL);
@@ -349,7 +353,7 @@ void patch_for_face(int face_num)
 	texture_info_t* ti = tinfo + face->t_info_idx;
 	std::string* t_string = tex_strings + ti->t_index;
 	// Skybox doesn't make patches
-	if (face->dont_draw) {
+	if (face->dont_draw || ti->flags & SURF_EMIT) {
 		return;
 	}
 	patch_t* p = &patches[num_patches++];
@@ -387,12 +391,6 @@ void patch_for_face(int face_num)
 			p->reflectivity = default_reflectivity;
 		}
 	}
-
-	if (ti->flags & SURF_EMIT) {
-		p->total_light = vec3(1.f);
-		p->emission = vec3(10.f);
-	}
-	
 
 	p->next = nullptr;
 }
@@ -494,6 +492,7 @@ void create_patch_view(PatchDebugMode mode)
 			break;
 		case PDM::RADCOLOR:
 			color = p->total_light;
+			break;
 		}
 		for (int i = 0; i < w->num_verts-2; i++) {
 		//	patch_va.push_line(w->v[i], w->v[(i + 1)%w->num_verts], vec3(1.0));
@@ -527,63 +526,7 @@ void make_transfers(int patch_num)
 	float total = 0;
 	vec3 center_with_offset = patch->center + plane.normal * 0.01f;
 	patch->num_transfers = 0;
-#ifndef USE_RANDOM_VECTORS
-	std::vector<float> transfers;
-	transfers.resize(num_patches);
-	for (int j = 0; j < num_patches; j++)
-	{
-		transfers[j] = 0;
 
-		if (j == i) {
-			continue;
-		}
-		patch_t* other = &patches[j];
-		vec3 dir = normalize(other->center - patch->center);
-		float angi = dot(dir, plane.normal);
-		if (angi <= 0) {
-			continue;
-		}
-
-		float dist_sq = dot(other->center - patch->center, other->center - patch->center);
-
-		plane_t* planej = &faces[other->face].plane;
-		float angj = -dot(dir, planej->normal);
-		float factor = (angj * angi * other->area) / (dist_sq);
-
-		if (factor <= 0.00005) {
-			continue;
-		}
-		auto res = global_world.tree.test_ray_fast(center_with_offset, other->center + planej->normal * 0.01f);
-		if (res.hit) {
-			continue;
-		}
-
-		if (factor > 0.00005) {
-			transfers[j] = factor;
-			total += factor;
-			patch->num_transfers++;
-		}
-	}
-	float final_total = 0;
-	if (patch->num_transfers > 0) {
-		patch->transfers = new transfer_t[patch->num_transfers];
-
-		int t_index = 0;
-		transfer_t* t = &patch->transfers[t_index++];
-		for (int i = 0; i < num_patches; i++) {
-			if (transfers[i] <= 0.00005) {
-				continue;
-			}
-			t->factor = transfers[i] / total;
-			t->patch_num = i;
-			final_total += t->factor;
-
-			t = &patch->transfers[t_index++];
-			assert(t_index <= patch->num_transfers + 1);
-		}
-	}
-
-#else
 	std::vector<int> patch_hits;
 	for (int i = 0; i < NUM_PATCH_RAYCASTS; i++) 
 	{
@@ -637,126 +580,8 @@ void make_transfers(int patch_num)
 		}
 	}
 
-#endif // !USE_RANDOM_VECTORS
 }
 
-#ifndef USE_RANDOM_VECTORS
-
-
-void make_ambient_transfers(int ambient_num)
-{
-	vec3 point = ambient_cubes[ambient_num];
-	AmbCubeTransfer* act = &amb_cube_transfers[ambient_num];
-
-	std::vector<int> patch_nums;
-	patch_nums.reserve(256);
-	// Gather patches in all directions
-	int backface_hits = 0;
-	for (int i = 0; i < num_patches; i++) {
-		patch_t* p = patches + i;
-		/*float dist = sqrt(dot(point - p->center, point - p->center));
-		// Don't care as much about perfect transfers
-		vec3 dir = p->center - point;
-		dir /= dist;
-		float angj = -dot(dir, faces[p->face].plane.normal);
-
-		// doesn't factor in point's face as it has 6 of them
-		float partial_factor = (angj * p->area) / (dist*dist);
-		if (partial_factor <= 0.0001);
-			//continue;
-			*/
-		trace_t res = global_world.tree.test_ray_fast(point, p->center + faces[p->face].plane.normal * 0.01f);
-		if (res.hit) {
-			if (res.hit_backface()) {
-				backface_hits++;
-				// Mother of hacks...
-				if (backface_hits >= 25) {
-					act->inside_wall = true;
-					return;
-				}
-			}
-			continue;
-		}
-		 
-
-		patch_nums.push_back(i);
-	}
-
-	// Hack
-	if (patch_nums.size() < 1) {
-		act->inside_wall = true;
-		return;
-	}
-
-	std::vector<float> transfers;
-	transfers.resize(patch_nums.size());
-	for (int i = 0; i < 6; i++)
-	{
-		AmbCubeTransfer::CubeSide* cs = &act->sides[i];
-		plane_t p;
-		p.normal = vec3(0);
-		int dig = i / 2;
-		p.normal[dig] = (i & 1) ? -1.0 : 1.0;
-		p.d = -point[dig] * ((i & 1) ? -1.0 : 1.0);
-
-		float total=0;
-
-
-		for (int j = 0; j < patch_nums.size(); j++) {
-			transfers[j] = 0.0;
-			
-			patch_t* patch = patches + patch_nums[j];
-			vec3 dir = normalize(patch->center - point);
-			float angi = dot(dir, p.normal);
-
-			if (angi <= 0) {
-				continue;
-			}
-
-			float dist_sq = dot(patch->center - point, patch->center - point);
-
-			plane_t* planej = &faces[patch->face].plane;
-			float angj = -dot(dir, planej->normal);
-			float factor = (angj * angi * patch->area) / (dist_sq);
-
-			if (factor <= 0.00005) {
-				continue;
-			}
-			
-			if (factor > 0.00005) {
-				transfers[j] = factor;
-				total += factor;
-				cs->num_transfers++;
-			}
-		}
-
-		// A side should never have less than 3 patches unless its in a wall, abort!
-		if (cs->num_transfers < 3) {
-			//act->inside_wall = true;
-			//return;
-		}
-
-		float final_total = 0;
-		if (cs->num_transfers > 0) {
-			cs->transfer_list = new transfer_t[cs->num_transfers];
-
-			int t_index = 0;
-			transfer_t* t = &cs->transfer_list[t_index++];
-			for (int m = 0; m < patch_nums.size(); m++) {
-				if (transfers[m] <= 0.00005) {
-					continue;
-				}
-				t->factor = transfers[m] / total;
-				t->patch_num = patch_nums[m];
-				final_total += t->factor;
-
-				t = &cs->transfer_list[t_index++];
-				//assert(t_index <= patch->num_transfers + 1);
-			}
-		}
-	}
-}
-#endif // !USE_RANDOM_VECTORS
 
 struct PatchHitAndDir
 {
@@ -841,62 +666,9 @@ void sample_ambient_cubes(int cube_num)
 }
 
 
-void shoot_light(int patch_num)
-{
-	patch_t* p = &patches[patch_num];
 
-	vec3 send = radiosity[patch_num];
-
-	for (int i = 0; i < p->num_transfers; i++) {
-		transfer_t* t = p->transfers + i;
-		illumination[t->patch_num] += send * t->factor;
-	}
-}
-
-void shoot_and_collect_ambient_cube(int amb_num)
-{
-	auto& act = amb_cube_transfers.at(amb_num);
-	if (act.inside_wall)
-		return;
-	for (int i = 0; i < 6; i++) {
-		auto& cs = act.sides[i];
-		for (int j = 0; j < cs.num_transfers; j++) {
-			transfer_t& t = cs.transfer_list[j];
-			cs.total_light += (radiosity[t.patch_num] * t.factor)/(patch_grid*patch_grid);
-		}
-	}
-}
-void collect_light()
-{
-	for (int i = 0; i < num_patches; i++) {
-
-		patch_t* p = patches + i;
-		p->total_light += illumination[i] / p->area;
-		radiosity[i] = illumination[i] * p->reflectivity;
-		illumination[i] = vec3(0.f);
-	}
-}
 void start_radiosity()
 {
-#ifndef USE_RANDOM_VECTORS
-
-
-	for (int i = 0; i < num_patches; i++)
-	{
-		patch_t* p = &patches[i];
-		radiosity[i] = p->sample_light * p->reflectivity * p->area + p->emission * p->area;
-	}
-	for (int i = 0; i < num_bounces; i++)
-	{
-		for (int j = 0; j < num_patches; j++) {
-			shoot_light(j);
-		}
-		for (int j = 0; j < amb_cube_transfers.size(); j++) {
-			shoot_and_collect_ambient_cube(j);
-		}
-		collect_light();
-	}
-#else
 	for (int i = 0; i < num_patches; i++) {
 		patch_t* p = &patches[i];
 		radiosity[i] = p->sample_light * p->reflectivity + p->emission;
@@ -924,8 +696,8 @@ void start_radiosity()
 
 			radiosity[j] = (p->total_light + p->sample_light) * p->reflectivity + p->emission;
 		}
+
 	}
-#endif // !RANDOM_VECTORS
 
 }
 
@@ -1069,10 +841,6 @@ void calc_extents(LightmapState& l)
 	l.face_middle /= vcount;
 
 	for (int i = 0; i < 2; i++) {
-
-		//	va->push_2({ l.face->texture_axis[i]*min[i],vec3(0,1,1) }, { vec3(0),vec3(0,1,1) });
-		//	va->push_2({ l.face->texture_axis[i] * max[i],vec3(0,0.8,1) }, { vec3(0),vec3(0,1,0.8) });
-
 		l.tex_min[i] = min[i];
 		l.tex_size[i] = ceil(max[i]) - floor(min[i]);
 		if (l.tex_size[i] > 64) {
@@ -1240,6 +1008,7 @@ void light_face(int num)
 				vec3 final_color = vec3(0.0);
 
 				switch (light->type) {
+				case LIGHT_SPOT:
 				case LIGHT_POINT:
 				{
 					vec3 light_p = lights[i].pos;
@@ -1256,6 +1025,7 @@ void light_face(int num)
 					if (res.hit) {
 						continue;
 					}
+
 					vec3 light_dir = light_p - sample_pos;
 					float dist = length(light_dir);
 					light_dir = normalize(light_dir);
@@ -1264,13 +1034,74 @@ void light_face(int num)
 						continue;
 					}
 
-					float surface_scale = 1.f;
-					if (lights[i].type == LIGHT_SURFACE) {
-						surface_scale = -dot(lights[i].normal, light_dir);
-						surface_scale = glm::max(surface_scale, 0.f);
+					float extra_scale = 1.f;
+					if (light->type == LIGHT_SPOT) {
+						float cos_theta = dot(-light_dir, light->normal);
+						float outer = light->width * 0.90;
+						float epsilon = light->width - outer;
+						extra_scale = clamp((cos_theta - outer) / epsilon, 0.0f, 1.0f);
 					}
-					final_color = lights[i].color * dif * max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f) * surface_scale;
+
+					if (lights[i].type == LIGHT_SURFACE) {
+						extra_scale = -dot(lights[i].normal, light_dir);
+						extra_scale = glm::max(extra_scale, 0.f);
+					}
+					float attenuation_factor = ((float)lights[i].brightness / (dist * dist + 0.01)) *(1 - dist/(float)lights[i].brightness);
+					//max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f)
+					final_color = lights[i].color * dif * attenuation_factor * extra_scale;
 				} break;
+				case LIGHT_SURFACE:
+				{
+					const face_t* lface = faces + light->face_idx;
+					if (!lface->plane.classify(sample_pos))
+						continue;
+					// Load verts into winding...
+					winding_t w;
+					for (int v = 0; v < lface->v_count; v++) {
+						w.add_vert(verts[lface->v_start + v]);
+					}
+					vec3 closest = w.closest_point_on_winding(sample_pos);
+					float distsq = dot(closest - sample_pos, closest - sample_pos);
+					if (distsq > light->brightness * light->brightness)
+						continue;
+					vec3 closest_dir = normalize(closest - sample_pos);
+					if (dot(closest_dir, l.face->plane.normal) <= 0)
+						continue;
+
+					float area = w.get_area();
+					int num_surf_samples = ceil(area / (patch_grid * patch_grid));	// arbitrary
+					
+					
+					vec3 accumulate = vec3(0.0);
+					for (int surf_samp = 0; surf_samp < num_surf_samples; surf_samp++) {
+						vec3 point;
+						vec3 dir;
+						if (surf_samp == 0) {
+							point = closest;
+							dir = closest_dir;
+						}
+						else {
+							point = random_point_on_rectangular_face(light->face_idx);
+							dir = normalize(point - sample_pos);
+						}
+
+						point += lface->plane.normal * 0.01f;
+
+						trace_t res = global_world.tree.test_ray_fast(sample_pos, point, -0.005f, 0.005f);
+						if (res.hit) {
+							continue;
+						}
+
+
+						float dist = length(point - sample_pos);
+
+						float dif = dot(dir, l.face->plane.normal);
+						float attenuation_factor = ((float)lights[i].brightness / (dist * dist + 0.01)) * (1 - dist / (float)lights[i].brightness);
+						accumulate += lights[i].color * dif * attenuation_factor;
+					}
+					accumulate /= (float)num_surf_samples;
+					final_color = accumulate;
+				}break;
 				case LIGHT_SUN:
 				{
 					float angle = dot(l.face->plane.normal, -light->normal);
@@ -1285,7 +1116,6 @@ void light_face(int num)
 						if (!(ti->flags & SURF_SKYBOX))
 							continue;
 					}
-					//va.push_line(sample_pos, sample_pos + (-light->normal * 300.f), vec3(1, 0, 0));
 					final_color = light->color * angle * (float)light->brightness;
 				} break;
 				default:
@@ -1332,6 +1162,7 @@ void final_light_face(int face_num)
 			if (no_direct) {
 				fl->pixel_colors[i] = vec3(0.0);
 			}
+			
 			fl->pixel_colors[i] += radial.get_ambient(i);
 		}
 	}
@@ -1426,21 +1257,32 @@ void add_lights(worldmodel_t* wm)
 		auto find = ent->properties.find("classname");
 		vec3 color = vec3(1.0);
 		float brightness = 200;
+		light_t l;
+		
 		if (find->second == "light_torch_small_walltorch") {
 			color = vec3(1.0, 0.3, 0.0);
 			brightness = 100;
+			l.type = LIGHT_POINT;
+
 			//continue;
 		}
 		else if (find->second == "light_flame_large_yellow") {
 			color = vec3(1.0, 0.5, 0.0);
 			brightness = 400;
+			l.type = LIGHT_POINT;
+
 			//continue;
 		}
 		else if (find->second == "light") {
-
+			l.type = LIGHT_POINT;
 		}
 		else if (find->second == "light_fluoro") {
 			color = vec3(0.8, 0.8, 1.0);
+			l.type = LIGHT_POINT;
+
+		}
+		else if (find->second == "spot_light") {
+			l.type = LIGHT_SPOT;
 		}
 		else {
 			continue;
@@ -1466,33 +1308,49 @@ void add_lights(worldmodel_t* wm)
 			work_str = ent->properties.find("color")->second;
 			sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
 		}
-
-		light_t l;
 		l.pos = org;
 		l.color = color;
 		l.brightness = brightness;
-		l.type = LIGHT_POINT;
+		
+		if (l.type == LIGHT_SPOT) {
+			float width = std::stof(ent->properties.find("width")->second);
+			width = cos(radians(width));
+			l.width = width;
+
+			std::string angle = ent->properties.find("mangle")->second;
+			int angles[3];
+			sscanf_s(angle.c_str(), "%d %d %d", &angles[0], &angles[1], &angles[2]);
+
+			vec3 dir = vec3(0);
+			dir.x = cos(radians((float)angles[1])) * cos((radians((float)angles[0])));
+			dir.y = sin((radians((float)angles[0])));
+			dir.z = -sin(radians((float)angles[1])) * cos(radians((float)angles[0]));
+
+			l.normal = -dir;
+		}
 
 		lights.push_back(l);
 	}
-	for (int i = 0; i < num_patches; i++)
+	for (int i = 0; i < num_faces; i++)
 	{
-		patch_t* p = patches + i;
-		float light_amt = dot(p->total_light, vec3(1.f));
-		if (light_amt < 1.f) {
+		const face_t* face = &faces[i];
+		texture_info_t* ti = tinfo + face->t_info_idx;
+		if (!(ti->flags & SURF_EMIT)) {
 			continue;
 		}
-		
-		texture_info_t* ti = tinfo + faces[p->face].t_info_idx;
 
 		light_t l;
 		// brightness value is stored in the x texture scale
-		l.brightness = ti->uv_scale[0] * p->area;
+		l.brightness = ti->uv_scale[0];
 		l.color = vec3(1.f);
 		l.type = LIGHT_SURFACE;
-		l.normal = faces[p->face].plane.normal;
-		l.pos = p->center + l.normal * 0.01f;
-	
+		l.normal = face->plane.normal;
+		vec3 center = vec3(0);
+		for (int j = 0; j < face->v_count; j++) {
+			center += verts[face->v_start + j];
+		}
+		center /= (float)face->v_count;
+		l.face_idx = i;
 
 		lights.push_back(l);
 	}
@@ -1514,15 +1372,12 @@ void add_lights(worldmodel_t* wm)
 		light_t l;
 		l.type = LIGHT_SUN;
 		l.brightness = std::stoi(e.properties.find("brightness")->second);
-		l.color = vec3(1.f);
+		l.color = rgb_to_float(253, 243, 208);
 		l.normal = -normalize(sun_direction);
 		
 		env_light_index = lights.size();
 		
 		lights.push_back(l);
-
-		//va.push_line(vec3(0), l.normal, vec3(1, 1, 0));
-		
 		break;
 	}
 
@@ -1559,8 +1414,6 @@ void ambient_voxel_debug()
 		auto& act = amb_cube_transfers.at(i);
 		if (act.inside_wall)
 			continue;
-
-
 		vec3 colors[6];
 		colors[0] = act.sides[0].total_light;// x
 		colors[1] = act.sides[1].total_light;// -x
@@ -1601,6 +1454,9 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	no_direct = settings.no_direct;
 	RADIAL = patch_grid * 4.f;
 	RADIALSQRT = sqrt(RADIAL);
+	NUM_PATCH_RAYCASTS = settings.samples_per_patch;
+
+	sky_color = rgb_to_float(124, 138, 203);
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 2; j++) {
 			sample_ofs[i][j] *= settings.sample_ofs;
@@ -1617,8 +1473,7 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	// Used for random debug colors
 	srand(time(NULL));
 
-	Voxelizer vox(wm, 1.0,5);
-	//vox.add_points(&voxels);
+	Voxelizer vox(wm, 1.0,2);
 	vox.move_final_samples(ambient_cubes);
 	add_manual_ambient_cubes();
 	amb_cube_transfers.resize(ambient_cubes.size());
@@ -1658,41 +1513,23 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 
 	run_threads_on_function(&light_face, bm->face_start, bm->face_start + bm->face_count);
 
-	//for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
-	//	light_face(i);
-	//}
-
 	printf("Total pixels: %u\n", total_pixels);
 	printf("Total raycasts: %u\n", total_rays_cast);
 	printf("Face lighting time: %u\n", SDL_GetTicks() - start_light_face);
 
 	if (enable_radiosity) {
 		printf("Making transfers...\n");
-		//transfers.resize(MAX_PATCHES);
 
 		run_threads_on_function(&make_transfers, 0, num_patches);
-
-		//for (int i = 0; i < num_patches; i++) {
-		//	make_transfers(i);
-		//}
-#ifndef USE_RANDOM_VECTORS
-		for (int i = 0; i < amb_cube_transfers.size(); i++) {
-			make_ambient_transfers(i);
-		}
-#endif // !USE_RANDOM_VECTORS
 
 		printf("Finished transfers\n");
 
 		printf("Bouncing light...\n");
 		start_radiosity();
 
-#ifdef USE_RANDOM_VECTORS
 		for (int i = 0; i < amb_cube_transfers.size(); i++) {
 			sample_ambient_cubes(i);
 		}
-
-#endif // USE_RANDOM_VECTORS
-
 	}
 
 	printf("Final light pass...\n");

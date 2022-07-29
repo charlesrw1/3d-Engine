@@ -50,7 +50,7 @@ Renderer::Renderer()
 		std::cout << "Framebuffer not complete!" << std::endl;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	HDRbuffer.create(FramebufferSpec(global_app.width, global_app.height, 4, FBAttachments::FLOAT16, true));
+	HDRbuffer.create(FramebufferSpec(global_app.width, global_app.height, 8, FBAttachments::FLOAT16, true));
 
 	depth_map.create(FramebufferSpec(SHADOW_WIDTH, SHADOW_WIDTH, 1, FBAttachments::DEPTH, false));
 	glBindTexture(GL_TEXTURE_2D, depth_map.depth_id);
@@ -114,7 +114,9 @@ void Renderer::render_scene(SceneData& scene)
 	stats = {};
 
 	
-	glClearColor(0.5, 0.7, 1.0, 1);
+	//glClearColor(0.5, 0.7, 1.0, 1);
+	glClearColor(0,0,0, 1);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	mat4 light_space_matrix = render_shadow_map(scene);
@@ -245,9 +247,6 @@ void Renderer::world_pass(SceneData& scene)
 			if (obj->closest_reflection_probe != -1)
 				continue;
 			
-			ambientcube_shade.set_vec3("light.position", scene.point_lights.at(obj->closest_light).position);
-			ambientcube_shade.set_vec3("light.color", scene.point_lights.at(obj->closest_light).color);
-			ambientcube_shade.set_float("light.radius", scene.point_lights.at(obj->closest_light).radius);
 
 			for (int i = 0; i < 6; i++) {
 				ambientcube_shade.set_vec3(("ambient_cube[" + std::to_string(i) + "]").c_str(),
@@ -301,68 +300,6 @@ void Renderer::world_pass(SceneData& scene)
 			.set_vec3("view_pos", scene.active_camera()->position).set_int("diffuse_tex", 0).set_int("shiny_tex", 1);
 
 		ambientcube_reflection.set_int("cubemap", 2);
-
-		for (const auto obj : scene.objects) {
-
-			if (obj->closest_reflection_probe == -1)
-				continue;
-
-			ambientcube_reflection.set_vec3("light.position", scene.point_lights.at(obj->closest_light).position);
-			ambientcube_reflection.set_vec3("light.color", scene.point_lights.at(obj->closest_light).color);
-			ambientcube_reflection.set_float("light.radius", scene.point_lights.at(obj->closest_light).radius);
-
-			for (int i = 0; i < 6; i++) {
-				ambientcube_reflection.set_vec3(("ambient_cube[" + std::to_string(i) + "]").c_str(),
-					global_app.world.ambient_grid.at(obj->closest_ambient_cube).axis_colors[i]);
-			}
-
-			ambientcube_reflection.set_float("reflection_str", obj->reflection_strength);
-			glActiveTexture(GL_TEXTURE0 + 2);
-			int index = scene.enviorment_probes.at(obj->closest_reflection_probe).cubemap_index;
-			if (index != -1) {
-				glBindTexture(GL_TEXTURE_CUBE_MAP,
-					world_cubemaps.at(index).get_ID());
-			}
-
-
-			// this should be changed, the list should only be textured items
-			if (obj->has_shading) {
-
-				// this is going to go
-				if (obj->matrix_needs_update) {
-					obj->update_matrix();
-					obj->matrix_needs_update = false;
-				}
-				// Check if previous draw call used same texture or buffer!
-				//Model::SubMesh& sm = obj->model->meshes.at(0);
-				for (int i = 0; i < obj->model->num_meshes(); i++) {
-
-					const RenderMesh* rm = obj->model->mesh(i);
-
-					if (rm->diffuse) {
-						rm->diffuse->bind(0);
-					}
-					else {
-						white_tex->bind(0);
-					}
-
-					if (rm->specular) {
-						rm->specular->bind(1);
-					}
-					else {
-						white_tex->bind(1);
-					}
-
-					ambientcube_reflection.set_mat4("u_model", obj->model_matrix).set_mat4("normal_mat", obj->inverse_matrix);
-
-					//	sm.mesh.bind();
-					glBindVertexArray(rm->vao);
-					glDrawElements(GL_TRIANGLES, rm->num_indices, GL_UNSIGNED_INT, NULL);
-					//sm.mesh.draw_indexed_primitive();
-
-				}
-			}
-		}
 	}
 }
 
