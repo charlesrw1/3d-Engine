@@ -5,6 +5,33 @@
 
 #include "Light.h"
 #include <cstring>
+#include <fstream>
+
+void output_to_obj(worldmodel_t* wm)
+{
+	printf("Writing .obj file\n");
+	std::ofstream outfile(wm->name + ".obj");
+	for (int i = 0; i < wm->verts.size(); i++) {
+		outfile << "v " << wm->verts[i][0] << " " << wm->verts[i][1] << " " << wm->verts[i][2] << "\n";
+	}
+	for (int i = 0; i < wm->faces.size(); i++) {
+		vec3 normal = wm->faces[i].plane.normal;
+		outfile << "vn " << normal[0] << " " << normal[1] << " " << normal[2] << '\n';
+	}
+	for (int i = 0; i < wm->faces.size(); i++) {
+		face_t* face = &wm->faces[i];
+		if (face->dont_draw)
+			continue;
+		int first_vert = face->v_start;
+		for (int j = 0; j < face->v_count - 2; j++) {
+			outfile << "f " << first_vert + 1<< "//" << i + 1
+				<< " " << first_vert + 1 + j + 1 << "//" << i +1
+				<< " " << first_vert + (2 + j) % face->v_count + 1 << "//" << i + 1 << '\n';
+		}
+	}
+	outfile.close();
+}
+
 
 void print_help()
 {
@@ -128,6 +155,7 @@ int main(int argc, char* argv[])
 	else {
 		app.load_map(file);
 	}
+	output_to_obj(&app.world);
 	app.setup_new_map();
 
 

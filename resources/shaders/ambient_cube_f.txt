@@ -61,7 +61,7 @@ void main()
 	// light attenuation, real time rendering
 	
 	vec3 result = (ambient)*color.rgb;//+specular*0.1;
-
+	//result = result/(result+vec3(1.0));
 	
 	FragColor = vec4(result,1.0);
 }

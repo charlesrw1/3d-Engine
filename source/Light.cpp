@@ -6,7 +6,7 @@
 #include "Voxelizer.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-#include <random>
+#include "Sampling.h"
 
 const worldmodel_t* world;
 
@@ -61,6 +61,7 @@ struct light_t
 };
 std::vector<light_t> lights;
 static int env_light_index = -1;
+vec3 sky_color = vec3(0.5, 0.7, 1.0);
 
 static const int NUM_SKY_SAMPLES = 30;
 
@@ -69,8 +70,8 @@ static const int NUM_SKY_SAMPLES = 30;
 
 
 // ------ RADIOSITY ARRAYS -------
-vec3 radiosity[MAX_PATCHES];
-vec3 illumination[MAX_PATCHES];
+vec3 radiosity[MAX_PATCHES];	// excindent
+vec3 illumination[MAX_PATCHES];	// incindent
 // -------------------------------
 
 // -------- SETTINGS --------------
@@ -94,8 +95,14 @@ vec3 default_reflectivity = vec3(0.3);
 bool no_direct = false;
 
 // Use random vectors vs exact for patch-to-patch form factor
-//#define USE_RANDOM_VECTORS
-//const int NUM_PATCH_RAYCASTS=50;
+#define USE_RANDOM_VECTORS
+const int NUM_PATCH_RAYCASTS=400;
+
+//// Don't do radiosity, use radiosity caching and random ray tracing
+//#define RAYTRACED_NO_TRANSFERS
+//const int RAYS_PER_TEXEL = 50;
+
+
 // ---------------------------------
 
 // ---------- DEBUG ---------------
@@ -140,27 +147,7 @@ std::vector<AmbCubeTransfer> amb_cube_transfers;
 // -----------------------------------
 
 // ------------ UTILITIES --------------
-float random_float()
-{
-	return rand() / (RAND_MAX + 1.0f);
-}
-float random_float(float min, float max)
-{
-	return min + (max - min) * random_float();
-}
-vec3 random_vec3(float min, float max)
-{
-	return vec3(random_float(min,max), random_float(min,max),random_float(min,max));
-}
-vec3 random_in_unit_sphere()
-{
-	while (1)
-	{
-		vec3 v = random_vec3(-1.f, 1.f);
-		if (dot(v, v) >= 1) continue;
-		return v;
-	}
-}
+
 vec3 lerp(const vec3& a, const vec3& b, float percentage)
 {
 	return a + (b - a) * percentage;
@@ -403,6 +390,7 @@ void patch_for_face(int face_num)
 
 	if (ti->flags & SURF_EMIT) {
 		p->total_light = vec3(1.f);
+		p->emission = vec3(10.f);
 	}
 	
 
@@ -464,6 +452,8 @@ void subdivide_patch(patch_t* p)
 
 	new_p->sample_light = p->sample_light;
 	new_p->total_light = p->total_light;
+	new_p->emission = p->emission;
+
 
 	subdivide_patch(p);
 	subdivide_patch(new_p);
@@ -592,66 +582,18 @@ void make_transfers(int patch_num)
 			assert(t_index <= patch->num_transfers + 1);
 		}
 	}
-	/*//return;
-	
-	// Calc indirect lighting from skybox, this should go elsewhere
-	if (env_light_index == -1)
-		return;
 
-	light_t* env_light = &lights[env_light_index];
-
-	int num_skybox_hits = 0;
-	float total_accumulation = 0;
-
-	for (int i = 0; i < NUM_SKY_SAMPLES; i++) {
-		vec3 direction;
-		float length;
-		do {
-			direction = plane.normal + random_vec3(-1.0, 1.0);
-			length = glm::length(direction);
-		} while (length < 0.0001f);	// prevent divide by zero
-
-		//vec3 direction = random_vec3(-1.0, 1.0);
-		//if (dot(direction, plane.normal) <= 0)
-		//	direction = -direction;
-		//
-
-		direction = normalize(direction);
-		trace_t res = global_world.tree.test_ray_fast(center_with_offset, center_with_offset + direction * 300.f, -0.005, 0.005);
-		if (!res.hit)
-			continue;
-		texture_info_t* ti = tinfo + faces[res.face].t_info_idx;
-		if (ti->flags & SURF_SKYBOX) {
-			num_skybox_hits++;
-			total_accumulation += dot(plane.normal, direction);
-		}
-	}
-	// Skycolor * brightness scale * directional scale * occlusion scale
-	//patch->total_light += vec3(0.2, 0.2, 1.0) * 0.03f* (total_accumulation * (num_skybox_hits / float(NUM_SKY_SAMPLES)));
-	patch->sample_light += vec3(0.2, 0.2, 1.0) * 0.03f * (total_accumulation * (num_skybox_hits / float(NUM_SKY_SAMPLES)));
-
-
-	*/
 #else
-	std::vector<TempTransfer> temp_transfers;
+	std::vector<int> patch_hits;
 	for (int i = 0; i < NUM_PATCH_RAYCASTS; i++) 
 	{
-		//vec3 direction;
-		//float length;
-		//do {
-		// direction = plane.normal + random_vec3(-1.0, 1.0);
-		// length = glm::length(direction);
-		//} while (length < 0.0001f);	// prevent divide by zero
-
-		vec3 direction = random_vec3(-1.0, 1.0);
-		if (dot(direction, plane.normal) <= 0)
-			direction = -direction;
-
-		direction = normalize(direction);
+		vec3 direction = sample_hemisphere_cos(plane.normal, i, NUM_PATCH_RAYCASTS - 1);
 
 		trace_t res = global_world.tree.test_ray_fast(center_with_offset, center_with_offset + direction * 300.f,-0.005,0.005);
-		if (!res.hit)
+		if (!res.hit || tinfo[faces[res.face].t_info_idx].flags & SURF_SKYBOX) {
+			patch_hits.push_back(-1);	// Sky index
 			continue;
+		}
 
 		// Find patch that was hit
 		patch_t* p = face_patches[res.face];
@@ -669,62 +611,36 @@ void make_transfers(int patch_num)
 		if (patch_idx == patch_num) {
 			continue;
 		}
-		vec3 dir = normalize(other->center - patch->center);
-		
-		float angi = dot(dir, plane.normal);
-		if (angi <= 0) {
-			continue;
-		}
-		float dist_sq = dot(other->center - patch->center, other->center - patch->center);
-
-		plane_t* planej = &faces[other->face].plane;
-		float angj = -dot(dir, planej->normal);
-		float factor = (angj * angi * other->area) / (dist_sq);
-
-		if (factor <= 0.00005) {
-			continue;
-		}
-
-
-		TempTransfer tt;
-		tt.patch_idx = (long long(other) - (long long)&patches[0]) / sizeof(patch_t);
-		tt.transfer_amt = factor;
-		temp_transfers.push_back(tt);
-
-		//transfers[j] = factor;
-		total += factor;
-		patch->num_transfers++;
+		patch_hits.push_back(patch_idx);
 	}
 
-	std::sort(temp_transfers.begin(), temp_transfers.end(), [](const TempTransfer& t1, const TempTransfer& t2)
+	std::sort(patch_hits.begin(), patch_hits.end());
+	
+	patch->transfers = new transfer_t[NUM_PATCH_RAYCASTS];
+	patch->num_transfers = 0;
+	for (int i = 0; i < patch_hits.size(); i++) {
+		int index = patch_hits[i];
+		int start = i;
+		while (i < patch_hits.size() && patch_hits[i] == index)
 		{
-			return t1.patch_idx < t2.patch_idx;
-		});
-	std::vector<TempTransfer> temp_temp;
-	int last_index = -1;
-	for (int i = 0; i < temp_transfers.size(); i++) {
-		if (temp_transfers[i].patch_idx != last_index) {
-			last_index = temp_transfers[i].patch_idx;
-			temp_temp.push_back(temp_transfers[i]);
+			i++;
+		}
+		int count = i - start;
+		float factor = count / (float)NUM_PATCH_RAYCASTS;
+		if (index == -1) {
+			patch->sky_visibility = factor;
 		}
 		else {
-			total -= temp_transfers[i].transfer_amt;
+			patch->transfers[patch->num_transfers].factor = factor;
+			patch->transfers[patch->num_transfers].patch_num = index;
+			patch->num_transfers++;
 		}
 	}
-	temp_transfers = std::move(temp_temp);
-	patch->num_transfers = temp_transfers.size();
-
-	if (patch->num_transfers > 0) {
-		patch->transfers = new transfer_t[patch->num_transfers];
-		for (int i = 0; i < patch->num_transfers; i++) {
-			patch->transfers[i].patch_num = temp_transfers.at(i).patch_idx;
-			patch->transfers[i].factor = temp_transfers.at(i).transfer_amt/total;
-		}
-	}
-
 
 #endif // !USE_RANDOM_VECTORS
 }
+
+#ifndef USE_RANDOM_VECTORS
 
 
 void make_ambient_transfers(int ambient_num)
@@ -840,6 +756,89 @@ void make_ambient_transfers(int ambient_num)
 		}
 	}
 }
+#endif // !USE_RANDOM_VECTORS
+
+struct PatchHitAndDir
+{
+	int patch_hit;
+	vec3 direction;
+};
+
+void sample_ambient_cubes(int cube_num)
+{
+	vec3 point = ambient_cubes[cube_num];
+	AmbCubeTransfer* act = &amb_cube_transfers[cube_num];
+
+	std::vector<PatchHitAndDir> patch_hits;
+	int backface_hits = 0;
+	for (int i = 0; i < NUM_PATCH_RAYCASTS; i++)
+	{
+		vec3 direction = sample_hemisphere_uniform(vec3(0, 1, 0), i, NUM_PATCH_RAYCASTS);
+		for (int j = 0; j < 2; j++)
+		{
+			// sample full sphere
+			direction = (j == 0) ? direction : -direction;
+			trace_t res = global_world.tree.test_ray_fast(point, point + direction * 300.f, -0.005, 0.005);
+			if (!res.hit || tinfo[faces[res.face].t_info_idx].flags & SURF_SKYBOX) {
+				patch_hits.push_back({ -1,direction });	// Sky index
+				continue;
+			}
+			if (res.hit_backface()) {
+				backface_hits++;
+				if (backface_hits >= 15) {
+					act->inside_wall = true;
+					return;
+				}
+				continue;
+			}
+
+			// Find patch that was hit
+			patch_t* p = face_patches[res.face];
+			while (p)
+			{
+				if (p->winding.point_inside(res.end_pos)) break;
+				p = p->next;
+			}
+			if (p == nullptr) {
+				//printf("Face hit but patch not found\n");
+				continue;
+			}
+			patch_t* other = p;
+			int patch_idx = (long long(other) - (long long)&patches[0]) / sizeof(patch_t);
+			patch_hits.push_back({ patch_idx,direction });
+		}
+	}
+
+	for (int i = 0; i < 6; i++)
+	{
+		float total = 0.0;
+
+		AmbCubeTransfer::CubeSide* cs = &act->sides[i];
+		cs->total_light = vec3(0.0);
+		vec3 side_normal = vec3(0);
+		int dig = i / 2;
+		side_normal[dig] = (i & 1) ? -1.0 : 1.0;
+
+		for (int j = 0; j < patch_hits.size(); j++)
+		{
+			float cos_theta = dot(patch_hits[j].direction, side_normal);
+			if (cos_theta <= 0)
+				continue;
+
+			total += cos_theta;
+			if (patch_hits[j].patch_hit == -1) {
+				cs->total_light += sky_color * cos_theta;
+				continue;
+			}
+
+			patch_t* ph = &patches[patch_hits[j].patch_hit];
+			cs->total_light += ((ph->total_light + ph->sample_light) * ph->reflectivity) * cos_theta;
+		}
+
+		cs->total_light /= total;
+	}
+
+}
 
 
 void shoot_light(int patch_num)
@@ -879,10 +878,13 @@ void collect_light()
 }
 void start_radiosity()
 {
+#ifndef USE_RANDOM_VECTORS
+
+
 	for (int i = 0; i < num_patches; i++)
 	{
 		patch_t* p = &patches[i];
-		radiosity[i] = p->sample_light * p->reflectivity * p->area;
+		radiosity[i] = p->sample_light * p->reflectivity * p->area + p->emission * p->area;
 	}
 	for (int i = 0; i < num_bounces; i++)
 	{
@@ -894,6 +896,36 @@ void start_radiosity()
 		}
 		collect_light();
 	}
+#else
+	for (int i = 0; i < num_patches; i++) {
+		patch_t* p = &patches[i];
+		radiosity[i] = p->sample_light * p->reflectivity + p->emission;
+	}
+	for (int i = 0; i < num_bounces; i++)
+	{
+		for (int j = 0; j < num_patches; j++)
+		{
+			vec3 total = vec3(0.0);
+			patch_t* p = &patches[j];
+			total += p->sky_visibility * sky_color;
+
+			for (int t = 0; t < p->num_transfers; t++)
+			{
+				transfer_t* tran = p->transfers + t;
+				total += radiosity[tran->patch_num] * tran->factor;
+			}
+			// Incoming irradiance
+			p->total_light = total;
+		}
+		// Collect light
+		for (int j = 0; j < num_patches; j++)
+		{
+			patch_t* p = &patches[j];
+
+			radiosity[j] = (p->total_light + p->sample_light) * p->reflectivity + p->emission;
+		}
+	}
+#endif // !RANDOM_VECTORS
 
 }
 
@@ -1643,14 +1675,24 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 		//for (int i = 0; i < num_patches; i++) {
 		//	make_transfers(i);
 		//}
+#ifndef USE_RANDOM_VECTORS
 		for (int i = 0; i < amb_cube_transfers.size(); i++) {
 			make_ambient_transfers(i);
 		}
+#endif // !USE_RANDOM_VECTORS
 
 		printf("Finished transfers\n");
 
 		printf("Bouncing light...\n");
 		start_radiosity();
+
+#ifdef USE_RANDOM_VECTORS
+		for (int i = 0; i < amb_cube_transfers.size(); i++) {
+			sample_ambient_cubes(i);
+		}
+
+#endif // USE_RANDOM_VECTORS
+
 	}
 
 	printf("Final light pass...\n");

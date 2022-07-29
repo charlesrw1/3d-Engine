@@ -15,9 +15,12 @@
 
 #include <iostream>
 
+#include "Sampling.h"
 
 Editor::Editor()
 {
+
+
 }
 #define R_BOOLEAN_IMGUI(str, var) 	if (ImGui::RadioButton(str, r->var)) { \
 r->var = !r->var; \
@@ -119,6 +122,22 @@ void Editor::on_render()
 		global_app.r->debug_point(hit.end_pos, vec3(1.f));
 		global_app.r->debug_line(hit.end_pos, hit.end_pos + hit.normal, vec3(0.5, 1.0, 0.0));
 	}
+	
+	vec3 Normals[3];
+	Normals[0] = vec3(0, 1, 0);
+	Normals[1] = normalize(vec3(1, 1, 0));
+	Normals[2] = normalize(vec3(0.3, -0.8, -0.4));
+	for (int i = 0; i < 3; i++)
+	{
+		for (int j = 0; j < 30; j++) {
+			vec3 dir = sample_hemisphere_cos(Normals[i], j, 30);
+			
+			r->debug_line(vec3(0, 0, i * 5), vec3(0, 0, i * 5) + dir, (dir + vec3(1)) / 2.f);
+		}
+	}
+
+
+
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

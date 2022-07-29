@@ -200,5 +200,8 @@
     <ClInclude Include="source\Voxelizer.h">
       <Filter>Source Files\Lightmapping</Filter>
     </ClInclude>
+    <ClInclude Include="source\Sampling.h">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

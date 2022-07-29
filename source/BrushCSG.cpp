@@ -28,7 +28,10 @@ static bool aabb_intersect(vec3& min1, vec3& max1, vec3& min2, vec3& max2)
 	}
 	return true;
 }
-
+static float box_size(vec3 min, vec3 max)
+{
+	return (max.x - min.x) * (max.y - min.y) * (max.z - min.z);
+}
 void MapParser::CSG_union()
 {
 	std::vector<mapface_t> clipped_faces;
@@ -55,7 +58,6 @@ void MapParser::CSG_union()
 					if (!aabb_intersect(clip_min, clip_max, other_min, other_max)) {
 						continue;
 					}
-
 					clip_to_brush(brushes.at(j), clip_on_plane, final_faces);
 				}
 				else {
@@ -132,6 +134,8 @@ std::vector<mapface_t> MapParser::clip_to_list(const mapbrush_t& a, int start_in
 		case BACK:
 			// no conlusion
 			// continue
+
+
 			break;
 		case ON_PLANE: {
 			float angle = dot(faces.at(a.face_start+i).plane.normal, b.plane.normal) - 1.f;
@@ -147,10 +151,10 @@ std::vector<mapface_t> MapParser::clip_to_list(const mapbrush_t& a, int start_in
 		}break;
 		case SPLIT:
 		{
+			
 			mapface_t front, back;
 			split_face(faces.at(a.face_start+i), b, front, back);
-			assert(front.plane.d != NAN);
-			assert(back.plane.d !=  NAN);
+			
 			if (i == a.num_faces - 1) {
 				// discard back clipped
 				result.push_back(front);

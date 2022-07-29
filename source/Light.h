@@ -47,6 +47,8 @@ struct patch_t
 	transfer_t* transfers = nullptr;
 	int num_transfers = 0;
 
+	float sky_visibility = 0.0;
+
 	vec3 center;
 	int face;
 	float area = 0;
@@ -57,6 +59,14 @@ struct patch_t
 	int num_samples = 0;
 
 	vec3 total_light = vec3(0);
+	vec3 emission = vec3(0.0);
+
+	// Variance tracking variables
+	float mean_dist2 = 0;
+	// mean = total_light
+	int count = 0;
+	// variance = mean_dist2 / (count-1)
+
 
 	patch_t* next = nullptr;
 	bool is_sky = false;

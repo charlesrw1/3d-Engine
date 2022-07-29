@@ -66,6 +66,7 @@
     <ClInclude Include="source\editor.h" />
     <ClInclude Include="source\Geometry.h" />
     <ClInclude Include="source\BSPtree.h" />
+    <ClInclude Include="source\Sampling.h" />
     <ClInclude Include="source\Voxelizer.h" />
     <ClInclude Include="source\Light.h" />
     <ClInclude Include="source\MapParser.h" />
