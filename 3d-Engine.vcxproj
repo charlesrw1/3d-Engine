@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="PATCH.cpp" />
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="source\BrushCSG.cpp" />
     <ClCompile Include="source\BSPtree.cpp" />
@@ -49,6 +50,7 @@
     <ClCompile Include="source\WorldGeometry.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="PATCH.h" />
     <ClInclude Include="source\app.h" />
     <ClInclude Include="source\camera.h" />
     <ClInclude Include="source\deps\include\glad\glad.h" />

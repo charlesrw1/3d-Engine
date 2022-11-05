@@ -1,11 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommandArguments>-lmdensity 8.0 -patchgrid 0.5 -samples 200 -outdoors outdoors.map</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-lmdensity 4.0 -patchgrid 1.0 -norad -quakefmt e1m1.map</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>-lmdensity 8.0 -patchgrid 0.5 -samples 200 -outdoors outdoors.map</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-lmdensity 4.0 -patchgrid 1.0 -norad -quakefmt e1m1.map</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

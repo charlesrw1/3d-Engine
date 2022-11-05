@@ -248,10 +248,10 @@ void Renderer::world_pass(SceneData& scene)
 				continue;
 			
 
-			for (int i = 0; i < 6; i++) {
-				ambientcube_shade.set_vec3(("ambient_cube[" + std::to_string(i) + "]").c_str(),
-					global_app.world.ambient_grid.at(obj->closest_ambient_cube).axis_colors[i]);
-			}
+			//for (int i = 0; i < 6; i++) {
+			//	ambientcube_shade.set_vec3(("ambient_cube[" + std::to_string(i) + "]").c_str(),
+			//		global_app.world.ambient_grid.at(obj->closest_ambient_cube).axis_colors[i]);
+			//}
 
 
 

@@ -108,6 +108,9 @@
     <ClCompile Include="source\Voxelizer.cpp">
       <Filter>Source Files\Lightmapping</Filter>
     </ClCompile>
+    <ClCompile Include="PATCH.cpp">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\app.h">
@@ -201,6 +204,9 @@
       <Filter>Source Files\Lightmapping</Filter>
     </ClInclude>
     <ClInclude Include="source\Sampling.h">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClInclude>
+    <ClInclude Include="PATCH.h">
       <Filter>Source Files\Lightmapping</Filter>
     </ClInclude>
   </ItemGroup>

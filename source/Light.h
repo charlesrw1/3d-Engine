@@ -1,6 +1,7 @@
 #ifndef LIGHT_H
 #define LIGHT_H
 #include "geometry.h"
+#include <vector>
 
 struct LightmapSettings
 {
@@ -14,12 +15,15 @@ struct LightmapSettings
 	bool no_direct = false;
 	float sample_ofs = 0.05;
 
-
 	vec3 default_reflectivity = vec3(0.3);
 };
 
 
+
+
+
 struct worldmodel_t;
+
 void create_light_map(worldmodel_t* wm, LightmapSettings settings);
 void draw_lightmap_debug();
 void draw_lightmap_patches();
@@ -69,7 +73,27 @@ struct patch_t
 };
 
 
-int light_main(int argc, char** argv);
+enum light_type_t
+{
+	LIGHT_POINT,
+	LIGHT_SURFACE,
+	LIGHT_SPOT,
+	LIGHT_SUN,
+};
+struct light_t
+{
+	vec3 pos;
+	vec3 color;
+	vec3 normal;	// sun/spot direction
+	float width;	// spot cone width
+
+	light_type_t type;
+
+	float brightness;
+	int face_idx;	// area lights
+};
+
+extern vec3 CalcDirectLightingAtPoint(vec3 point, vec3 normal);
 
 #endif // !LIGHT_H
 

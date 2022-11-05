@@ -42,27 +42,6 @@ struct facelight_t
 
 facelight_t facelights[0x10000];
 
-enum light_type_t
-{
-	LIGHT_POINT,
-	LIGHT_SURFACE,
-	LIGHT_SPOT,
-
-	LIGHT_SUN,
-};
-struct light_t
-{
-	vec3 pos;
-	vec3 color;
-	vec3 normal;	// sun/spot direction
-	float width;	// spot cone width
-
-	light_type_t type;
-
-	float brightness;
-	int face_idx;	// area lights
-};
-
 std::vector<light_t> lights;
 static int env_light_index = -1;
 vec3 sky_color = vec3(0);// vec3(0.5, 0.7, 1.0);
@@ -94,6 +73,10 @@ bool test_patch_visibility = true;
 vec3 default_reflectivity = vec3(0.3);
 // Dont add direct lighting to final lightmap, still gets computed for radiosity patch reflectivity 
 bool no_direct = false;
+
+float dirt_dist = 5.0;
+int num_dirt_vectors = 1;
+bool using_dirt = false;
 
 // Use random vectors vs exact for patch-to-patch form factor
 #define USE_RANDOM_VECTORS
@@ -710,11 +693,14 @@ void free_patches()
 	amb_cube_transfers.clear();
 }
 
-
+#define IS_OCCLUDED 1
+#define OCCLUDER_EDGE 2
 const int MAX_POINTS = 256 * 256;
 struct LightmapState
 {
 	vec3 face_middle = vec3(0);
+	vec3 plane_dir;
+	float plane_d;
 
 	vec3 tex_normal;
 	vec3 tex_origin = vec3(0);
@@ -723,17 +709,22 @@ struct LightmapState
 	vec3 tex_to_world[2];	// world_pos = tex_origin + u * tex_to_world[0]
 
 	int numpts = 0;
+	int height = 0;
+	int width = 0;
+
 
 	int tex_min[2];
 	int tex_size[2];
 	float exact_min[2];
 	float exact_max[2];
 
-	facelight_t* fl=nullptr;
+	//facelight_t* fl=nullptr;
 
 	// For supersampling, final facelight_t points are the center of the 4 (they might get shifted around)
-	std::vector<vec3> sample_points[4];
-	int num_samples = 4;
+	std::vector<vec3> sample_points;
+	std::vector<float> occlusion;
+	std::vector<unsigned char> occluded;
+	std::vector<vec3> pixel_colors;
 
 	int surf_num = 0;
 	face_t* face = nullptr;
@@ -825,7 +816,6 @@ void calc_extents(LightmapState& l)
 
 		l.face_middle += verts[l.face->v_start + i];
 
-
 		for (int j = 0; j < 2; j++) {
 
 			float val = dot(verts[l.face->v_start + i], ti->axis[j]);
@@ -870,15 +860,18 @@ void calc_points(LightmapState& l, Image& img)
 	}
 	total_pixels += l.numpts;
 
-	l.fl->height = h;
-	l.fl->width = w;
+//	l.fl->height = h;
+//	l.fl->width = w;
+//
+//	l.fl->num_pixels = l.numpts;
+//	l.fl->num_points = l.numpts;
 
-	l.fl->num_pixels = l.numpts;
-	l.fl->num_points = l.numpts;
-
-	for (int i = 0; i < l.num_samples; i++) {
-		l.sample_points[i].resize(l.numpts);
-	}
+	l.sample_points.resize(l.numpts);
+	l.pixel_colors.resize(l.numpts,vec3(0));
+	l.occlusion.resize(l.numpts,0);
+	l.occluded.resize(l.numpts,0);
+	l.height = h;
+	l.width = w;
 
 	img.height = h;
 	img.width = w;
@@ -893,18 +886,18 @@ void calc_points(LightmapState& l, Image& img)
 		wind.add_vert(verts[f->v_start + i]);
 	}
 
-	l.fl->pixel_colors = new vec3[l.numpts];
-	l.fl->sample_points = new vec3[l.numpts];
+	//l.fl->pixel_colors = new vec3[l.numpts];
+	//l.fl->sample_points = new vec3[l.numpts];
 
 	vec3 face_mid = l.face_middle + l.face->plane.normal * 0.01f;
 
-	for (int s = 0; s < l.num_samples; s++) {
+	//for (int s = 0; s < l.num_samples; s++) {
 		int top_point = 0;
 		for (int y = 0; y < h; y++) {
 			for (int x = 0; x < w; x++) {
 				float ofs[2];
-				ofs[0] = (l.num_samples == 1) ? 0 : sample_ofs[s][0];
-				ofs[1] = (l.num_samples == 1) ? 0 : sample_ofs[s][1];
+				ofs[0] = 0;
+				ofs[1] = 0;
 
 				float u = start_u + (x)*step[0] + ofs[0];
 				float v = start_v + (y)*step[1] + ofs[1];
@@ -918,25 +911,28 @@ void calc_points(LightmapState& l, Image& img)
 				//			no, point is good
 				//			yes, find closest point on face winding, move sample to that position
 
-				if (!wind.point_inside(point)) {
 					auto trace_res = global_world.tree.test_ray_fast(point, face_mid);
-					if (trace_res.hit) {
-						point = wind.closest_point_on_winding(point);
-					}
+				if (!wind.point_inside(point)||trace_res.hit) {
+					//if (trace_res.hit) {
+					//	point = wind.closest_point_on_winding(point);
+					//}
+					l.occluded[top_point++] = 1;
+					continue;
 				}
 
 				if (top_point >= MAX_POINTS) {
 					l.numpts = MAX_POINTS - 1;
+					l.height = y - 1;
 					img.height = y - 1;
-					l.fl->height = y - 1;
+					//l.fl->height = y - 1;
 					goto face_too_big;
 				}
 				assert(top_point < MAX_POINTS);
-				l.sample_points[s][top_point++] = point;
+				l.sample_points[top_point++] = point;
 			}
 		}
 	face_too_big:;
-	}
+	//}
 }
 
 void calc_vectors(LightmapState& l)
@@ -968,6 +964,121 @@ void calc_vectors(LightmapState& l)
 	l.tex_origin += l.tex_normal * dist;
 }
 
+void FloodFillOccludedSamples(LightmapState* l)
+{
+	for (int y = 0; y < l->height; y++) {
+		for (int x = 0; x < l->width; x++) {
+			const int i = y * l->width + x;
+			if (!(l->occluded[i]&IS_OCCLUDED))
+				continue;
+			vec3 sum = vec3(0);
+			int sum_cnt = 0;
+			for (int y0 = -2; y0 <= 2; y0++) {
+				for (int x0 = -2; x0 <= 2; x0++) {
+					int y1 = y + y0;
+					int x1 = x + x0;
+					if (y1 < 0 || y1 >= l->height || x1 < 0 || x1 >= l->width)
+						continue;
+					const int j = y1 * l->width + x1;
+					if (!(l->occluded[j]&IS_OCCLUDED)) {
+						sum += l->pixel_colors[j];
+						sum_cnt++;
+
+						l->occluded[j] = OCCLUDER_EDGE;
+					}
+
+				}
+			}
+			if (sum_cnt > 0)
+				l->pixel_colors[i] = sum / (float)sum_cnt;
+			else
+				l->pixel_colors[i] = vec3(0, 1, 1);
+		}
+	}
+}
+void BoxBlur(LightmapState* l,int radius)
+{
+	std::vector<vec3> final_colors;
+	final_colors.resize(l->numpts);
+	for (int y = 0; y < l->height; y++) {
+		for (int x = 0; x < l->width; x++) {
+			const int i = y * l->width + x;
+			// Edges must maintain their sample colors or the seams become obvious
+			if (x == 0 || x == l->width - 1 || y == 0 || y == l->height - 1 || l->occluded[i]&OCCLUDER_EDGE) {
+				final_colors[i] = l->pixel_colors[i];
+				continue;
+			}
+			vec3 sum_color = vec3(0);
+			float sum_weight = 0;
+			for (int y0 = -radius; y0 <= radius; y0++) {
+				for (int x0 = -radius; x0 <= radius; x0++) {
+					int y1 = clamp(y + y0,0,l->height-1);
+					int x1 = clamp(x + x0,0,l->width-1);
+					const int j = y1 * l->width + x1;
+					if (!(l->occluded[j]&IS_OCCLUDED)) {
+						sum_color += l->pixel_colors[j];
+						sum_weight += 1.f;
+					}
+				}
+			}
+			if (sum_weight > 0)
+				final_colors[i] = sum_color / sum_weight;
+			else
+				final_colors[i] = vec3(0, 1, 1);
+		}
+	}
+	l->pixel_colors = std::move(final_colors);
+}
+
+void CalculateDirtMap(LightmapState* l)
+{
+	for (int j = 0; j < l->numpts; j++) {
+		if (l->occluded[j])
+			continue;
+
+		vec3 sample_pos = l->sample_points[j];
+		float occlusion = 0;
+		for (int i = 0; i < num_dirt_vectors; i++) {
+			vec3 dirtvec = sample_hemisphere_cos(l->face->plane.normal, i, num_dirt_vectors);
+			auto res = global_world.tree.test_ray_fast(sample_pos, sample_pos + dirtvec * dirt_dist);
+			if (res.hit) {
+				occlusion += min(dirt_dist, res.length);
+			}
+			else {
+				occlusion += dirt_dist;
+			}
+		}
+		l->occlusion[j] = occlusion / (num_dirt_vectors * dirt_dist);
+	}
+}
+
+void CalcFaceDirectLighting(LightmapState* l, const light_t* light)
+{
+	float plane_dist = l->face->plane.dist(light->pos);
+	if (plane_dist < 0)
+		return;
+	for (int s = 0; s < l->sample_points.size(); s++)
+	{
+		if (l->occluded[s])
+			continue;
+		const vec3 sample_pos = l->sample_points[s];
+		vec3 v = light->pos - sample_pos;
+		float sqred_dist = dot(v, v);
+		if (sqred_dist > light->brightness * light->brightness)
+			continue;
+
+		trace_t res = global_world.tree.test_ray_fast(sample_pos, light->pos, -0.005f, 0.005f);
+		if (res.hit)
+			continue;
+
+		float dist = sqrt(sqred_dist);
+		vec3 dir = v / dist;
+
+		vec3 sample_color = light->color * (max(light->brightness - dist,0.f)/ light->brightness) * dot(dir, l->face->plane.normal);
+		
+		l->pixel_colors[s] += sample_color;
+	}
+}
 void light_face(int num)
 {
 	LightmapState l;
@@ -975,7 +1086,7 @@ void light_face(int num)
 	assert(num < num_faces);
 	l.face = &faces[num];
 	l.surf_num = num;
-	l.fl = &facelights[num];
+	//l.fl = &facelights[num];
 	img.face_num = num;
 
 	texture_info_t* ti = tinfo + l.face->t_info_idx;
@@ -986,21 +1097,24 @@ void light_face(int num)
 	calc_extents(l);
 
 	calc_points(l, img);
+	if(using_dirt)
+		CalculateDirtMap(&l);
 
-	for (int i = 0; i < l.numpts; i++) {
-		l.fl->pixel_colors[i] = vec3(0);
+
+	for (const auto& light : lights) {
+		CalcFaceDirectLighting(&l, &light);
 	}
-	// calc middle points
-	for (int i = 0; i < l.numpts; i++) {
-		vec3 total = vec3(0.f);
-		for (int s = 0; s < l.num_samples; s++) {
-			total += l.sample_points[s][i];
+
+	if (using_dirt) {
+		for (int s = 0; s < l.sample_points.size(); s++) {
+			if (l.occluded[s])continue;
+			l.pixel_colors[s] *= l.occlusion[s];
 		}
-		l.fl->sample_points[i] = total / (float)l.num_samples;
 	}
 
-	float sample_scale = 1 / (float)l.num_samples;
 	for (int j = 0; j < l.numpts; j++) {
+	
+#if 0
 		for (int i = 0; i < lights.size(); i++) {
 			for (int s = 0; s < l.num_samples; s++) {
 				light_t* light = &lights[i];
@@ -1128,7 +1242,9 @@ void light_face(int num)
 		if (enable_radiosity) {
 			add_sample_to_patch(l.fl->sample_points[j], l.fl->pixel_colors[j], num);
 		}
+#endif
 	}
+#if 0
 	if (enable_radiosity) {
 		patch_t* patch = face_patches[num];
 		while (patch)
@@ -1139,6 +1255,33 @@ void light_face(int num)
 			patch = patch->next;
 		}
 	}
+#endif
+
+#if 1
+
+	FloodFillOccludedSamples(&l);
+	BoxBlur(&l, 1);
+
+	img.face_num = num;
+	img.height = l.height;
+	img.width = l.width;
+	img.buffer_start = data_buffer.size();
+	make_space(img.height* img.width);
+
+
+	for (int y = 0; y < img.height; y++) {
+		for (int x = 0; x < img.width; x++) {
+			vec3 total = vec3(0);
+			int added = 0;
+			int offset = y * img.width + x;
+			total = l.pixel_colors[y * img.width + x];
+			total = glm::pow(total, vec3(1.0 / 2.2));
+			add_color(img.buffer_start, offset, total);
+		}
+	}
+
+	images.push_back(img);
+#endif
 
 }
 void final_light_face(int face_num)
@@ -1473,10 +1616,10 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	// Used for random debug colors
 	srand(time(NULL));
 
-	Voxelizer vox(wm, 1.0,2);
-	vox.move_final_samples(ambient_cubes);
-	add_manual_ambient_cubes();
-	amb_cube_transfers.resize(ambient_cubes.size());
+	//Voxelizer vox(wm, 1.0,2);
+	//vox.move_final_samples(ambient_cubes);
+	//add_manual_ambient_cubes();
+	//amb_cube_transfers.resize(ambient_cubes.size());
 
 
 
@@ -1511,7 +1654,10 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	printf("Lighting faces...\n");
 	const brush_model_t* bm = &wm->models[0];	// "worldspawn"
 
-	run_threads_on_function(&light_face, bm->face_start, bm->face_start + bm->face_count);
+	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
+		light_face(i);
+	}
+	//run_threads_on_function(&light_face, bm->face_start, bm->face_start + bm->face_count);
 
 	printf("Total pixels: %u\n", total_pixels);
 	printf("Total raycasts: %u\n", total_rays_cast);
@@ -1532,11 +1678,11 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 		}
 	}
 
-	printf("Final light pass...\n");
-
-	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
-		final_light_face(i);
-	}
+	//printf("Final light pass...\n");
+	//
+	//for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
+	//	final_light_face(i);
+	//}
 
 
 	final_lightmap.resize(lm_width * lm_height * 3, 0);
