@@ -19,39 +19,8 @@ BrushTree brush_tree;
 const BrushTree* GetBrushTree() { return &brush_tree; }
 
 
-
-// --------------------------------
-
-// ------ RADIOSITY ARRAYS ------
-
 std::vector<vec3> radiosity;
-//vec3 radiosity[MAX_PATCHES];	// excindent
-// -------------------------------
-/*
-// -------- SETTINGS --------------
-// how many texels per 1.0 meters/units
-// 32 quake units = 1 my units
-// this is how many actual pixels are in the lightmap, each pixel gets supersampled with 4 additional samples 
-float density_per_unit = 10.f;
-// Determines size of a patch, more patches dramatically slow radiosity lighting time (its O(n^2))
-float patch_grid = 0.5f;
-// Number of bounce iterations, you already pay the price computing form factors so might as well set it high
-int num_bounces = 64;
-// False means direct only
-bool enable_radiosity = true;
-// determine if "outward facing" faces are culled and not computed, helps performance and file space for Quake and indoor maps
-bool inside_map = true;
-// Cast a ray from the patch to the center of a face to prevent light bleeds, breaks on some maps
-bool test_patch_visibility = true;
-// This is sort of hacky, it should be taken from the actual face textures themselves
-vec3 default_reflectivity = vec3(0.3);
-// Dont add direct lighting to final lightmap, still gets computed for radiosity patch reflectivity 
-bool no_direct = false;
 
-float dirt_dist = 5.0;
-int num_dirt_vectors = 25;
-bool using_dirt = false;
-*/
 // Use random vectors vs exact for patch-to-patch form factor
 #define USE_RANDOM_VECTORS
  int NUM_PATCH_RAYCASTS=100;
@@ -66,21 +35,6 @@ static PatchDebugMode cur_mode;
 // ---------------------------------
 
 
-
-
-// ------- AMBIENT CUBE -------------
-struct AmbCubeTransfer
-{
-	struct CubeSide {
-		vec3 total_light = vec3(0.0);
-
-	}sides[6];
-
-	bool inside_wall = false;
-};
-std::vector<vec3> ambient_cubes;
-std::vector<AmbCubeTransfer> amb_cube_transfers;
-// -----------------------------------
 
 // ------------ UTILITIES --------------
 
@@ -128,6 +82,14 @@ struct PackNode
 };
 
 
+struct Sample
+{
+	vec3 color;
+	vec3 position;
+	vec3 normal;
+	bool edge;
+	bool occluded;
+};
 
 struct Image
 {
@@ -136,6 +98,29 @@ struct Image
 
 	int face_num;
 };
+
+class SampleBuffer
+{
+public:
+	void AddImage(Image image) {
+		images.push_back(image);
+	}
+	int MakeSpace(int num_samples) {
+		int start = samples.size();
+		samples.resize(samples.size() + num_samples);
+		return start;
+	}
+	void AddSample(const Image& img, int sample_num, const Sample& sample) {
+		samples[img.buffer_start + sample_num] = sample;
+	}
+
+
+	std::vector<Image> images;
+	std::vector<Sample> samples;
+};
+
+static SampleBuffer sample_buffer;
+
 
 // ---------- LIGHTMAP IMAGE --------
 PackNode* root = nullptr;
@@ -512,23 +497,23 @@ void MakeTransfers(int patch_num)
 			patch->num_transfers++;
 		}
 	}
-	float final_total = 0;
+	
+	// radiosity equation should sum to PI, leftover is the factor that isnt seen by a surface, assume its the sky
+	float temp_sky_vis = max(3.14159f - total,0.f)/3.14159f;
+	if (temp_sky_vis > SKYVIS_THRESHOLD)
+	{
+		float real_sky_vis = GatherSkyVisibility(center_with_offset, plane.normal);
+		
+		total += real_sky_vis*3.14159;
+		
+		patch->sky_visibility = real_sky_vis;
+	}
+	total = max(total, 3.14159f);
+	patch->sky_visibility /= total;
+
+
 	if (patch->num_transfers > 0) {
 		patch->transfers = new transfer_t[patch->num_transfers];
-
-		// radiosity equation should sum to PI, leftover is the factor that isnt seen by a surface, assume its the sky
-		float temp_sky_vis = max(3.14159f - total,0.f)/3.14159f;
-		if (temp_sky_vis > SKYVIS_THRESHOLD)
-		{
-			float real_sky_vis = GatherSkyVisibility(center_with_offset, plane.normal);
-		
-			total += real_sky_vis*3.14159;
-		
-			patch->sky_visibility = real_sky_vis;
-		}
-		total = max(total, 3.14159f);
-		patch->sky_visibility /= total;
-		
 
 		int t_index = 0;
 		transfer_t* t = &patch->transfers[t_index++];
@@ -538,8 +523,6 @@ void MakeTransfers(int patch_num)
 			}
 			t->factor = transfers[i] / total;
 			t->patch_num = i;
-			final_total += t->factor;
-
 			t = &patch->transfers[t_index++];
 			assert(t_index <= patch->num_transfers + 1);
 		}
@@ -1019,20 +1002,50 @@ void CalculateIndirectLighting(LightmapState* l)
 		float total_weight = 0;
 		for (int i = 0; i < indicies.size(); i++) {
 			const patch_t* patch = &patches[patch_tree.points[indicies[i]].patch_index];
-			float angle = dot(world->faces[patch->face].plane.normal, l->face->plane.normal);
-			float dist = length(l->sample_points[s]- patch_tree.points[indicies[i]].GetPoint());
+			vec3 patch_center = patch->center;
+			vec3 patch_n = world->faces[patch->face].plane.normal;
+			float angle = dot(patch_n, l->face->plane.normal);
+			float dist = length(l->sample_points[s]- patch_center);
 			float weight = ((INDIRECT_SAMPLE_RADIUS - dist))/INDIRECT_SAMPLE_RADIUS * angle;
 			if (weight <= 0)
 				continue;
+
+
+			if (config.test_patch_visibility&& dist >= 0.05) {
+				vec3 to_patch = patch_center-l->sample_points[s];
+				float projected = dot(to_patch, l->face->plane.normal);
+				if (projected >= 0) {
+					// Simple LOS test
+					auto res = global_world.tree.test_ray_fast(l->sample_points[s],patch_center);
+					if (res.hit)
+						continue;
+				}
+				else {
+					// Patch is "below the horizon"
+					vec3 a = projected * l->face->plane.normal;
+					vec3 b = to_patch - a;	// orthagonal component
+
+					float test = dot(b, l->face->plane.normal);
+					assert(abs(test) < 0.05);
+
+					auto res = global_world.tree.test_ray_fast(l->sample_points[s],l->sample_points[s]+b);
+					if (res.hit)
+						continue;
+				}
+			}
 
 			total_weight += weight;
 			total_indirect += patch->total_light * weight;
 		}
 		if (total_weight > 0)
 			l->pixel_colors[s] += total_indirect / total_weight;
-		else
-			l->pixel_colors[s] = vec3(0, 1, 0);
-
+		else {
+			// This really shouldn't happen, but it sometimes does
+			if (config.debug_indirect_occluded_samples)
+				l->pixel_colors[s] = vec3(0, 1, 0);
+			else
+				l->occluded[s] = 1;
+		}
 	}
 }
 
@@ -1078,152 +1091,6 @@ void light_face(int num)
 		}
 	}
 
-	for (int j = 0; j < l.numpts; j++) {
-	
-#if 0
-		for (int i = 0; i < lights.size(); i++) {
-			for (int s = 0; s < l.num_samples; s++) {
-				light_t* light = &lights[i];
-				vec3 sample_pos = l.sample_points[s][j];
-				vec3 final_color = vec3(0.0);
-
-				switch (light->type) {
-				case LIGHT_SPOT:
-				case LIGHT_POINT:
-				{
-					vec3 light_p = lights[i].pos;
-					float plane_dist = l.face->plane.distance(light_p);
-					if (plane_dist < 0) {
-						continue;
-					}
-					float sqrd_dist = dot(light_p - sample_pos, light_p - sample_pos);
-					if (sqrd_dist > lights[i].brightness * lights[i].brightness) {
-						continue;
-					}
-					total_rays_cast++;
-					trace_t res = global_world.tree.test_ray_fast(sample_pos, light_p, -0.005f, 0.005f);
-					if (res.hit) {
-						continue;
-					}
-
-					vec3 light_dir = light_p - sample_pos;
-					float dist = length(light_dir);
-					light_dir = normalize(light_dir);
-					float dif = dot(light_dir, l.face->plane.normal);
-					if (dif < 0) {
-						continue;
-					}
-
-					float extra_scale = 1.f;
-					if (light->type == LIGHT_SPOT) {
-						float cos_theta = dot(-light_dir, light->normal);
-						float outer = light->width * 0.90;
-						float epsilon = light->width - outer;
-						extra_scale = clamp((cos_theta - outer) / epsilon, 0.0f, 1.0f);
-					}
-
-					if (lights[i].type == LIGHT_SURFACE) {
-						extra_scale = -dot(lights[i].normal, light_dir);
-						extra_scale = glm::max(extra_scale, 0.f);
-					}
-					float attenuation_factor = ((float)lights[i].brightness / (dist * dist + 0.01)) *(1 - dist/(float)lights[i].brightness);
-					//max(1 / (dist * dist + lights[i].brightness) * (lights[i].brightness - dist), 0.f)
-					final_color = lights[i].color * dif * attenuation_factor * extra_scale;
-				} break;
-				case LIGHT_SURFACE:
-				{
-					const face_t* lface = faces + light->face_idx;
-					if (!lface->plane.classify(sample_pos))
-						continue;
-					// Load verts into winding...
-					winding_t w;
-					for (int v = 0; v < lface->v_count; v++) {
-						w.add_vert(verts[lface->v_start + v]);
-					}
-					vec3 closest = w.closest_point_on_winding(sample_pos);
-					float distsq = dot(closest - sample_pos, closest - sample_pos);
-					if (distsq > light->brightness * light->brightness)
-						continue;
-					vec3 closest_dir = normalize(closest - sample_pos);
-					if (dot(closest_dir, l.face->plane.normal) <= 0)
-						continue;
-
-					float area = w.get_area();
-					int num_surf_samples = ceil(area / (patch_grid * patch_grid));	// arbitrary
-					
-					
-					vec3 accumulate = vec3(0.0);
-					for (int surf_samp = 0; surf_samp < num_surf_samples; surf_samp++) {
-						vec3 point;
-						vec3 dir;
-						if (surf_samp == 0) {
-							point = closest;
-							dir = closest_dir;
-						}
-						else {
-							point = random_point_on_rectangular_face(light->face_idx);
-							dir = normalize(point - sample_pos);
-						}
-
-						point += lface->plane.normal * 0.01f;
-
-						trace_t res = global_world.tree.test_ray_fast(sample_pos, point, -0.005f, 0.005f);
-						if (res.hit) {
-							continue;
-						}
-
-
-						float dist = length(point - sample_pos);
-
-						float dif = dot(dir, l.face->plane.normal);
-						float attenuation_factor = ((float)lights[i].brightness / (dist * dist + 0.01)) * (1 - dist / (float)lights[i].brightness);
-						accumulate += lights[i].color * dif * attenuation_factor;
-					}
-					accumulate /= (float)num_surf_samples;
-					final_color = accumulate;
-				}break;
-				case LIGHT_SUN:
-				{
-					float angle = dot(l.face->plane.normal, -light->normal);
-					if (angle <= 0)
-						continue;
-					total_rays_cast++;
-					trace_t res = global_world.tree.test_ray_fast(sample_pos, sample_pos + (-light->normal * 300.f));
-					// If it traces to the sun, it should hit a skybox face
-					if (res.hit) {
-						face_t* face = faces + res.face;
-						texture_info_t* ti = tinfo + face->t_info_idx;
-						if (!(ti->flags & SURF_SKYBOX))
-							continue;
-					}
-					final_color = light->color * angle * (float)light->brightness;
-				} break;
-				default:
-					break;
-				}
-
-				l.fl->pixel_colors[j] += final_color*sample_scale;
-			}
-		}
-		if (enable_radiosity) {
-			add_sample_to_patch(l.fl->sample_points[j], l.fl->pixel_colors[j], num);
-		}
-#endif
-	}
-#if 0
-	if (enable_radiosity) {
-		patch_t* patch = face_patches[num];
-		while (patch)
-		{
-			if (patch->num_samples > 0) {
-				patch->sample_light /= patch->num_samples;
-			}
-			patch = patch->next;
-		}
-	}
-#endif
-
-#if 1
 
 	FloodFillOccludedSamples(&l);
 	//BoxBlur(&l, 4);
@@ -1233,7 +1100,7 @@ void light_face(int num)
 	img.width = l.width;
 	img.buffer_start = data_buffer.size();
 	make_space(img.height* img.width);
-
+	//img.buffer_start = sample_buffer.MakeSpace(img.height*img.width);
 
 	for (int y = 0; y < img.height; y++) {
 		for (int x = 0; x < img.width; x++) {
@@ -1247,7 +1114,6 @@ void light_face(int num)
 	}
 
 	images.push_back(img);
-#endif
 
 }
 
@@ -1418,12 +1284,13 @@ void mark_bad_faces()
 void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 {
 	config = settings;
-	config.using_dirt = true;
-	config.no_direct = true;
-	config.enable_radiosity = true;
+	config.using_dirt = false;
+	config.no_direct = false;
+	config.enable_radiosity = false;
 	config.dirt_gain = 2.0;
 	config.dirt_dist = 8.0;
-	config.num_dirt_vectors = 50;
+	config.num_dirt_vectors = 25;
+	config.test_patch_visibility = false;
 
 	//patch_grid = settings.patch_grid;
 	//density_per_unit = settings.pixel_density;

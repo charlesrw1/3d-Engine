@@ -35,6 +35,7 @@ struct LightmapSettings
 
 	/* Debugging */
 	bool debug_dirt = false;
+	bool debug_indirect_occluded_samples = true;
 };
 extern LightmapSettings config;
 

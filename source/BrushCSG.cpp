@@ -106,7 +106,7 @@ void MapParser::clip_to_brush(const mapbrush_t& b, bool clip_to_plane, std::vect
 	temp_list.reserve(final_faces.size());
 	for (int i = 0; i < final_faces.size(); i++) {
 		auto clipped_brush_faces = clip_to_list(b, 0, final_faces.at(i), clip_to_plane);
-		if (clipped_brush_faces.size() <= 1)
+		if (clipped_brush_faces.size() <= 2)
 			temp_list.insert(temp_list.end(), clipped_brush_faces.begin(), clipped_brush_faces.end());
 		else
 			temp_list.push_back(final_faces.at(i));
