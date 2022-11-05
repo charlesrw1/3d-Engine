@@ -3,13 +3,21 @@
 #include "geometry.h"
 #include <vector>
 
+
 struct LightmapSettings
 {
 	int samples_per_patch = 100;
-	float patch_grid = 2.f;
+
+	// how many texels per 1.0 meters/units
+	// 32 quake units = 1 my units
 	float pixel_density = 4.f;
+	// Determines size of a patch, more patches dramatically slow radiosity lighting time (its O(n^2))
+	float patch_grid = 2.f;
+	// Number of bounce iterations, you already pay the price computing form factors so might as well set it high
 	int num_bounces = 64;
+
 	bool enable_radiosity = true;
+	// Determines if "outside" faces are removed with a simple raycast 
 	bool inside_map = true;
 	bool test_patch_visibility = true;
 	bool no_direct = false;
@@ -17,9 +25,16 @@ struct LightmapSettings
 
 	vec3 default_reflectivity = vec3(0.3);
 
-	float dirt_dist = 5.0;
-	int num_dirt_vectors = 25;
+	// Dirt = ambient occlusion
+	float dirt_dist = 8.0;	// dist=raycast length
+	float dirt_scale = 1.0;	// scale=scales occlusion
+	float dirt_gain = 1.0;	// gain= exponential multiplier
+	int num_dirt_vectors = 25;	// number of raycasts for calculating dirt
 	bool using_dirt = false;
+
+
+	/* Debugging */
+	bool debug_dirt = false;
 };
 extern LightmapSettings config;
 

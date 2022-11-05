@@ -5,6 +5,7 @@
 std::vector<patch_t> patches;
 std::vector<int> face_patches;
 
+
 static void PatchForFace(int face_num)
 {
 	const face_t* face = &GetWorld()->faces[face_num];

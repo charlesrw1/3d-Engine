@@ -9,7 +9,7 @@
 #include "Sampling.h"
 #include "BVHTREE.h"
 
-const worldmodel_t* world;
+worldmodel_t* world;
 const worldmodel_t* GetWorld() { return world; }
 
 LightmapSettings config;
@@ -19,32 +19,13 @@ BrushTree brush_tree;
 const BrushTree* GetBrushTree() { return &brush_tree; }
 
 
-face_t* faces;
-int num_faces;
-
-const vec3* verts;
-int num_verts;
-
-texture_info_t* tinfo;
-int num_tinfo;
-
-//std::vector<patch_t> patches;
-
-#define MAX_PATCHES 0x10000
-
-//patch_t patches[MAX_PATCHES];
-//int num_patches = 0;
-
-//patch_t* face_patches[MAX_PATCHES];
-
-std::string* tex_strings;
-int num_tex_strings;
-
 
 // --------------------------------
 
-// ------ RADIOSITY ARRAYS -------
-vec3 radiosity[MAX_PATCHES];	// excindent
+// ------ RADIOSITY ARRAYS ------
+
+std::vector<vec3> radiosity;
+//vec3 radiosity[MAX_PATCHES];	// excindent
 // -------------------------------
 /*
 // -------- SETTINGS --------------
@@ -85,16 +66,6 @@ static PatchDebugMode cur_mode;
 // ---------------------------------
 
 
-// -------- COPLANAR DATA ----------
-struct planeneighbor_t
-{
-	planeneighbor_t* next = nullptr;
-	int face = 0;
-};
-static int num_planes = 0;
-planeneighbor_t planes[MAX_PATCHES];
-int index_to_plane_list[MAX_PATCHES];
-// ----------------------------------
 
 
 // ------- AMBIENT CUBE -------------
@@ -184,14 +155,14 @@ bool vec3_compare(vec3& v1, vec3& v2, float epsilon)
 // Assumes face is rectangular
 vec3 random_point_on_rectangular_face(int face_idx)
 {
-	face_t* f = faces + face_idx;
-	vec3 V0 = verts[f->v_start] - verts[f->v_start + 1];
-	vec3 V1 = verts[f->v_start + 1] - verts[f->v_start + 2];
+	const face_t* f = &world->faces[face_idx];
+	vec3 V0 = world->verts[f->v_start] - world->verts[f->v_start + 1];
+	vec3 V1 = world->verts[f->v_start + 1] - world->verts[f->v_start + 2];
 
 	float u = random_float();
 	float v = random_float();
 
-	return verts[f->v_start + 2] + u * V0 + v * V1;
+	return world->verts[f->v_start + 2] + u * V0 + v * V1;
 }
 
 
@@ -349,7 +320,7 @@ void create_patch_view(PatchDebugMode mode)
 			color = vec3(p->num_transfers * 2.f / (patches.size()));
 			break;
 		case PDM::RADCOLOR:
-			color = p->total_light;
+			color =  pow(p->total_light,vec3(1/2.2f));
 			break;
 		}
 		for (int i = 0; i < w->num_verts-2; i++) {
@@ -476,6 +447,26 @@ void start_radiosity()
 
 }
 #endif
+
+const int NUM_SKY_SAMPLES = 36;
+const float SKY_DISTANCE = 300.f;
+
+float GatherSkyVisibility(vec3 p, vec3 N)
+{
+	int sky_hit = 0;
+	for (int i = 0; i < NUM_SKY_SAMPLES; i++)
+	{
+		vec3 direction = sample_hemisphere_cos(N, i, NUM_SKY_SAMPLES-1);
+		trace_t res = global_world.tree.test_ray_fast(p, p + direction * SKY_DISTANCE);
+		if (!res.hit|| world->t_info[world->faces[res.face].t_info_idx].flags & SURF_SKYBOX)
+			sky_hit++;
+
+	}
+	return sky_hit / (float)NUM_SKY_SAMPLES;
+}
+
+const float SKYVIS_THRESHOLD = 0.1;
+
 std::vector<float> transfers;
 void MakeTransfers(int patch_num)
 {
@@ -483,7 +474,7 @@ void MakeTransfers(int patch_num)
 	if (patch->occluded)
 		return;
 
-	plane_t plane = faces[patch->face].plane;
+	plane_t plane = world->faces[patch->face].plane;
 	const int i = patch_num;
 	float total = 0;
 	vec3 center_with_offset = patch->center + plane.normal * 0.01f;
@@ -505,7 +496,7 @@ void MakeTransfers(int patch_num)
 
 		float dist_sq = dot(other->center - patch->center, other->center - patch->center);
 
-		plane_t* planej = &faces[other->face].plane;
+		const plane_t* planej = &world->faces[other->face].plane;
 		float angj = -dot(dir, planej->normal);
 		float factor = (angj * angi * other->area) / (dist_sq);
 		if (factor <= 0.00005)
@@ -525,8 +516,19 @@ void MakeTransfers(int patch_num)
 	if (patch->num_transfers > 0) {
 		patch->transfers = new transfer_t[patch->num_transfers];
 
-		patch->sky_visibility = max(3.14159f - total,0.f)/3.14159f;
+		// radiosity equation should sum to PI, leftover is the factor that isnt seen by a surface, assume its the sky
+		float temp_sky_vis = max(3.14159f - total,0.f)/3.14159f;
+		if (temp_sky_vis > SKYVIS_THRESHOLD)
+		{
+			float real_sky_vis = GatherSkyVisibility(center_with_offset, plane.normal);
+		
+			total += real_sky_vis*3.14159;
+		
+			patch->sky_visibility = real_sky_vis;
+		}
 		total = max(total, 3.14159f);
+		patch->sky_visibility /= total;
+		
 
 		int t_index = 0;
 		transfer_t* t = &patch->transfers[t_index++];
@@ -542,7 +544,6 @@ void MakeTransfers(int patch_num)
 			assert(t_index <= patch->num_transfers + 1);
 		}
 			
-		// radiosity equation should sum to PI, leftover is the factor that isnt seen by a surface, assume its the sky
 	}
 }
 
@@ -555,6 +556,8 @@ void FreePatches()
 
 void RadWorld()
 {
+	radiosity.resize(patches.size());
+
 	for (int i = 0; i < patches.size(); i++) {
 		patch_t* p = &patches[i];
 		radiosity[i] = p->sample_light * p->reflectivity + p->emission;
@@ -585,6 +588,33 @@ void RadWorld()
 
 	}
 }
+
+
+struct PatchPointType
+{
+	int patch_index{};
+	vec3 GetPoint() const {
+		return patches[patch_index].center;
+	}
+};
+
+static PointTree<PatchPointType> patch_tree;
+
+void CreatePatchTree()
+{
+	for (int i = 0; i < patches.size(); i++) {
+		PatchPointType ppt;
+		ppt.patch_index = i;
+
+		patch_tree.points.push_back(ppt);
+	}
+
+	patch_tree.Build();
+}
+
+
+
+
 
 #define IS_OCCLUDED 1
 #define OCCLUDER_EDGE 2
@@ -666,7 +696,7 @@ void add_sample_to_patch(vec3 point, vec3 color, int face_num)
 
 void calc_extents(LightmapState& l)
 {
-	texture_info_t* ti = &tinfo[l.face->t_info_idx];
+	const texture_info_t* ti = &world->t_info[l.face->t_info_idx];
 	// Calc face min and max
 	float min[2], max[2];
 	min[0] = min[1] = 50000;
@@ -675,11 +705,11 @@ void calc_extents(LightmapState& l)
 	l.face_middle = vec3(0);
 	for (int i = 0; i < vcount; i++) {
 
-		l.face_middle += verts[l.face->v_start + i];
+		l.face_middle += world->verts[l.face->v_start + i];
 
 		for (int j = 0; j < 2; j++) {
 
-			float val = dot(verts[l.face->v_start + i], ti->axis[j]);
+			float val = dot(world->verts[l.face->v_start + i], ti->axis[j]);
 			if (val < min[j]) {
 				min[j] = val;
 			}
@@ -744,7 +774,7 @@ void calc_points(LightmapState& l, Image& img)
 	const face_t* f = l.face;
 	winding_t wind;
 	for (int i = 0; i < f->v_count; i++) {
-		wind.add_vert(verts[f->v_start + i]);
+		wind.add_vert(world->verts[f->v_start + i]);
 	}
 
 	//l.fl->pixel_colors = new vec3[l.numpts];
@@ -800,7 +830,7 @@ void calc_points(LightmapState& l, Image& img)
 void calc_vectors(LightmapState& l)
 {
 	assert(l.face->t_info_idx >= 0 && l.face->t_info_idx < num_tinfo);
-	texture_info_t* ti = &tinfo[l.face->t_info_idx];
+	const texture_info_t* ti = &world->t_info[l.face->t_info_idx];
 
 
 	// face vectors
@@ -835,8 +865,8 @@ void FloodFillOccludedSamples(LightmapState* l)
 				continue;
 			vec3 sum = vec3(0);
 			int sum_cnt = 0;
-			for (int y0 = -2; y0 <= 2; y0++) {
-				for (int x0 = -2; x0 <= 2; x0++) {
+			for (int y0 = -1; y0 <= 1; y0++) {
+				for (int x0 = -1; x0 <= 1; x0++) {
 					int y1 = y + y0;
 					int x1 = x + x0;
 					if (y1 < 0 || y1 >= l->height || x1 < 0 || x1 >= l->width)
@@ -891,7 +921,13 @@ void BoxBlur(LightmapState* l,int radius)
 	}
 	l->pixel_colors = std::move(final_colors);
 }
-
+float GetDirtValue(float occlusion)
+{
+	float out = pow(occlusion, config.dirt_gain);
+	out *= config.dirt_scale;
+	out = clamp(out,0.f, 1.f);
+	return out;
+}
 void CalculateDirtMap(LightmapState* l)
 {
 	for (int j = 0; j < l->numpts; j++) {
@@ -964,17 +1000,53 @@ void CalcFaceDirectLighting(LightmapState* l, const light_t* light)
 		l->pixel_colors[s] += sample_color;
 	}
 }
+
+const float INDIRECT_SAMPLE_RADIUS = 3.0;
+
+void CalculateIndirectLighting(LightmapState* l)
+{
+	std::vector<int> indicies;
+	indicies.reserve(16);
+	for (int s = 0; s < l->sample_points.size(); s++)
+	{
+		if (l->occluded[s])
+			continue;
+		patch_tree.PointsInRadius(l->sample_points[s], INDIRECT_SAMPLE_RADIUS, indicies);
+
+		// Determine contribution
+
+		vec3 total_indirect = vec3(0);
+		float total_weight = 0;
+		for (int i = 0; i < indicies.size(); i++) {
+			const patch_t* patch = &patches[patch_tree.points[indicies[i]].patch_index];
+			float angle = dot(world->faces[patch->face].plane.normal, l->face->plane.normal);
+			float dist = length(l->sample_points[s]- patch_tree.points[indicies[i]].GetPoint());
+			float weight = ((INDIRECT_SAMPLE_RADIUS - dist))/INDIRECT_SAMPLE_RADIUS * angle;
+			if (weight <= 0)
+				continue;
+
+			total_weight += weight;
+			total_indirect += patch->total_light * weight;
+		}
+		if (total_weight > 0)
+			l->pixel_colors[s] += total_indirect / total_weight;
+		else
+			l->pixel_colors[s] = vec3(0, 1, 0);
+
+	}
+}
+
 void light_face(int num)
 {
 	LightmapState l;
 	Image img;
 	assert(num < num_faces);
-	l.face = &faces[num];
+	l.face = &world->faces[num];
 	l.surf_num = num;
 	//l.fl = &facelights[num];
 	img.face_num = num;
 
-	texture_info_t* ti = tinfo + l.face->t_info_idx;
+	const texture_info_t* ti = &world->t_info[l.face->t_info_idx];
 	if (l.face->dont_draw)
 		return;
 
@@ -985,15 +1057,24 @@ void light_face(int num)
 	if(config.using_dirt)
 		CalculateDirtMap(&l);
 
-
-	for (const auto& light : LightList()) {
-		CalcFaceDirectLighting(&l, &light);
+	if (!config.no_direct) {
+		for (const auto& light : LightList()) {
+			CalcFaceDirectLighting(&l, &light);
+		}
 	}
 
-	if (config.using_dirt) {
+	if (config.enable_radiosity) {
+		CalculateIndirectLighting(&l);
+	}
+
+	if (config.using_dirt || config.debug_dirt) {
 		for (int s = 0; s < l.sample_points.size(); s++) {
 			if (l.occluded[s])continue;
-			l.pixel_colors[s] *=l.occlusion[s];
+			float val = GetDirtValue(l.occlusion[s]);
+			if (config.debug_dirt)
+				l.pixel_colors[s] = vec3(val);
+			else
+				l.pixel_colors[s] *= val;
 		}
 	}
 
@@ -1145,7 +1226,7 @@ void light_face(int num)
 #if 1
 
 	FloodFillOccludedSamples(&l);
-	BoxBlur(&l, 1);
+	//BoxBlur(&l, 4);
 
 	img.face_num = num;
 	img.height = l.height;
@@ -1169,6 +1250,8 @@ void light_face(int num)
 #endif
 
 }
+
+
 #if 0
 void final_light_face(int face_num)
 {
@@ -1215,38 +1298,6 @@ void final_light_face(int face_num)
 }
 #endif
 
-PackNode* insert_imgage(PackNode* pn, const Image* img)
-{
-	if (pn->child[0] != nullptr) {
-		PackNode* new_n = insert_imgage(pn->child[0], img);
-		if (new_n != nullptr) {
-			return new_n;
-		}
-		return insert_imgage(pn->child[1], img);
-	}
-	else {
-		if (pn->image_id != -1)
-			return nullptr;
-		if (pn->rc.height < img->height || pn->rc.width < img->width)
-			return nullptr;
-		if (pn->rc.height == img->height && pn->rc.width == img->width)
-			return pn;
-		pn->child[0] = new PackNode;
-		pn->child[1] = new PackNode;
-		int dw = pn->rc.width - img->width;
-		int dh = pn->rc.height - img->height;
-		if (dw > dh) {
-
-			pn->child[0]->rc = Rectangle(pn->rc.x, pn->rc.y, pn->rc.x + img->width, pn->rc.y + pn->rc.height);
-			pn->child[1]->rc = Rectangle(pn->rc.x + img->width, pn->rc.y, pn->rc.x + pn->rc.width, pn->rc.y + pn->rc.height);
-		}
-		else {
-			pn->child[0]->rc = Rectangle(pn->rc.x, pn->rc.y, pn->rc.x + pn->rc.width, pn->rc.y + img->height);
-			pn->child[1]->rc = Rectangle(pn->rc.x, pn->rc.y + img->height, pn->rc.x + pn->rc.width, pn->rc.y + pn->rc.height);
-		}
-		return insert_imgage(pn->child[0], img);
-	}
-}
 void add_to_buffer(int x, int y, u8 r, u8 g, u8 b)
 {
 	assert(x < lm_width&& y < lm_height);
@@ -1277,14 +1328,77 @@ void append_to_lightmap(const PackNode* pn, const Image* img)
 
 }
 
+
+void pack_rover_method()
+{
+	std::sort(images.begin(), images.end(), [](const Image& i1, const Image& i2)
+		{ return i1.height > i2.height; });
+
+	std::vector<int> allocated(lm_width, 0);
+	for (int i = 0; i < images.size(); i++) {
+		Image* img = &images.at(i);
+
+		int rect_x{};
+		int rect_y{};
+
+		int x, x1;
+		int best_height, best_tentative_height;
+		best_height = lm_height;
+		for (x = 0; x < lm_width - img->width; x++)
+		{
+			best_tentative_height = 0;
+			for (x1 = 0; x1 < img->width; x1++)
+			{
+				if (allocated[x + x1] >= best_height)
+					break;
+				if (allocated[x + x1] > best_tentative_height)
+					best_tentative_height = allocated[x + x1];
+			}
+			if (x1 == img->width)
+			{
+				rect_x = x;
+				rect_y = best_height = best_tentative_height;
+			}
+		}
+		if (best_height + img->height > lm_height)
+		{
+			printf("NOT ENOUGH SPACE IN LIGHTMAP\n");
+			return;
+		}
+
+		for (int k = 0; k < img->width; k++)
+			allocated[rect_x + k] = best_height + img->height;
+
+
+		PackNode temp_fuckshit;
+		temp_fuckshit.rc.x = rect_x;
+		temp_fuckshit.rc.y = rect_y;
+		temp_fuckshit.rc.width = img->width;
+		temp_fuckshit.rc.height = img->height;
+
+		temp_fuckshit.image_id = i;
+		// insert image here
+
+		append_to_lightmap(&temp_fuckshit, &images.at(i));
+
+		face_t* f = &world->faces[images.at(i).face_num];
+		f->lightmap_min[0] = temp_fuckshit.rc.x;
+		f->lightmap_min[1] = temp_fuckshit.rc.y;
+
+		f->lightmap_size[0] = temp_fuckshit.rc.width;
+		f->lightmap_size[1] = temp_fuckshit.rc.height;
+	}
+}
+
+
 void mark_bad_faces()
 {
 	const brush_model_t* bm = &world->models[0];
 	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
-		face_t* f = &faces[i];
+		face_t* f = &world->faces[i];
 		vec3 middle = vec3(0.f);
 		for (int v = 0; v < f->v_count; v++) {
-			middle += verts[f->v_start+v];
+			middle += world->verts[f->v_start+v];
 		}
 		middle /= f->v_count;
 		middle += f->plane.normal * 0.02f;
@@ -1304,7 +1418,12 @@ void mark_bad_faces()
 void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 {
 	config = settings;
-
+	config.using_dirt = true;
+	config.no_direct = true;
+	config.enable_radiosity = true;
+	config.dirt_gain = 2.0;
+	config.dirt_dist = 8.0;
+	config.num_dirt_vectors = 50;
 
 	//patch_grid = settings.patch_grid;
 	//density_per_unit = settings.pixel_density;
@@ -1318,7 +1437,7 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	//RADIALSQRT = sqrt(RADIAL);
 	//NUM_PATCH_RAYCASTS = settings.samples_per_patch;
 
-	GetSky().sky_color = RGBToFloat(124, 138, 203);
+	GetSky().sky_color = RGBToFloat(124, 138, 250);
 	vec3 v = GetSky().sky_color;
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 2; j++) {
@@ -1336,18 +1455,6 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	// Used for random debug colors
 	srand(time(NULL));
 
-	faces = wm->faces.data();
-	num_faces = wm->faces.size();
-
-	verts = wm->verts.data();
-	num_verts = wm->verts.size();
-
-	tinfo = wm->t_info.data();
-	num_tinfo = wm->t_info.size();
-
-	tex_strings = wm->texture_names.data();
-	num_tex_strings = wm->texture_names.size();
-
 	brush_tree.Build(wm,0,wm->map_brushes.size());
 	
 	AddLightEntities(wm);
@@ -1358,7 +1465,9 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 
 	if (config.enable_radiosity) {
 		MakePatches();
+		CreatePatchTree();
 	}
+
 
 
 	printf("Total patches: %d\n", (int)patches.size());
@@ -1366,15 +1475,6 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	u32 start_light_face = SDL_GetTicks();
 	printf("Lighting faces...\n");
 	const brush_model_t* bm = &wm->models[0];	// "worldspawn"
-
-	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
-		light_face(i);
-	}
-	//run_threads_on_function(&light_face, bm->face_start, bm->face_start + bm->face_count);
-
-	printf("Total pixels: %u\n", total_pixels);
-	printf("Total raycasts: %u\n", total_rays_cast);
-	printf("Face lighting time: %u\n", SDL_GetTicks() - start_light_face);
 
 	if (config.enable_radiosity) {
 		printf("Making transfers...\n");
@@ -1387,13 +1487,17 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 		RadWorld();
 	}
 
-	//printf("Final light pass...\n");
-	//
-	//for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
-	//	final_light_face(i);
-	//}
+	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
+		light_face(i);
+	}
+	//run_threads_on_function(&light_face, bm->face_start, bm->face_start + bm->face_count);
+
+	printf("Total pixels: %u\n", total_pixels);
+	printf("Total raycasts: %u\n", total_rays_cast);
+	printf("Face lighting time: %u\n", SDL_GetTicks() - start_light_face);
 
 
+	printf("Writing output...\n");
 	final_lightmap.resize(lm_width * lm_height * 3, 0);
 	for (int i = 0; i < final_lightmap.size(); i += 3) {
 		final_lightmap[i] = 255;
@@ -1401,45 +1505,13 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 		final_lightmap[i+2] = 255;
 
 	}
-
-	printf("Writing output...\n");
-
-	std::sort(images.begin(), images.end(), [](const Image& i1, const Image& i2)
-		{ return i1.height * i1.width > i2.height * i2.width; });
-
-
-	root = new PackNode;
-	root->rc.x = 0;
-	root->rc.y = 0;
-	root->rc.height = lm_height;
-	root->rc.width = lm_width;
-	for (int i = 0; i < images.size(); i++) {
-		Image* img = &images.at(i);
-		img->height;// += 2;
-		img->width;// += 2;
-
-		auto pnode = insert_imgage(root, &images.at(i));
-		if (!pnode) {
-			printf("Not enough room in lightmap\n");
-			exit(1);
-		}
-		pnode->image_id = i;
-		// insert image here
-
-		append_to_lightmap(pnode, &images.at(i));
-
-		face_t* f = &faces[images.at(i).face_num];
-		f->lightmap_min[0] = pnode->rc.x;// +1;
-		f->lightmap_min[1] = pnode->rc.y;// +1;
-
-		f->lightmap_size[0] = pnode->rc.width;// -1;
-		f->lightmap_size[1] = pnode->rc.height;// -1;
-	}
-
-	delete root;
-
+	pack_rover_method();
 	stbi_write_bmp(("resources/textures/" + wm->name + "_lm.bmp").c_str(), lm_width, lm_height, 3, final_lightmap.data());
+	
 	printf("Lightmap finished in %u ms\n", SDL_GetTicks() - start);
+	
+	
+	
 	print_rays_cast();
 	cur_mode = PatchDebugMode::RADCOLOR;
 	create_patch_view(PatchDebugMode::RADCOLOR);
