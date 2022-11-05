@@ -1,5 +1,6 @@
 #include "Light.h"
 #include "WorldGeometry.h"
+#include "BVHTREE.h"
 #include <string>
 std::vector<patch_t> patches;
 std::vector<int> face_patches;
@@ -51,15 +52,6 @@ static void PatchForFace(int face_num)
 	}
 	patches.push_back(p);
 	p.next = -1;
-}
-
-void MakePatches()
-{
-	face_patches.resize(GetWorld()->faces.size());
-	const brush_model_t* bm = &GetWorld()->models[0];
-	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
-		PatchForFace(i);
-	}
 }
 
 static int failed_subdivide = 0;
@@ -127,4 +119,44 @@ void SubdividePatches()
 		SubdividePatch(i);
 	}
 	printf("Failed num: %d\n", failed_subdivide);
+}
+
+void InvalidatePatches()
+{
+	for (int i = 0; i < patches.size(); i++) {
+		vec3 n = GetWorld()->faces[patches[i].face].plane.normal;
+		vec3 p = patches[i].center + n * 0.05f;
+
+		bool inside = GetBrushTree()->PointInside(p);
+		patches[i].occluded = inside;
+	}
+}
+
+void MakePatches()
+{
+	face_patches.resize(GetWorld()->faces.size());
+	const brush_model_t* bm = &GetWorld()->models[0];
+	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
+		PatchForFace(i);
+	}
+	int num = patches.size();	// patches will grow in size
+	for (int i = 0; i < num; i++) {
+		SubdividePatch(i);
+	}
+	printf("Failed num: %d\n", failed_subdivide);
+
+	InvalidatePatches();
+
+	for (int i = 0; i < patches.size(); i++) {
+		if (patches[i].occluded) {
+			patches[i].sample_light = vec3(0, 1, 1);
+			continue;
+		}
+
+		vec3 n = GetWorld()->faces[patches[i].face].plane.normal;
+		vec3 p = patches[i].center + n * 0.005f;
+		vec3 sample = CalcDirectLightingAtPoint(p, n);
+
+		patches[i].sample_light = sample;
+	}
 }

@@ -107,7 +107,7 @@ void AddLightEntities(worldmodel_t* wm)
 		sun_direction.z = -sin(radians((float)angles[1])) * cos(radians((float)angles[0]));
 
 		sky_light.has_sun = true;
-		sky_light.sky_color = vec3(1);
+		//sky_light.sky_color = vec3(1);
 		sky_light.sun_dir = -normalize(sun_direction);
 		break;
 	}

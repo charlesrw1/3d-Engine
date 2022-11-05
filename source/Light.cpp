@@ -13,6 +13,11 @@ const worldmodel_t* world;
 const worldmodel_t* GetWorld() { return world; }
 
 LightmapSettings config;
+const LightmapSettings* GetConfig() { return &config; }
+
+BrushTree brush_tree;
+const BrushTree* GetBrushTree() { return &brush_tree; }
+
 
 face_t* faces;
 int num_faces;
@@ -28,7 +33,7 @@ int num_tinfo;
 #define MAX_PATCHES 0x10000
 
 //patch_t patches[MAX_PATCHES];
-int num_patches = 0;
+//int num_patches = 0;
 
 //patch_t* face_patches[MAX_PATCHES];
 
@@ -37,9 +42,6 @@ int num_tex_strings;
 
 
 // --------------------------------
-
-static BrushTree brush_tree;
-
 
 // ------ RADIOSITY ARRAYS -------
 vec3 radiosity[MAX_PATCHES];	// excindent
@@ -328,7 +330,7 @@ void create_patch_view(PatchDebugMode mode)
 	using VP = VertexP;
 	using PDM = PatchDebugMode;
 	patch_va.init(VAPrim::TRIANGLES);
-	for (int i = 0; i < num_patches; i++) {
+	for (int i = 0; i < patches.size(); i++) {
 		patch_t* p = &patches[i];
 		winding_t* w = &p->winding;
 		vec3 color;
@@ -344,7 +346,7 @@ void create_patch_view(PatchDebugMode mode)
 			color = p->sample_light;
 			break;
 		case PDM::NUMTRANSFERS:
-			color = vec3(p->num_transfers * 2.f / (num_patches));
+			color = vec3(p->num_transfers * 2.f / (patches.size()));
 			break;
 		case PDM::RADCOLOR:
 			color = p->total_light;
@@ -473,14 +475,115 @@ void start_radiosity()
 	}
 
 }
-
 #endif
-void free_patches()
+std::vector<float> transfers;
+void MakeTransfers(int patch_num)
 {
-	for (int i = 0; i < num_patches; i++) {
+	patch_t* patch = &patches[patch_num];
+	if (patch->occluded)
+		return;
+
+	plane_t plane = faces[patch->face].plane;
+	const int i = patch_num;
+	float total = 0;
+	vec3 center_with_offset = patch->center + plane.normal * 0.01f;
+	patch->num_transfers = 0;
+	for (int j = 0; j < patches.size(); j++)
+	{
+		transfers[j] = 0;
+		if (j == i)
+			continue;
+		patch_t* other = &patches[j];
+
+		if (other->occluded)
+			continue;
+
+		vec3 dir = normalize(other->center - patch->center);
+		float angi = dot(dir, plane.normal);
+		if (angi <= 0)
+			continue;
+
+		float dist_sq = dot(other->center - patch->center, other->center - patch->center);
+
+		plane_t* planej = &faces[other->face].plane;
+		float angj = -dot(dir, planej->normal);
+		float factor = (angj * angi * other->area) / (dist_sq);
+		if (factor <= 0.00005)
+			continue;
+		
+		auto res = global_world.tree.test_ray_fast(center_with_offset, other->center + planej->normal * 0.01f);
+		if (res.hit)
+			continue;
+
+		if (factor > 0.00005) {
+			transfers[j] = factor;
+			total += factor;
+			patch->num_transfers++;
+		}
+	}
+	float final_total = 0;
+	if (patch->num_transfers > 0) {
+		patch->transfers = new transfer_t[patch->num_transfers];
+
+		patch->sky_visibility = max(3.14159f - total,0.f)/3.14159f;
+		total = max(total, 3.14159f);
+
+		int t_index = 0;
+		transfer_t* t = &patch->transfers[t_index++];
+		for (int i = 0; i < patches.size(); i++) {
+			if (transfers[i] <= 0.00005) {
+				continue;
+			}
+			t->factor = transfers[i] / total;
+			t->patch_num = i;
+			final_total += t->factor;
+
+			t = &patch->transfers[t_index++];
+			assert(t_index <= patch->num_transfers + 1);
+		}
+			
+		// radiosity equation should sum to PI, leftover is the factor that isnt seen by a surface, assume its the sky
+	}
+}
+
+void FreePatches()
+{
+	for (int i = 0; i < patches.size(); i++) {
 		delete[] patches[i].transfers;
 	}
-	amb_cube_transfers.clear();
+}
+
+void RadWorld()
+{
+	for (int i = 0; i < patches.size(); i++) {
+		patch_t* p = &patches[i];
+		radiosity[i] = p->sample_light * p->reflectivity + p->emission;
+	}
+	for (int i = 0; i < config.num_bounces; i++)
+	{
+		for (int j = 0; j < patches.size(); j++)
+		{
+			vec3 total = vec3(0.0);
+			patch_t* p = &patches[j];
+			total += p->sky_visibility * GetSky().sky_color;
+
+			for (int t = 0; t < p->num_transfers; t++)
+			{
+				transfer_t* tran = p->transfers + t;
+				total += radiosity[tran->patch_num] * tran->factor;
+			}
+			// Incoming irradiance
+			p->total_light = total;
+		}
+		// Collect light
+		for (int j = 0; j < patches.size(); j++)
+		{
+			patch_t* p = &patches[j];
+
+			radiosity[j] = (p->total_light + p->sample_light) * p->reflectivity + p->emission;
+		}
+
+	}
 }
 
 #define IS_OCCLUDED 1
@@ -530,40 +633,7 @@ bool plane_equals(plane_t& p1, plane_t& p2)
 		&& (fabs(p1.normal.y - p2.normal.y) < 0.001f) 
 		&& (fabs(p1.normal.z - p2.normal.z) < 0.001f);
 }
-void find_coplanar_faces()
-{
-	printf("Finding coplanar faces...\n");
-	memset(index_to_plane_list, -1, sizeof(index_to_plane_list));
-	for (int i = 0; i < num_faces; i++) {
-		if (index_to_plane_list[i] != -1)
-			continue;
-		face_t* f = &faces[i];
-		planeneighbor_t* p = &planes[num_planes];
-		planeneighbor_t* last_p = p;
-		p->face = i;
-		int plane_index = num_planes;
-		index_to_plane_list[i] = plane_index;
-		num_planes++;
-		num_unique_planes++;
-		for (int j = i+1; j < num_faces; j++) {
-			if (index_to_plane_list[j] != -1)
-				continue;
-			face_t* of = &faces[j];
 
-			if (!plane_equals(f->plane, of->plane))
-				continue;
-			
-			planeneighbor_t* opn = &planes[num_planes++];
-
-			last_p->next = opn;
-			last_p = opn;
-			opn->face = j;
-
-			index_to_plane_list[j] = plane_index;
-		}
-	}
-	printf("Num unique planes: %d\n", num_unique_planes);
-}
 
 #if 0
 void add_sample_to_patch(vec3 point, vec3 color, int face_num)
@@ -842,6 +912,29 @@ void CalculateDirtMap(LightmapState* l)
 		}
 		l->occlusion[j] = occlusion / (config.num_dirt_vectors * config.dirt_dist);
 	}
+}
+vec3 CalcDirectLightingAtPoint(vec3 point, vec3 normal)
+{
+	const vec3 sample_pos = point;
+	vec3 sum = vec3(0);
+	for (const auto& light : LightList()) {
+		vec3 v = light.pos - sample_pos;
+		if (dot(v, normal) < 0)
+			continue;
+		float sqred_dist = dot(v, v);
+		if (sqred_dist > light.brightness * light.brightness)
+			continue;
+
+		trace_t res = global_world.tree.test_ray_fast(sample_pos, light.pos);
+		if (res.hit)
+			continue;
+
+		float dist = sqrt(sqred_dist);
+		vec3 dir = v / dist;
+
+		sum += light.color * (max(light.brightness - dist, 0.f) / light.brightness) * dot(dir,normal);
+	}
+	return sum;
 }
 
 void CalcFaceDirectLighting(LightmapState* l, const light_t* light)
@@ -1226,6 +1319,7 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	//NUM_PATCH_RAYCASTS = settings.samples_per_patch;
 
 	GetSky().sky_color = RGBToFloat(124, 138, 203);
+	vec3 v = GetSky().sky_color;
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 2; j++) {
 			sample_ofs[i][j] *= settings.sample_ofs;
@@ -1256,21 +1350,18 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 
 	brush_tree.Build(wm,0,wm->map_brushes.size());
 	
+	AddLightEntities(wm);
+
 	if (config.inside_map) {
 		mark_bad_faces();
 	}
 
 	if (config.enable_radiosity) {
-		find_coplanar_faces();
-		//make_patches();
-		//subdivide_patches();
 		MakePatches();
-		SubdividePatches();
 	}
 
-	AddLightEntities(wm);
 
-	printf("Total patches: %u\n", num_patches);
+	printf("Total patches: %d\n", (int)patches.size());
 
 	u32 start_light_face = SDL_GetTicks();
 	printf("Lighting faces...\n");
@@ -1287,13 +1378,13 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 
 	if (config.enable_radiosity) {
 		printf("Making transfers...\n");
-
-		//run_threads_on_function(&make_transfers, 0, num_patches);
-
+		transfers.resize(patches.size());
+		for (int i = 0; i < patches.size(); i++)
+			MakeTransfers(i);
+		//run_threads_on_function(&MakeTransfers, 0, patches.size());
 		printf("Finished transfers\n");
-
 		printf("Bouncing light...\n");
-		//start_radiosity();
+		RadWorld();
 	}
 
 	//printf("Final light pass...\n");
@@ -1353,22 +1444,8 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	cur_mode = PatchDebugMode::RADCOLOR;
 	create_patch_view(PatchDebugMode::RADCOLOR);
 
-	for (int i = 0; i < ambient_cubes.size(); i++) {
-		AmbientCube ac;
-		ac.position = ambient_cubes.at(i);
-		AmbCubeTransfer& act = amb_cube_transfers.at(i);
-		if (act.inside_wall)
-			continue;
-		for (int j = 0; j < 6; j++) {
-			ac.axis_colors[j] = act.sides[j].total_light;
-		}
 
-		wm->ambient_grid.push_back(ac);
-	}
-
-
-
-	free_patches();
+	FreePatches();
 }
 #include "glad/glad.h"
 void draw_lightmap_debug()

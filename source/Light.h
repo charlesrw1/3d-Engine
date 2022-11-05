@@ -65,6 +65,7 @@ struct patch_t
 
 	vec3 reflectivity=vec3(0.9);
 
+	bool occluded = false;
 	vec3 sample_light = vec3(0);
 	int num_samples = 0;
 
@@ -104,8 +105,12 @@ struct Skylight
 	vec3 sky_color=vec3(0);
 };
 
+/* LIGHT.cpp */
+struct BrushTree;
+extern const BrushTree* GetBrushTree();
 extern const worldmodel_t* GetWorld();
 extern vec3 CalcDirectLightingAtPoint(vec3 point, vec3 normal);
+extern const LightmapSettings* GetConfig();
 
 /* LIGHTENT.cpp */
 extern void AddLightEntities(worldmodel_t* world);
@@ -118,7 +123,6 @@ extern Skylight& GetSky();
  /* PATCH.cpp */
  extern std::vector<patch_t> patches;
  extern void MakePatches();
- extern void SubdividePatches();
 
  /* LMBUFFER.cpp */
 
