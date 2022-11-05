@@ -108,7 +108,16 @@
     <ClCompile Include="source\Voxelizer.cpp">
       <Filter>Source Files\Lightmapping</Filter>
     </ClCompile>
-    <ClCompile Include="PATCH.cpp">
+    <ClCompile Include="source\LIGHTENT.cpp">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClCompile>
+    <ClCompile Include="source\PATCH.cpp">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClCompile>
+    <ClCompile Include="source\LMBUFFER.cpp">
+      <Filter>Source Files\Lightmapping</Filter>
+    </ClCompile>
+    <ClCompile Include="source\BVHTREE.cpp">
       <Filter>Source Files\Lightmapping</Filter>
     </ClCompile>
   </ItemGroup>
@@ -206,7 +215,7 @@
     <ClInclude Include="source\Sampling.h">
       <Filter>Source Files\Lightmapping</Filter>
     </ClInclude>
-    <ClInclude Include="PATCH.h">
+    <ClInclude Include="source\BVHTREE.h">
       <Filter>Source Files\Lightmapping</Filter>
     </ClInclude>
   </ItemGroup>

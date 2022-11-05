@@ -16,8 +16,12 @@ struct LightmapSettings
 	float sample_ofs = 0.05;
 
 	vec3 default_reflectivity = vec3(0.3);
-};
 
+	float dirt_dist = 5.0;
+	int num_dirt_vectors = 25;
+	bool using_dirt = false;
+};
+extern LightmapSettings config;
 
 
 
@@ -67,8 +71,8 @@ struct patch_t
 	vec3 total_light = vec3(0);
 	vec3 emission = vec3(0.0);
 
-
-	patch_t* next = nullptr;
+	int self_index;
+	int next=-1;// index into patches
 	bool is_sky = false;
 };
 
@@ -93,7 +97,36 @@ struct light_t
 	int face_idx;	// area lights
 };
 
+struct Skylight
+{
+	bool has_sun = false;
+	vec3 sun_dir=vec3(0,-1,0);
+	vec3 sky_color=vec3(0);
+};
+
+extern const worldmodel_t* GetWorld();
 extern vec3 CalcDirectLightingAtPoint(vec3 point, vec3 normal);
+
+/* LIGHTENT.cpp */
+extern void AddLightEntities(worldmodel_t* world);
+extern std::vector<light_t>& LightList();
+extern Skylight& GetSky();
+
+ vec3 RGBToFloat(unsigned char r, unsigned char b, unsigned char g);
+
+
+ /* PATCH.cpp */
+ extern std::vector<patch_t> patches;
+ extern void MakePatches();
+ extern void SubdividePatches();
+
+ /* LMBUFFER.cpp */
+
+ class Lightmap
+ {
+
+ };
+
 
 #endif // !LIGHT_H
 

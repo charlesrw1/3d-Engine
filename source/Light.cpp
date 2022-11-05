@@ -7,8 +7,12 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include "Sampling.h"
+#include "BVHTREE.h"
 
 const worldmodel_t* world;
+const worldmodel_t* GetWorld() { return world; }
+
+LightmapSettings config;
 
 face_t* faces;
 int num_faces;
@@ -18,42 +22,29 @@ int num_verts;
 
 texture_info_t* tinfo;
 int num_tinfo;
+
+//std::vector<patch_t> patches;
+
 #define MAX_PATCHES 0x10000
 
-patch_t patches[MAX_PATCHES];
+//patch_t patches[MAX_PATCHES];
 int num_patches = 0;
 
-patch_t* face_patches[MAX_PATCHES];
+//patch_t* face_patches[MAX_PATCHES];
 
 std::string* tex_strings;
 int num_tex_strings;
 
-// ---------- LIGHTING ------------
-struct facelight_t
-{
-	int num_points = 0;
-	vec3* sample_points = nullptr;
-
-	int num_pixels = 0;
-	vec3* pixel_colors = nullptr;
-
-	int width=0, height = 0;
-};
-
-facelight_t facelights[0x10000];
-
-std::vector<light_t> lights;
-static int env_light_index = -1;
-vec3 sky_color = vec3(0);// vec3(0.5, 0.7, 1.0);
 
 // --------------------------------
 
+static BrushTree brush_tree;
 
 
 // ------ RADIOSITY ARRAYS -------
 vec3 radiosity[MAX_PATCHES];	// excindent
 // -------------------------------
-
+/*
 // -------- SETTINGS --------------
 // how many texels per 1.0 meters/units
 // 32 quake units = 1 my units
@@ -75,9 +66,9 @@ vec3 default_reflectivity = vec3(0.3);
 bool no_direct = false;
 
 float dirt_dist = 5.0;
-int num_dirt_vectors = 1;
+int num_dirt_vectors = 25;
 bool using_dirt = false;
-
+*/
 // Use random vectors vs exact for patch-to-patch form factor
 #define USE_RANDOM_VECTORS
  int NUM_PATCH_RAYCASTS=100;
@@ -125,7 +116,7 @@ vec3 lerp(const vec3& a, const vec3& b, float percentage)
 	return a + (b - a) * percentage;
 }
 
-vec3 rgb_to_float(uint8 r, uint g, uint b) {
+vec3 RGBToFloat(unsigned char r, unsigned char g, unsigned char b) {
 	return vec3(r / 255.f, g / 255.f, b / 255.f);
 }
 vec3 random_color()
@@ -202,10 +193,11 @@ vec3 random_point_on_rectangular_face(int face_idx)
 }
 
 
- float RADIAL = patch_grid*4.f;
+ float RADIAL = config.patch_grid*4.f;
  float RADIALSQRT = sqrt(RADIAL);
 
 // This is similar to what Valve uses in VRAD, Quake 2's triangulation method was garbage frankly
+#if 0
 class Radial
 {
 public:
@@ -310,6 +302,7 @@ private:
 	float* weights = nullptr;
 	vec3* ambient_light = nullptr;
 };
+#endif
 
 
 void make_space(int pixels)
@@ -330,126 +323,6 @@ void add_color(int start, int offset, vec3 color)
 	}
 }
 
-void patch_for_face(int face_num)
-{
-	const face_t* face = &faces[face_num];
-	texture_info_t* ti = tinfo + face->t_info_idx;
-	std::string* t_string = tex_strings + ti->t_index;
-	// Skybox doesn't make patches
-	if (face->dont_draw || ti->flags & SURF_EMIT) {
-		return;
-	}
-	patch_t* p = &patches[num_patches++];
-	assert(num_patches < 0x10000);
-	p->face = face_num;
-	face_patches[face_num] = p;
-
-	for (int i = 0; i < face->v_count; i++) {
-		p->winding.add_vert(verts[face->v_start + i]);
-	}
-	p->area = p->winding.get_area();
-	p->area = max(p->area, 0.1f);
-	p->center = p->winding.get_center();
-
-
-	if (*t_string == "color/red") {
-		p->reflectivity = rgb_to_float(237, 28, 36);
-	}
-	else if (*t_string == "color/green") {
-		p->reflectivity = rgb_to_float(34,177,76);
-	}
-	else if (*t_string == "color/blue") {
-		p->reflectivity = rgb_to_float(0, 128, 255);
-	}
-	else if (*t_string == "color/yellow") {
-		p->reflectivity = rgb_to_float(255, 242, 0);
-	}
-	else {
-		auto rflc_idx = t_string->find("dev/rflc");
-		if (rflc_idx != std::string::npos) {
-			int brightness = std::stoi(t_string->substr(t_string->size() - 2, 2));
-			p->reflectivity = vec3(brightness/100.0);
-		}
-		else {
-			p->reflectivity = default_reflectivity;
-		}
-	}
-
-	p->next = nullptr;
-}
-
-void make_patches()
-{
-	const brush_model_t* bm = &world->models[0];
-	for (int i = bm->face_start; i < bm->face_start + bm->face_count; i++) {
-		patch_for_face(i);
-	}
-}
-
-static int failed_subdivide = 0;
-void subdivide_patch(patch_t* p)
-{
-	vec3 min, max;
-	winding_t front, back;
-	get_extents(p->winding, min, max);
-	int i;
-	for (i = 0; i < 3; i++) {
-		// Quake 2 had the patch grid as an actual grid thats not relative to a specific patch
-		// However this leads to some really small patches, more matches no matter the size tank performance (n^2)
-		// Instead make it relative to the face
-		if (min[i]+patch_grid+(patch_grid) <= max[i]) {
-			plane_t split;
-			split.normal = vec3(0);
-			split.normal[i] = 1.f;
-			split.d = -(min[i]+ patch_grid);
-			bool res = try_split_winding(p->winding, split, front, back);
-			if (res) {
-				break;
-			}
-			failed_subdivide++;
-		}
-	}
-	if (i == 3) {
-		return;
-	}
-
-	assert(num_patches < MAX_PATCHES);
-	patch_t* new_p = &patches[num_patches++];
-
-	new_p->next = p->next;
-	p->next = new_p;
-
-	p->winding = front;
-	new_p->winding = back;
-
-	new_p->face = p->face;
-
-	p->center = p->winding.get_center();
-	new_p->center = new_p->winding.get_center();
-	p->area = p->winding.get_area();
-	new_p->area = new_p->winding.get_area();
-
-	new_p->reflectivity = p->reflectivity;
-
-	new_p->sample_light = p->sample_light;
-	new_p->total_light = p->total_light;
-	new_p->emission = p->emission;
-
-
-	subdivide_patch(p);
-	subdivide_patch(new_p);
-
-}
-void subdivide_patches()
-{
-	int num = num_patches;
-	for (int i = 0; i < num; i++) {
-		subdivide_patch(&patches[i]);
-	}
-	printf("Failed num: %d\n", failed_subdivide);
-}
-
-
 void create_patch_view(PatchDebugMode mode)
 {
 	using VP = VertexP;
@@ -465,7 +338,7 @@ void create_patch_view(PatchDebugMode mode)
 			color = random_color();
 			break;
 		case PDM::AREA:
-			color = vec3(p->area / (patch_grid*patch_grid*5.f));
+			color = vec3(p->area / (config.patch_grid*config.patch_grid*5.f));
 			break;
 		case PDM::LIGHTCOLOR:
 			color = p->sample_light;
@@ -500,7 +373,7 @@ struct TempTransfer
 	int patch_idx;
 	float transfer_amt;
 };
-
+#if 0
 void make_transfers(int patch_num)
 {
 	patch_t* patch = &patches[patch_num];
@@ -566,89 +439,6 @@ void make_transfers(int patch_num)
 }
 
 
-struct PatchHitAndDir
-{
-	int patch_hit;
-	vec3 direction;
-};
-
-void sample_ambient_cubes(int cube_num)
-{
-	vec3 point = ambient_cubes[cube_num];
-	AmbCubeTransfer* act = &amb_cube_transfers[cube_num];
-
-	std::vector<PatchHitAndDir> patch_hits;
-	int backface_hits = 0;
-	for (int i = 0; i < NUM_PATCH_RAYCASTS; i++)
-	{
-		vec3 direction = sample_hemisphere_uniform(vec3(0, 1, 0), i, NUM_PATCH_RAYCASTS);
-		for (int j = 0; j < 2; j++)
-		{
-			// sample full sphere
-			direction = (j == 0) ? direction : -direction;
-			trace_t res = global_world.tree.test_ray_fast(point, point + direction * 300.f, -0.005, 0.005);
-			if (!res.hit || tinfo[faces[res.face].t_info_idx].flags & SURF_SKYBOX) {
-				patch_hits.push_back({ -1,direction });	// Sky index
-				continue;
-			}
-			if (res.hit_backface()) {
-				backface_hits++;
-				if (backface_hits >= 15) {
-					act->inside_wall = true;
-					return;
-				}
-				continue;
-			}
-
-			// Find patch that was hit
-			patch_t* p = face_patches[res.face];
-			while (p)
-			{
-				if (p->winding.point_inside(res.end_pos)) break;
-				p = p->next;
-			}
-			if (p == nullptr) {
-				//printf("Face hit but patch not found\n");
-				continue;
-			}
-			patch_t* other = p;
-			int patch_idx = (long long(other) - (long long)&patches[0]) / sizeof(patch_t);
-			patch_hits.push_back({ patch_idx,direction });
-		}
-	}
-
-	for (int i = 0; i < 6; i++)
-	{
-		float total = 0.0;
-
-		AmbCubeTransfer::CubeSide* cs = &act->sides[i];
-		cs->total_light = vec3(0.0);
-		vec3 side_normal = vec3(0);
-		int dig = i / 2;
-		side_normal[dig] = (i & 1) ? -1.0 : 1.0;
-
-		for (int j = 0; j < patch_hits.size(); j++)
-		{
-			float cos_theta = dot(patch_hits[j].direction, side_normal);
-			if (cos_theta <= 0)
-				continue;
-
-			total += cos_theta;
-			if (patch_hits[j].patch_hit == -1) {
-				cs->total_light += sky_color * cos_theta;
-				continue;
-			}
-
-			patch_t* ph = &patches[patch_hits[j].patch_hit];
-			cs->total_light += ((ph->total_light + ph->sample_light) * ph->reflectivity) * cos_theta;
-		}
-
-		cs->total_light /= total;
-	}
-
-}
-
-
 
 void start_radiosity()
 {
@@ -662,7 +452,7 @@ void start_radiosity()
 		{
 			vec3 total = vec3(0.0);
 			patch_t* p = &patches[j];
-			total += p->sky_visibility * sky_color;
+			total += p->sky_visibility * GetSky().sky_color;
 
 			for (int t = 0; t < p->num_transfers; t++)
 			{
@@ -684,7 +474,7 @@ void start_radiosity()
 
 }
 
-
+#endif
 void free_patches()
 {
 	for (int i = 0; i < num_patches; i++) {
@@ -775,7 +565,7 @@ void find_coplanar_faces()
 	printf("Num unique planes: %d\n", num_unique_planes);
 }
 
-
+#if 0
 void add_sample_to_patch(vec3 point, vec3 color, int face_num)
 {
 	patch_t* patch = face_patches[face_num];
@@ -800,6 +590,7 @@ void add_sample_to_patch(vec3 point, vec3 color, int face_num)
 		patch = patch->next;
 	}
 }
+#endif
 
 // Lots of help from Quake's LTFACE.c 
 
@@ -850,8 +641,8 @@ float sample_ofs[4][2] = { {1,1},{1,-1},{-1,-1},{-1,1} };
 
 void calc_points(LightmapState& l, Image& img)
 {
-	int h = l.tex_size[1] * density_per_unit + 1;
-	int w = l.tex_size[0] * density_per_unit + 1;
+	int h = l.tex_size[1] * config.pixel_density + 1;
+	int w = l.tex_size[0] * config.pixel_density + 1;
 	float start_u = l.exact_min[0];	
 	float start_v = l.exact_min[1];
 	l.numpts = h * w;
@@ -911,8 +702,9 @@ void calc_points(LightmapState& l, Image& img)
 				//			no, point is good
 				//			yes, find closest point on face winding, move sample to that position
 
-					auto trace_res = global_world.tree.test_ray_fast(point, face_mid);
-				if (!wind.point_inside(point)||trace_res.hit) {
+				//	auto trace_res = global_world.tree.test_ray_fast(point, face_mid);
+				bool inside =  brush_tree.PointInside(point);
+				if (!wind.point_inside(point)||inside) {
 					//if (trace_res.hit) {
 					//	point = wind.closest_point_on_winding(point);
 					//}
@@ -1038,17 +830,17 @@ void CalculateDirtMap(LightmapState* l)
 
 		vec3 sample_pos = l->sample_points[j];
 		float occlusion = 0;
-		for (int i = 0; i < num_dirt_vectors; i++) {
-			vec3 dirtvec = sample_hemisphere_cos(l->face->plane.normal, i, num_dirt_vectors);
-			auto res = global_world.tree.test_ray_fast(sample_pos, sample_pos + dirtvec * dirt_dist);
+		for (int i = 0; i < config.num_dirt_vectors; i++) {
+			vec3 dirtvec = sample_hemisphere_cos(l->face->plane.normal, i, config.num_dirt_vectors);
+			auto res = global_world.tree.test_ray_fast(sample_pos, sample_pos + dirtvec * config.dirt_dist);
 			if (res.hit) {
-				occlusion += min(dirt_dist, res.length);
+				occlusion += min(config.dirt_dist, res.length);
 			}
 			else {
-				occlusion += dirt_dist;
+				occlusion += config.dirt_dist;
 			}
 		}
-		l->occlusion[j] = occlusion / (num_dirt_vectors * dirt_dist);
+		l->occlusion[j] = occlusion / (config.num_dirt_vectors * config.dirt_dist);
 	}
 }
 
@@ -1067,7 +859,7 @@ void CalcFaceDirectLighting(LightmapState* l, const light_t* light)
 		if (sqred_dist > light->brightness * light->brightness)
 			continue;
 
-		trace_t res = global_world.tree.test_ray_fast(sample_pos, light->pos, -0.005f, 0.005f);
+		trace_t res = global_world.tree.test_ray_fast(sample_pos, light->pos);
 		if (res.hit)
 			continue;
 
@@ -1097,18 +889,18 @@ void light_face(int num)
 	calc_extents(l);
 
 	calc_points(l, img);
-	if(using_dirt)
+	if(config.using_dirt)
 		CalculateDirtMap(&l);
 
 
-	for (const auto& light : lights) {
+	for (const auto& light : LightList()) {
 		CalcFaceDirectLighting(&l, &light);
 	}
 
-	if (using_dirt) {
+	if (config.using_dirt) {
 		for (int s = 0; s < l.sample_points.size(); s++) {
 			if (l.occluded[s])continue;
-			l.pixel_colors[s] *= l.occlusion[s];
+			l.pixel_colors[s] *=l.occlusion[s];
 		}
 	}
 
@@ -1284,6 +1076,7 @@ void light_face(int num)
 #endif
 
 }
+#if 0
 void final_light_face(int face_num)
 {
 	face_t* face = &faces[face_num];
@@ -1327,7 +1120,7 @@ void final_light_face(int face_num)
 	delete[] fl->pixel_colors;
 	delete[] fl->sample_points;
 }
-
+#endif
 
 PackNode* insert_imgage(PackNode* pn, const Image* img)
 {
@@ -1391,141 +1184,6 @@ void append_to_lightmap(const PackNode* pn, const Image* img)
 
 }
 
-void add_lights(worldmodel_t* wm)
-{
-	std::string work_str;
-	work_str.reserve(64);
-	for (int i = 0; i < wm->entities.size(); i++) {
-		entity_t* ent = &wm->entities.at(i);
-		auto find = ent->properties.find("classname");
-		vec3 color = vec3(1.0);
-		float brightness = 200;
-		light_t l;
-		
-		if (find->second == "light_torch_small_walltorch") {
-			color = vec3(1.0, 0.3, 0.0);
-			brightness = 100;
-			l.type = LIGHT_POINT;
-
-			//continue;
-		}
-		else if (find->second == "light_flame_large_yellow") {
-			color = vec3(1.0, 0.5, 0.0);
-			brightness = 400;
-			l.type = LIGHT_POINT;
-
-			//continue;
-		}
-		else if (find->second == "light") {
-			l.type = LIGHT_POINT;
-		}
-		else if (find->second == "light_fluoro") {
-			color = vec3(0.8, 0.8, 1.0);
-			l.type = LIGHT_POINT;
-
-		}
-		else if (find->second == "spot_light") {
-			l.type = LIGHT_SPOT;
-		}
-		else {
-			continue;
-		}
-
-		work_str = ent->properties.find("origin")->second;
-		vec3 org;
-		sscanf_s(work_str.c_str(), "%f %f %f", &org.x, &org.y, &org.z);
-		org /= 32.f;	// scale down
-
-		org = vec3(-org.x, org.z, org.y);
-
-		auto brightness_str = ent->properties.find("light");
-		if (brightness_str != ent->properties.end()) {
-			work_str = brightness_str->second;
-			brightness = std::stoi(work_str);
-		}
-		brightness /= 32.f;
-
-		// "color" isn't in Quake's light entities, but it is in my own format
-		auto color_str = ent->properties.find("color");
-		if (color_str != ent->properties.end()) {
-			work_str = ent->properties.find("color")->second;
-			sscanf_s(work_str.c_str(), "%f %f %f", &color.r, &color.g, &color.b);
-		}
-		l.pos = org;
-		l.color = color;
-		l.brightness = brightness;
-		
-		if (l.type == LIGHT_SPOT) {
-			float width = std::stof(ent->properties.find("width")->second);
-			width = cos(radians(width));
-			l.width = width;
-
-			std::string angle = ent->properties.find("mangle")->second;
-			int angles[3];
-			sscanf_s(angle.c_str(), "%d %d %d", &angles[0], &angles[1], &angles[2]);
-
-			vec3 dir = vec3(0);
-			dir.x = cos(radians((float)angles[1])) * cos((radians((float)angles[0])));
-			dir.y = sin((radians((float)angles[0])));
-			dir.z = -sin(radians((float)angles[1])) * cos(radians((float)angles[0]));
-
-			l.normal = -dir;
-		}
-
-		lights.push_back(l);
-	}
-	for (int i = 0; i < num_faces; i++)
-	{
-		const face_t* face = &faces[i];
-		texture_info_t* ti = tinfo + face->t_info_idx;
-		if (!(ti->flags & SURF_EMIT)) {
-			continue;
-		}
-
-		light_t l;
-		// brightness value is stored in the x texture scale
-		l.brightness = ti->uv_scale[0];
-		l.color = vec3(1.f);
-		l.type = LIGHT_SURFACE;
-		l.normal = face->plane.normal;
-		vec3 center = vec3(0);
-		for (int j = 0; j < face->v_count; j++) {
-			center += verts[face->v_start + j];
-		}
-		center /= (float)face->v_count;
-		l.face_idx = i;
-
-		lights.push_back(l);
-	}
-
-	for (const auto& e : world->entities)
-	{
-		if (e.get_classname() != "enviorment_light")
-			continue;
-
-		std::string angle = e.properties.find("mangle")->second;
-		int angles[3];
-		sscanf_s(angle.c_str(), "%d %d %d", &angles[0], &angles[1], &angles[2]);
-
-		vec3 sun_direction = vec3(0);
-		sun_direction.x = cos(radians((float)angles[1])) * cos((radians((float)angles[0])));
-		sun_direction.y = sin((radians((float)angles[0])));
-		sun_direction.z = -sin(radians((float)angles[1])) * cos(radians((float)angles[0]));
-
-		light_t l;
-		l.type = LIGHT_SUN;
-		l.brightness = std::stoi(e.properties.find("brightness")->second);
-		l.color = rgb_to_float(253, 243, 208);
-		l.normal = -normalize(sun_direction);
-		
-		env_light_index = lights.size();
-		
-		lights.push_back(l);
-		break;
-	}
-
-
-}
 void mark_bad_faces()
 {
 	const brush_model_t* bm = &world->models[0];
@@ -1549,57 +1207,25 @@ void mark_bad_faces()
 	}
 }
 
-void ambient_voxel_debug()
-{
-	for (int i = 0; i < amb_cube_transfers.size(); i++)
-	{
-		vec3 point = ambient_cubes.at(i);
-		auto& act = amb_cube_transfers.at(i);
-		if (act.inside_wall)
-			continue;
-		vec3 colors[6];
-		colors[0] = act.sides[0].total_light;// x
-		colors[1] = act.sides[1].total_light;// -x
-		colors[2] = act.sides[2].total_light;// y
-		colors[3] = act.sides[3].total_light;// -y
-		colors[4] = act.sides[4].total_light;// z
-		colors[5] = act.sides[5].total_light;// -
-
-		voxels.add_solid_box(point - vec3(0.25), point + vec3(0.25), colors);
-	}
-}
-
-void add_manual_ambient_cubes()
-{
-	for (const auto& ent : world->entities) {
-		auto classname = ent.properties.find("classname");
-		if (classname == ent.properties.end())
-			continue;
-		if (classname->second != "AmbientCube")
-			continue;
-
-		vec3 origin = ent.get_transformed_origin();
-
-		ambient_cubes.push_back(origin);
-	}
-}
-
 
 void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 {
-	patch_grid = settings.patch_grid;
-	density_per_unit = settings.pixel_density;
-	enable_radiosity = settings.enable_radiosity;
-	test_patch_visibility = settings.test_patch_visibility;
-	inside_map = settings.inside_map;
-	num_bounces = settings.num_bounces;
-	default_reflectivity = settings.default_reflectivity;
-	no_direct = settings.no_direct;
-	RADIAL = patch_grid * 4.f;
-	RADIALSQRT = sqrt(RADIAL);
-	NUM_PATCH_RAYCASTS = settings.samples_per_patch;
+	config = settings;
 
-	sky_color = rgb_to_float(124, 138, 203);
+
+	//patch_grid = settings.patch_grid;
+	//density_per_unit = settings.pixel_density;
+	//enable_radiosity = settings.enable_radiosity;
+	//test_patch_visibility = settings.test_patch_visibility;
+	//inside_map = settings.inside_map;
+	//num_bounces = settings.num_bounces;
+	//default_reflectivity = settings.default_reflectivity;
+	//no_direct = settings.no_direct;
+	//RADIAL = patch_grid * 4.f;
+	//RADIALSQRT = sqrt(RADIAL);
+	//NUM_PATCH_RAYCASTS = settings.samples_per_patch;
+
+	GetSky().sky_color = RGBToFloat(124, 138, 203);
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 2; j++) {
 			sample_ofs[i][j] *= settings.sample_ofs;
@@ -1616,13 +1242,6 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	// Used for random debug colors
 	srand(time(NULL));
 
-	//Voxelizer vox(wm, 1.0,2);
-	//vox.move_final_samples(ambient_cubes);
-	//add_manual_ambient_cubes();
-	//amb_cube_transfers.resize(ambient_cubes.size());
-
-
-
 	faces = wm->faces.data();
 	num_faces = wm->faces.size();
 
@@ -1635,18 +1254,21 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	tex_strings = wm->texture_names.data();
 	num_tex_strings = wm->texture_names.size();
 
+	brush_tree.Build(wm,0,wm->map_brushes.size());
 	
-	if (inside_map) {
+	if (config.inside_map) {
 		mark_bad_faces();
 	}
 
-	if (enable_radiosity) {
+	if (config.enable_radiosity) {
 		find_coplanar_faces();
-		make_patches();
-		subdivide_patches();
+		//make_patches();
+		//subdivide_patches();
+		MakePatches();
+		SubdividePatches();
 	}
 
-	add_lights(wm);
+	AddLightEntities(wm);
 
 	printf("Total patches: %u\n", num_patches);
 
@@ -1663,19 +1285,15 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	printf("Total raycasts: %u\n", total_rays_cast);
 	printf("Face lighting time: %u\n", SDL_GetTicks() - start_light_face);
 
-	if (enable_radiosity) {
+	if (config.enable_radiosity) {
 		printf("Making transfers...\n");
 
-		run_threads_on_function(&make_transfers, 0, num_patches);
+		//run_threads_on_function(&make_transfers, 0, num_patches);
 
 		printf("Finished transfers\n");
 
 		printf("Bouncing light...\n");
-		start_radiosity();
-
-		for (int i = 0; i < amb_cube_transfers.size(); i++) {
-			sample_ambient_cubes(i);
-		}
+		//start_radiosity();
 	}
 
 	//printf("Final light pass...\n");
@@ -1749,7 +1367,6 @@ void create_light_map(worldmodel_t* wm, LightmapSettings settings)
 	}
 
 
-	ambient_voxel_debug();
 
 	free_patches();
 }

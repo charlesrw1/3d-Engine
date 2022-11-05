@@ -188,11 +188,36 @@ void Editor::handle_event(SDL_Event& event)
 	}
 
 }
+
+bool is_inside_brush()
+{
+	const vec3 cam_pos = global_app.scene->active_camera()->position;
+	for (int i = 0; i < global_world.wm->map_brushes.size(); i++) {
+		const mapbrush_t* brush = &global_world.wm->map_brushes[i];
+		bool inside = true;
+		for (int j = 0; j < brush->num_faces; j++) {
+			plane_t p = global_world.wm->brush_sides[brush->face_start + j];
+			if (p.dist(cam_pos) > 0) {
+				inside = false;
+				break;
+			}
+		}
+		if (inside)
+			return true;
+	}
+
+	return false;
+}
+
 void Editor::on_update()
 {
 	if (game_focused) {
 		global_app.scene->active_camera()->keyboard_update(SDL_GetKeyboardState(0));
 	}
+	//if (is_inside_brush())
+	//	printf("INSIDE BRUSH\n");
+	//else
+	//	printf("OUTSIDE\n");
 	//shoot_ray();
 }
 #include <chrono>

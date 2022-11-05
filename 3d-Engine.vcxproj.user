@@ -1,19 +1,19 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommandArguments>-lmdensity 4.0 -patchgrid 1.0 -norad -quakefmt e1m1.map</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-patchgrid 1.0 -lmdensity 4.0 -outdoors -norad m2.map</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>-lmdensity 4.0 -patchgrid 1.0 -norad -quakefmt e1m1.map</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-patchgrid 1.0 -lmdensity 4.0 -outdoors -norad m2.map</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>-patchgrid 4.0 temple.map</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-patchgrid 1.0 -lmdensity 1.0 -outdoors -norad m2.map</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-patchgrid 4.0 temple.map</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-patchgrid 1.0 -lmdensity 1.0 -outdoors -norad m2.map</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

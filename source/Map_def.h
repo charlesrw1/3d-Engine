@@ -45,6 +45,7 @@ struct mapbrush_t
 
 	int contents = 0;
 	int surf_types = 0;
+	int model_index;
 
 	vec3 min, max;
 };
@@ -136,7 +137,10 @@ struct worldmodel_t
 	std::vector<Texture*> textures;
 	std::vector<std::string> texture_names;
 	std::vector<entity_t> entities;
-
+	 
+	/* Unmodified brush data for determining inside/outside */
+	std::vector<plane_t> brush_sides;
+	std::vector<mapbrush_t> map_brushes;
 
 	std::vector<AmbientCube> ambient_grid;
 };

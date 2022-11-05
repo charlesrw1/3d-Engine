@@ -33,6 +33,9 @@ public:
 	// Can call CSG union with a new filter to make a collision mesh with clip brushes
 	void move_to_worldmodel(worldmodel_t* wm) {
 		assert(wm);
+		
+		move_mapbrushes(wm);
+
 		wm->name = map_name;
 		wm->faces = std::move(face_list);
 		wm->entities = std::move(entities);
@@ -61,6 +64,8 @@ private:
 	std::vector<mapface_t> faces;
 
 	enum Result { R_GOOD, R_FAIL, R_EOF };
+
+	void move_mapbrushes(worldmodel_t* wm);
 
 	void parse_file();
 

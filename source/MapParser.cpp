@@ -23,7 +23,31 @@ static bool intersect_3_planes(const plane_t& p1, const plane_t& p2, const plane
 	res = (-p1.d * cross(p2.normal, p3.normal) - p2.d * cross(p3.normal, p1.normal) - p3.d * cross(p1.normal, p2.normal)) / denom;
 	return true;
 }
+void MapParser::move_mapbrushes(worldmodel_t* wm)
+{
+	for (int i = 0; i < entities.size(); i++) {
+		if (entities.at(i).brush_count == 0) continue;
 
+		for (int j = 0; j < entities[i].brush_count; j++) {
+			mapbrush_t* b = &brushes[entities[i].brush_start+j];
+			b->model_index = j;
+			b->min /= 32.f;
+			b->min = vec3(-b->min.x, b->min.z, b->min.y);
+			b->max /= 32.f;
+			b->max = vec3(-b->max.x, b->max.z, b->max.y);
+			float temp = b->min.x;
+			b->min.x = b->max.x;
+			b->max.x = temp;
+			for (int k = 0; k < b->num_faces; k++) {
+				plane_t p = faces[b->face_start + k].plane;
+				p.normal = vec3(-p.normal.x, p.normal.z, p.normal.y);
+				p.d /= 32.f;
+				wm->brush_sides.push_back(p);
+			}
+		}
+	}
+	wm->map_brushes = std::move(brushes);
+}
 void MapParser::start_file(std::string file)
 {
 	std::cout << "Parsing .map file, " << file << "...\n";

@@ -19,10 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="PATCH.cpp" />
     <ClCompile Include="source\app.cpp" />
     <ClCompile Include="source\BrushCSG.cpp" />
     <ClCompile Include="source\BSPtree.cpp" />
+    <ClCompile Include="source\BVHTREE.cpp" />
     <ClCompile Include="source\camera.cpp" />
     <ClCompile Include="source\deps\glad.c" />
     <ClCompile Include="source\deps\imgui.cpp" />
@@ -36,11 +36,14 @@
     <ClCompile Include="source\ForwardPlus.cpp" />
     <ClCompile Include="source\Geometry.cpp" />
     <ClCompile Include="source\Light.cpp" />
+    <ClCompile Include="source\LIGHTENT.cpp" />
+    <ClCompile Include="source\LMBUFFER.cpp" />
     <ClCompile Include="source\main.cpp" />
     <ClCompile Include="source\MapParser.cpp" />
     <ClCompile Include="source\ModelManager.cpp" />
     <ClCompile Include="source\Model_def.cpp" />
     <ClCompile Include="source\opengl_api.cpp" />
+    <ClCompile Include="source\PATCH.cpp" />
     <ClCompile Include="source\renderer.cpp" />
     <ClCompile Include="source\TextureManager.cpp" />
     <ClCompile Include="source\Texture_def.cpp" />
@@ -50,8 +53,8 @@
     <ClCompile Include="source\WorldGeometry.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PATCH.h" />
     <ClInclude Include="source\app.h" />
+    <ClInclude Include="source\BVHTREE.h" />
     <ClInclude Include="source\camera.h" />
     <ClInclude Include="source\deps\include\glad\glad.h" />
     <ClInclude Include="source\deps\include\imconfig.h" />
