@@ -57,7 +57,7 @@ enum class PatchDebugMode
 	RADCOLOR,
 	VARIANCE,
 };
-void set_patch_debug(PatchDebugMode mode);
+
 
 // Radiosity of i = Emitted of i + Reflectance of i * sum[Form factor of i to j * Radiosity of j]
 struct transfer_t
@@ -127,25 +127,17 @@ extern const BrushTree* GetBrushTree();
 extern const worldmodel_t* GetWorld();
 extern vec3 CalcDirectLightingAtPoint(vec3 point, vec3 normal);
 extern const LightmapSettings* GetConfig();
+extern vec3 RGBToFloat(unsigned char r, unsigned char b, unsigned char g);
 
 /* LIGHTENT.cpp */
 extern void AddLightEntities(worldmodel_t* world);
 extern std::vector<light_t>& LightList();
 extern Skylight& GetSky();
 
- vec3 RGBToFloat(unsigned char r, unsigned char b, unsigned char g);
-
 
  /* PATCH.cpp */
  extern std::vector<patch_t> patches;
  extern void MakePatches();
-
- /* LMBUFFER.cpp */
-
- class Lightmap
- {
-
- };
 
 
 #endif // !LIGHT_H
